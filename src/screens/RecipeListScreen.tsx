@@ -1,0 +1,286 @@
+/**
+ * RECIPE LIST SCREEN
+ * Overzicht van alle recepten met zoek- en filterfunctionaliteit.
+ */
+
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ActivityIndicator,
+  FlatList,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors, radius, spacing, shadows } from '../constants/theme';
+import { RecipeCard } from '../components/RecipeCard';
+import { useToast } from '../components/Toast';
+import {
+  getRecipes,
+  getAllRatings,
+  getFavoriteRecipeIds,
+  toggleFavorite,
+} from '../lib/store';
+import { useUser } from '../context/UserContext';
+import { ALLERGENS, MEAL_MOMENTS } from '../constants/data';
+import type { Recipe, RatingSummary } from '../types';
+
+export function RecipeListScreen({ navigation }: any) {
+  const { user } = useUser();
+  const { show } = useToast();
+
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [ratings, setRatings] = useState<Record<string, RatingSummary>>({});
+  const [favIds, setFavIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [search, setSearch] = useState('');
+  const [momentFilter, setMomentFilter] = useState('');
+  const [allergenFilter, setAllergenFilter] = useState('');
+
+  const loadData = useCallback(async () => {
+    try {
+      const [r, rt, favs] = await Promise.all([
+        getRecipes(),
+        getAllRatings(),
+        getFavoriteRecipeIds(user),
+      ]);
+      setRecipes(r);
+      setRatings(rt);
+      setFavIds(favs);
+    } catch (err: any) {
+      show('Fout bij laden: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user, show]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleToggleFav = useCallback(
+    async (recipeId: string) => {
+      try {
+        const isFav = await toggleFavorite(recipeId, user);
+        setFavIds(prev =>
+          isFav ? [...prev, recipeId] : prev.filter(id => id !== recipeId)
+        );
+      } catch (err: any) {
+        show('Fout: ' + err.message, 'error');
+      }
+    },
+    [user, show]
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return recipes.filter(r => {
+      if (q && !r.name.toLowerCase().includes(q)) return false;
+      if (momentFilter && !(r.mealMoments || []).includes(momentFilter)) return false;
+      if (allergenFilter && (r.allergens || []).includes(allergenFilter)) return false;
+      return true;
+    });
+  }, [recipes, search, momentFilter, allergenFilter]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Recepten laden...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.toolbar}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="🔍  Zoek recepten..."
+          placeholderTextColor={colors.gray}
+          value={search}
+          onChangeText={setSearch}
+        />
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          <FilterChip
+            label="Alle eetmomenten"
+            active={momentFilter === ''}
+            onPress={() => setMomentFilter('')}
+          />
+          {MEAL_MOMENTS.map(m => (
+            <FilterChip
+              key={m.id}
+              label={m.label}
+              active={momentFilter === m.id}
+              onPress={() => setMomentFilter(m.id)}
+            />
+          ))}
+        </ScrollView>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          <FilterChip
+            label="Geen allergenen filter"
+            active={allergenFilter === ''}
+            onPress={() => setAllergenFilter('')}
+          />
+          {ALLERGENS.map(a => (
+            <FilterChip
+              key={a}
+              label={`zonder ${a}`}
+              active={allergenFilter === a}
+              onPress={() => setAllergenFilter(a)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
+      <FlatList
+        data={filtered}
+        keyExtractor={r => r.id}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadData();
+            }}
+            tintColor={colors.primary}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>📭</Text>
+            <Text style={styles.emptyTitle}>Geen recepten gevonden</Text>
+            <Text style={styles.emptyText}>Probeer een andere zoekterm of filter.</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <RecipeCard
+            recipe={item}
+            rating={ratings[item.id]}
+            isFavorite={favIds.includes(item.id)}
+            onPress={() => navigation.navigate('RecipeDetail', { id: item.id })}
+            onToggleFavorite={() => handleToggleFav(item.id)}
+          />
+        )}
+      />
+    </SafeAreaView>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, active && styles.chipActive]}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  center: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    color: colors.gray,
+  },
+  toolbar: {
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.white,
+    ...shadows.sm,
+  },
+  searchInput: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 2,
+    borderColor: colors.light,
+    backgroundColor: colors.white,
+    fontSize: 14,
+    color: colors.dark,
+  },
+  chipRow: {
+    paddingHorizontal: spacing.lg,
+    gap: 6,
+    paddingVertical: 4,
+  },
+  chip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: colors.light,
+    borderRadius: radius.sm,
+    marginRight: 6,
+  },
+  chipActive: {
+    backgroundColor: colors.primary,
+  },
+  chipText: {
+    fontSize: 12,
+    color: colors.dark,
+    fontWeight: '500',
+  },
+  chipTextActive: {
+    color: colors.white,
+  },
+  list: {
+    padding: spacing.lg,
+    paddingBottom: 100,
+  },
+  empty: {
+    padding: spacing.xxl,
+    alignItems: 'center',
+  },
+  emptyIcon: {
+    fontSize: 56,
+    marginBottom: spacing.md,
+    opacity: 0.4,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.darkLight,
+    marginBottom: spacing.sm,
+  },
+  emptyText: {
+    color: colors.gray,
+    textAlign: 'center',
+  },
+});
