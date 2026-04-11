@@ -30,7 +30,7 @@ import {
   toggleFavorite,
   rateRecipe,
   addComment,
-} from '../lib/store';
+} from '../services';
 import type { Recipe, RatingSummary, Comment } from '../types';
 import { getMealMomentLabel } from '../constants/data';
 

@@ -1,21 +1,20 @@
 /**
- * SHOPPING LIST SCREEN
+ * SHOPPING LIST SELECTION SCREEN
  *
- * Visuele boodschappenlijst voor een opgeslagen weekschema.
+ * Stap 1 van het boodschappenlijst-proces. De gebruiker komt
+ * hier terecht via de knop "Genereer boodschappenlijst" onder
+ * een opgeslagen weekschema in de Favorieten-tab.
  *
- * Werking:
- *  1. Eerst kiest de gebruiker welke dagen / eetmomenten meegenomen
- *     worden (alle aangevinkt by default).
- *  2. Klik op "Genereer" → ingrediënten worden samengevoegd uit alle
- *     geselecteerde recepten en getoond als vierkante tegels met
- *     emoji-icoon en hoeveelheid.
- *  3. Tik op een tegel → ingrediënt verhuist naar de "In winkelmandje"
- *     lijst onderaan en wordt rood/doorstreept.
- *  4. Tik op een tegel in het mandje → terug naar de "Nog te kopen"
- *     lijst (voor het geval je per ongeluk klikte).
+ *  1. Eerst kiest de gebruiker welke dagen / eetmomenten
+ *     meegenomen worden (alle aangevinkt by default).
+ *  2. Klik op "Genereer" → ingrediënten worden samengevoegd uit
+ *     alle geselecteerde recepten en opgeslagen in de
+ *     ShoppingListContext (en in AsyncStorage).
+ *  3. De app navigeert automatisch naar de "Boodschappenlijst"
+ *     tab onderaan, waar de visuele tegels staan.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -25,30 +24,26 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CommonActions } from '@react-navigation/native';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
-import { getSchedule, getRecipesByIds } from '../lib/store';
+import { UsernameHeader } from '../components/UsernameHeader';
+import { getSchedule, getRecipesByIds } from '../services';
 import {
   WEEKDAYS,
   SCHEDULE_SLOTS,
-  type Weekday,
-  type ScheduleSlotId,
 } from '../constants/data';
 import { getIngredientIcon } from '../constants/ingredientIcons';
+import {
+  useShoppingList,
+  type AggregatedIngredient,
+} from '../context/ShoppingListContext';
 import type { Schedule, Recipe } from '../types';
-
-interface AggregatedIngredient {
-  key: string;
-  name: string;
-  icon: string;
-  totalAmount: number;
-  unit: string;
-  isNumeric: boolean;
-}
 
 export function ShoppingListScreen({ route, navigation }: any) {
   const { id } = route.params;
   const { show } = useToast();
+  const { setList } = useShoppingList();
 
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [recipeMap, setRecipeMap] = useState<Map<string, Recipe>>(new Map());
@@ -56,14 +51,6 @@ export function ShoppingListScreen({ route, navigation }: any) {
 
   /* Selectie staat: welke (day, slot)-combinaties zijn aangevinkt? */
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  /* Gegenereerde ingrediëntenlijst (alleen ingevuld na "Genereer") */
-  const [ingredients, setIngredients] = useState<AggregatedIngredient[] | null>(
-    null
-  );
-
-  /* Welke ingrediënten zitten al in het mandje? Bewaar de keys. */
-  const [inBasket, setInBasket] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -75,7 +62,6 @@ export function ShoppingListScreen({ route, navigation }: any) {
       }
       setSchedule(sch);
 
-      /* Verzamel recipe-ids uit het schema */
       const ids = new Set<string>();
       WEEKDAYS.forEach(day => {
         SCHEDULE_SLOTS.forEach(slot => {
@@ -89,7 +75,6 @@ export function ShoppingListScreen({ route, navigation }: any) {
       recipes.forEach(r => map.set(r.id, r));
       setRecipeMap(map);
 
-      /* Selecteer standaard alle slots die een geldig recept hebben */
       const initial = new Set<string>();
       WEEKDAYS.forEach(day => {
         SCHEDULE_SLOTS.forEach(slot => {
@@ -150,7 +135,7 @@ export function ShoppingListScreen({ route, navigation }: any) {
     return 'partial';
   };
 
-  const generate = () => {
+  const generate = async () => {
     if (!schedule) return;
     if (selected.size === 0) {
       show('Selecteer minstens één maaltijd', 'error');
@@ -197,36 +182,25 @@ export function ShoppingListScreen({ route, navigation }: any) {
     const sorted = Array.from(map.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-    setIngredients(sorted);
-    setInBasket(new Set());
-    show(`${sorted.length} ingrediënten op je lijst!`);
-  };
 
-  const moveToBasket = (key: string) => {
-    setInBasket(prev => new Set(prev).add(key));
-  };
-
-  const moveBackToList = (key: string) => {
-    setInBasket(prev => {
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
+    /* Persisteer naar context (en AsyncStorage) */
+    await setList({
+      scheduleId: schedule.id,
+      scheduleName: schedule.name,
+      generatedAt: Date.now(),
+      ingredients: sorted,
+      basket: [],
     });
-  };
 
-  const formatAmount = (n: number) => {
-    if (Number.isInteger(n)) return n.toString();
-    return n.toFixed(1).replace('.', ',');
-  };
+    show(`${sorted.length} ingrediënten op je lijst!`);
 
-  const remainingItems = useMemo(
-    () => (ingredients || []).filter(i => !inBasket.has(i.key)),
-    [ingredients, inBasket]
-  );
-  const basketItems = useMemo(
-    () => (ingredients || []).filter(i => inBasket.has(i.key)),
-    [ingredients, inBasket]
-  );
+    /* Navigeer naar de Boodschappenlijst-tab onderaan */
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Boodschappenlijst',
+      })
+    );
+  };
 
   if (loading) {
     return (
@@ -240,6 +214,7 @@ export function ShoppingListScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <UsernameHeader subtitle="Boodschappenlijst genereren" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>← Terug</Text>
@@ -247,6 +222,16 @@ export function ShoppingListScreen({ route, navigation }: any) {
 
         <Text style={styles.title}>🛒 Boodschappenlijst</Text>
         <Text style={styles.subtitle}>{schedule.name}</Text>
+
+        <View style={styles.intro}>
+          <Text style={styles.introText}>
+            📋 Selecteer hieronder welke dagen en maaltijden je wil meenemen.
+            Na het genereren verschijnt je volledige boodschappenlijst in de
+            tab <Text style={styles.bold}>Boodschappenlijst</Text> onderaan
+            het scherm — met visuele tegels die je in je winkelmandje kunt
+            slepen.
+          </Text>
+        </View>
 
         {/* Selectie van dagen / maaltijden */}
         <View style={styles.section}>
@@ -321,68 +306,6 @@ export function ShoppingListScreen({ route, navigation }: any) {
             <Text style={styles.btnPrimaryText}>📋 Genereer Boodschappenlijst</Text>
           </Pressable>
         </View>
-
-        {/* Resultaat: ingrediënten als tegels */}
-        {ingredients && (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                Nog te kopen ({remainingItems.length})
-              </Text>
-              <Text style={styles.helper}>
-                Tik op een ingrediënt om het in je winkelmandje te leggen.
-              </Text>
-
-              {remainingItems.length === 0 ? (
-                <View style={styles.allDoneBox}>
-                  <Text style={styles.allDoneIcon}>🎉</Text>
-                  <Text style={styles.allDoneText}>Alles in het mandje!</Text>
-                </View>
-              ) : (
-                <View style={styles.tileGrid}>
-                  {remainingItems.map(item => (
-                    <IngredientTile
-                      key={item.key}
-                      item={item}
-                      inBasket={false}
-                      formatAmount={formatAmount}
-                      onPress={() => moveToBasket(item.key)}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                In winkelmandje ({basketItems.length})
-              </Text>
-              {basketItems.length === 0 ? (
-                <Text style={styles.helper}>
-                  Nog niets in het mandje. Tik hierboven op een ingrediënt
-                  om hem hier te plaatsen.
-                </Text>
-              ) : (
-                <>
-                  <Text style={styles.helper}>
-                    Per ongeluk getikt? Tik nog een keer om hem terug te zetten.
-                  </Text>
-                  <View style={styles.tileGrid}>
-                    {basketItems.map(item => (
-                      <IngredientTile
-                        key={item.key}
-                        item={item}
-                        inBasket
-                        formatAmount={formatAmount}
-                        onPress={() => moveBackToList(item.key)}
-                      />
-                    ))}
-                  </View>
-                </>
-              )}
-            </View>
-          </>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -398,42 +321,6 @@ function hasAnyRecipe(
     return rid && recipeMap.has(rid);
   });
 }
-
-function IngredientTile({
-  item,
-  inBasket,
-  formatAmount,
-  onPress,
-}: {
-  item: AggregatedIngredient;
-  inBasket: boolean;
-  formatAmount: (n: number) => string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={[styles.tile, inBasket && styles.tileBasket]}
-      onPress={onPress}
-    >
-      <Text style={[styles.tileIcon, inBasket && styles.tileIconBasket]}>
-        {item.icon}
-      </Text>
-      <Text
-        style={[styles.tileName, inBasket && styles.tileNameBasket]}
-        numberOfLines={2}
-      >
-        {item.name}
-      </Text>
-      <Text style={[styles.tileAmount, inBasket && styles.tileAmountBasket]}>
-        {item.isNumeric
-          ? `${formatAmount(item.totalAmount)} ${item.unit}`.trim()
-          : item.unit || '—'}
-      </Text>
-    </Pressable>
-  );
-}
-
-const TILE_SIZE = '31%';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
@@ -464,6 +351,23 @@ const styles = StyleSheet.create({
   subtitle: {
     color: colors.gray,
     marginBottom: spacing.lg,
+  },
+  intro: {
+    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.secondaryDark,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  introText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.darkLight,
+  },
+  bold: {
+    fontWeight: '700',
+    color: colors.primaryDark,
   },
   section: {
     backgroundColor: colors.white,
@@ -556,71 +460,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     alignItems: 'center',
     marginTop: spacing.md,
+    borderRadius: radius.md,
   },
   btnLg: {
     paddingVertical: 14,
   },
   btnPrimary: { backgroundColor: colors.primary },
   btnPrimaryText: { color: colors.white, fontWeight: '600', fontSize: 15 },
-  /* Tegel grid */
-  tileGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tile: {
-    width: TILE_SIZE,
-    aspectRatio: 1,
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: colors.light,
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileBasket: {
-    backgroundColor: 'rgba(192, 57, 43, 0.08)',
-    borderColor: colors.danger,
-  },
-  tileIcon: {
-    fontSize: 32,
-    marginBottom: 4,
-  },
-  tileIconBasket: {
-    opacity: 0.6,
-  },
-  tileName: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.dark,
-    textAlign: 'center',
-  },
-  tileNameBasket: {
-    color: colors.danger,
-    textDecorationLine: 'line-through',
-  },
-  tileAmount: {
-    fontSize: 10,
-    color: colors.gray,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  tileAmountBasket: {
-    color: colors.danger,
-    textDecorationLine: 'line-through',
-  },
-  allDoneBox: {
-    padding: spacing.xl,
-    alignItems: 'center',
-  },
-  allDoneIcon: {
-    fontSize: 56,
-    marginBottom: spacing.sm,
-  },
-  allDoneText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.secondaryDark,
-  },
 });

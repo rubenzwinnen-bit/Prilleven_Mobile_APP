@@ -19,12 +19,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { RecipeCard } from '../components/RecipeCard';
 import { useToast } from '../components/Toast';
+import { UsernameHeader } from '../components/UsernameHeader';
 import {
   getRecipes,
   getAllRatings,
   getFavoriteRecipeIds,
   toggleFavorite,
-} from '../lib/store';
+} from '../services';
 import { useUser } from '../context/UserContext';
 import { ALLERGENS, MEAL_MOMENTS } from '../constants/data';
 import type { Recipe, RatingSummary } from '../types';
@@ -100,6 +101,7 @@ export function RecipeListScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <UsernameHeader subtitle="Recepten" />
       <View style={styles.toolbar}>
         <TextInput
           style={styles.searchInput}

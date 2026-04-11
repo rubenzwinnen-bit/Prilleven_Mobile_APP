@@ -23,7 +23,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
-import { getRecipes, saveSchedule } from '../lib/store';
+import { UsernameHeader } from '../components/UsernameHeader';
+import { getRecipes, saveSchedule } from '../services';
 import {
   ALLERGENS,
   WEEKDAYS,
@@ -216,8 +217,17 @@ export function WeekScheduleScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <UsernameHeader subtitle="Weekschema" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Weekschema Generator</Text>
+        <View style={styles.intro}>
+          <Text style={styles.introText}>
+            💡 Bewaar je weekschema in <Text style={styles.bold}>Favorieten</Text> en
+            genereer er nadien een <Text style={styles.bold}>boodschappenlijst</Text> van.
+            Die verschijnt automatisch in de tab{' '}
+            <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
+          </Text>
+        </View>
 
         <View style={styles.controls}>
           <Text style={styles.subTitle}>Allergenen uitsluiten</Text>
@@ -403,6 +413,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.dark,
     marginBottom: spacing.md,
+  },
+  intro: {
+    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.secondaryDark,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  introText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.darkLight,
+  },
+  bold: {
+    fontWeight: '700',
+    color: colors.primaryDark,
   },
   controls: {
     backgroundColor: colors.white,

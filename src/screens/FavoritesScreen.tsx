@@ -20,13 +20,14 @@ import { colors, radius, spacing, shadows } from '../constants/theme';
 import { RecipeCard } from '../components/RecipeCard';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
+import { UsernameHeader } from '../components/UsernameHeader';
 import {
   getFavoriteRecipes,
   getAllRatings,
   getSavedSchedules,
   toggleFavorite,
   deleteSchedule,
-} from '../lib/store';
+} from '../services';
 import type { Recipe, RatingSummary, Schedule } from '../types';
 
 export function FavoritesScreen({ navigation }: any) {
@@ -112,6 +113,7 @@ export function FavoritesScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <UsernameHeader subtitle="Favorieten" />
       <FlatList
         data={recipes}
         keyExtractor={r => r.id}
@@ -129,6 +131,16 @@ export function FavoritesScreen({ navigation }: any) {
         ListHeaderComponent={
           <View>
             <Text style={styles.heading}>Opgeslagen weekschema's</Text>
+            <View style={styles.explainer}>
+              <Text style={styles.explainerText}>
+                💡 <Text style={styles.bold}>Tip:</Text> per opgeslagen
+                weekschema kan je een boodschappenlijst genereren. Kies welke
+                dagen en maaltijden je wil meenemen, en de app maakt automatisch
+                een lijst met alle benodigde ingrediënten. Die verschijnt
+                vervolgens in de tab{' '}
+                <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
+              </Text>
+            </View>
             {schedules.length === 0 ? (
               <Text style={styles.muted}>
                 Nog geen weekschema's. Genereer er een via de Weekschema-tab.
@@ -151,7 +163,9 @@ export function FavoritesScreen({ navigation }: any) {
                         navigation.navigate('ShoppingList', { id: s.id })
                       }
                     >
-                      <Text style={styles.btnPrimaryText}>🛒 Boodschappenlijst</Text>
+                      <Text style={styles.btnPrimaryText}>
+                        🛒 Genereer boodschappenlijst
+                      </Text>
                     </Pressable>
                     <Pressable
                       style={[styles.btn, styles.btnDanger]}
@@ -218,6 +232,23 @@ const styles = StyleSheet.create({
     color: colors.gray,
     fontStyle: 'italic',
     marginBottom: spacing.md,
+  },
+  explainer: {
+    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.secondaryDark,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  explainerText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.darkLight,
+  },
+  bold: {
+    fontWeight: '700',
+    color: colors.primaryDark,
   },
   scheduleCard: {
     backgroundColor: colors.white,
