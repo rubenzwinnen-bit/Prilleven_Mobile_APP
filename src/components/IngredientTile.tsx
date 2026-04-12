@@ -74,10 +74,10 @@ export const ingredientTileStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   tile: {
     width: TILE_SIZE,
-    backgroundColor: '#FAF8F5',
+    backgroundColor: '#F5F0EB',
     borderRadius: radius.md,
     borderWidth: 2,
-    borderColor: '#F0EDE8',
+    borderColor: '#EAE4DD',
     paddingVertical: 10,
     paddingHorizontal: 6,
     alignItems: 'center',
@@ -88,13 +88,13 @@ const styles = StyleSheet.create({
     borderColor: colors.danger,
   },
   tileIcon: {
-    fontSize: 56,
+    fontSize: 72,
     marginBottom: 6,
   },
   tileIconImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 8,
+    width: 88,
+    height: 88,
+    borderRadius: 12,
     marginBottom: 6,
   },
   tileIconBasket: {
