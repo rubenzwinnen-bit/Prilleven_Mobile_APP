@@ -101,9 +101,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   tileName: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.dark,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#A89078',
     textAlign: 'center',
   },
   tileNameBasket: {
@@ -111,8 +111,8 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   tileAmount: {
-    fontSize: 10,
-    color: colors.gray,
+    fontSize: 12,
+    color: '#A89078',
     marginTop: 2,
     textAlign: 'center',
   },
