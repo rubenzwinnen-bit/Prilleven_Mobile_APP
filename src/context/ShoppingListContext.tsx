@@ -38,6 +38,7 @@ export interface ShoppingList {
   generatedAt: number;
   ingredients: AggregatedIngredient[];
   basket: string[]; // keys van ingrediënten die al in 't mandje zitten
+  persons?: number; // aantal personen (als actief weekschema)
 }
 
 interface ShoppingListContextValue {

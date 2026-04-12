@@ -41,6 +41,8 @@ export interface Schedule {
   name: string;
   days: Record<string, Record<string, string | null>>;
   excludedAllergens: string[];
+  persons?: number;
+  isActive?: boolean;
   createdAt?: string;
 }
 

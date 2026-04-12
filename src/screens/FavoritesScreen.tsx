@@ -25,9 +25,13 @@ import {
   getFavoriteRecipes,
   getAllRatings,
   getSavedSchedules,
+  getRecipesByIds,
   toggleFavorite,
   deleteSchedule,
+  setActiveSchedule,
+  deactivateSchedule,
 } from '../services';
+import { WEEKDAYS, SCHEDULE_SLOTS, getSlotLabel } from '../constants/data';
 import type { Recipe, RatingSummary, Schedule } from '../types';
 
 export function FavoritesScreen({ navigation }: any) {
@@ -37,6 +41,8 @@ export function FavoritesScreen({ navigation }: any) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [ratings, setRatings] = useState<Record<string, RatingSummary>>({});
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [expandedSchedules, setExpandedSchedules] = useState<Set<string>>(new Set());
+  const [scheduleRecipeNames, setScheduleRecipeNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -50,6 +56,22 @@ export function FavoritesScreen({ navigation }: any) {
       setRecipes(favs);
       setRatings(rt);
       setSchedules(schs);
+
+      // Haal receptnamen op voor alle schema's
+      const allIds = new Set<string>();
+      schs.forEach(s => {
+        Object.values(s.days || {}).forEach(slots => {
+          Object.values(slots || {}).forEach(rid => {
+            if (rid) allIds.add(rid);
+          });
+        });
+      });
+      if (allIds.size > 0) {
+        const recs = await getRecipesByIds([...allIds]);
+        const nameMap: Record<string, string> = {};
+        recs.forEach(r => { nameMap[r.id] = r.name; });
+        setScheduleRecipeNames(nameMap);
+      }
     } catch (err: any) {
       show('Fout: ' + err.message, 'error');
     } finally {
@@ -75,6 +97,51 @@ export function FavoritesScreen({ navigation }: any) {
       }
     },
     [user, show]
+  );
+
+  const handleActivateSchedule = useCallback(
+    (scheduleId: string, currentPersons?: number) => {
+      Alert.prompt(
+        'Activeren',
+        'Voor hoeveel personen wil je dit weekschema activeren?',
+        [
+          { text: 'Annuleren', style: 'cancel' },
+          {
+            text: 'Activeren',
+            onPress: async (input?: string) => {
+              const persons = parseInt(input || '4');
+              if (!persons || persons < 1) {
+                show('Voer een geldig aantal personen in (minimaal 1)', 'error');
+                return;
+              }
+              try {
+                await setActiveSchedule(scheduleId, persons);
+                show(`Weekschema geactiveerd voor ${persons} personen!`);
+                load();
+              } catch (err: any) {
+                show('Fout: ' + err.message, 'error');
+              }
+            },
+          },
+        ],
+        'plain-text',
+        String(currentPersons || 4)
+      );
+    },
+    [show, load]
+  );
+
+  const handleDeactivateSchedule = useCallback(
+    async (scheduleId: string) => {
+      try {
+        await deactivateSchedule(scheduleId);
+        show('Weekschema gedeactiveerd');
+        load();
+      } catch (err: any) {
+        show('Fout: ' + err.message, 'error');
+      }
+    },
+    [show, load]
   );
 
   const handleDeleteSchedule = useCallback(
@@ -147,26 +214,78 @@ export function FavoritesScreen({ navigation }: any) {
               </Text>
             ) : (
               schedules.map(s => (
-                <View key={s.id} style={styles.scheduleCard}>
+                <View
+                  key={s.id}
+                  style={[
+                    styles.scheduleCard,
+                    s.isActive && styles.scheduleCardActive,
+                  ]}
+                >
                   <View style={styles.scheduleHeader}>
-                    <Text style={styles.scheduleName}>{s.name}</Text>
-                    <Text style={styles.scheduleDate}>
-                      {s.createdAt
-                        ? new Date(s.createdAt).toLocaleDateString('nl-BE')
-                        : ''}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.scheduleName}>{s.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={styles.scheduleDate}>
+                          {s.createdAt
+                            ? new Date(s.createdAt).toLocaleDateString('nl-BE')
+                            : ''}
+                        </Text>
+                        {s.isActive && (
+                          <View style={styles.activeBadge}>
+                            <Text style={styles.activeBadgeText}>
+                              Actief · {s.persons || 4} personen
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
                   </View>
                   <View style={styles.scheduleActions}>
+                    {s.isActive ? (
+                      <Pressable
+                        style={[styles.btn, styles.btnOutline]}
+                        onPress={() => handleDeactivateSchedule(s.id)}
+                      >
+                        <Text style={styles.btnOutlineText}>Deactiveren</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={[styles.btn, styles.btnSecondary]}
+                        onPress={() => handleActivateSchedule(s.id, s.persons)}
+                      >
+                        <Text style={styles.btnPrimaryText}>Activeren</Text>
+                      </Pressable>
+                    )}
                     <Pressable
-                      style={[styles.btn, styles.btnPrimary]}
+                      style={[styles.btn, styles.btnOutline]}
                       onPress={() =>
-                        navigation.navigate('ShoppingList', { id: s.id })
+                        setExpandedSchedules(prev => {
+                          const next = new Set(prev);
+                          if (next.has(s.id)) next.delete(s.id);
+                          else next.add(s.id);
+                          return next;
+                        })
                       }
                     >
-                      <Text style={styles.btnPrimaryText}>
-                        🛒 Genereer boodschappenlijst
+                      <Text style={styles.btnOutlineText}>
+                        {expandedSchedules.has(s.id) ? 'Verbergen' : 'Details'}
                       </Text>
                     </Pressable>
+                    {s.isActive && (
+                      <Pressable
+                        style={[styles.btn, styles.btnPrimary]}
+                        onPress={() =>
+                          navigation.navigate('ShoppingList', {
+                            id: s.id,
+                            persons: s.persons,
+                          })
+                        }
+                      >
+                        <Text style={styles.btnPrimaryText}>
+                          🛒 Boodschappenlijst
+                        </Text>
+                      </Pressable>
+                    )}
                     <Pressable
                       style={[styles.btn, styles.btnDanger]}
                       onPress={() => handleDeleteSchedule(s.id, s.name)}
@@ -174,6 +293,40 @@ export function FavoritesScreen({ navigation }: any) {
                       <Text style={styles.btnPrimaryText}>Verwijderen</Text>
                     </Pressable>
                   </View>
+                  {expandedSchedules.has(s.id) && (
+                    <View style={styles.scheduleDetail}>
+                      {WEEKDAYS.map(day => {
+                        const slots = SCHEDULE_SLOTS.filter(
+                          slot => s.days?.[day]?.[slot.id]
+                        );
+                        if (slots.length === 0) return null;
+                        const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
+                        return (
+                          <View key={day} style={styles.detailDay}>
+                            <Text style={styles.detailDayLabel}>{dayLabel}</Text>
+                            {slots.map(slot => {
+                              const rid = s.days[day][slot.id]!;
+                              const recipeName = scheduleRecipeNames[rid] || '...';
+                              return (
+                                <Pressable
+                                  key={slot.id}
+                                  style={styles.detailSlot}
+                                  onPress={() => navigation.navigate('RecipeDetail', { id: rid })}
+                                >
+                                  <Text style={styles.detailSlotLabel}>
+                                    {getSlotLabel(slot.id)}
+                                  </Text>
+                                  <Text style={styles.detailRecipeName} numberOfLines={1}>
+                                    {recipeName}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
               ))
             )}
@@ -255,7 +408,23 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
     ...shadows.sm,
+  },
+  scheduleCardActive: {
+    borderColor: colors.secondary,
+  },
+  activeBadge: {
+    backgroundColor: colors.secondary,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  activeBadgeText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '600',
   },
   scheduleHeader: {
     flexDirection: 'row',
@@ -285,12 +454,58 @@ const styles = StyleSheet.create({
   btnPrimary: {
     backgroundColor: colors.primary,
   },
+  btnSecondary: {
+    backgroundColor: colors.secondary,
+  },
   btnDanger: {
     backgroundColor: colors.danger,
+  },
+  btnOutline: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: 'transparent',
+  },
+  btnOutlineText: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   btnPrimaryText: {
     color: colors.white,
     fontWeight: '600',
+  },
+  scheduleDetail: {
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.light,
+    paddingTop: spacing.md,
+  },
+  detailDay: {
+    marginBottom: spacing.sm,
+  },
+  detailDayLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primaryDark,
+    marginBottom: 4,
+  },
+  detailSlot: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    paddingLeft: spacing.sm,
+    gap: spacing.sm,
+  },
+  detailSlotLabel: {
+    width: 80,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.gray,
+    textTransform: 'uppercase',
+  },
+  detailRecipeName: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '500',
   },
   empty: {
     padding: spacing.xxl,

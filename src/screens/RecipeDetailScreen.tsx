@@ -30,9 +30,10 @@ import {
   toggleFavorite,
   rateRecipe,
   addComment,
+  getActiveSchedule,
 } from '../services';
-import type { Recipe, RatingSummary, Comment } from '../types';
-import { getMealMomentLabel } from '../constants/data';
+import type { Recipe, RatingSummary, Comment, Schedule } from '../types';
+import { getMealMomentLabel, WEEKDAYS, SCHEDULE_SLOTS, getSlotLabel } from '../constants/data';
 
 export function RecipeDetailScreen({ route, navigation }: any) {
   const { id } = route.params;
@@ -46,21 +47,61 @@ export function RecipeDetailScreen({ route, navigation }: any) {
   const [userRating, setUserRating] = useState(0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
+  const [activeInfo, setActiveInfo] = useState<{
+    persons: number;
+    portions: number;
+    X: number;
+    occurrences: number;
+    daySlots: string[];
+    selectedDays: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [r, isF, avg, uR, cs] = await Promise.all([
+      const [r, isF, avg, uR, cs, activeSch] = await Promise.all([
         getRecipe(id),
         isFavorite(id, user),
         getAverageRating(id),
         getUserRating(id, user),
         getComments(id),
+        getActiveSchedule(user),
       ]);
       setRecipe(r);
       setFav(isF);
       setAvgRating(avg);
       setUserRating(uR);
       setComments(cs);
+
+      // Check of dit recept in het actieve schema zit
+      if (activeSch && r) {
+        const daySlots: string[] = [];
+        WEEKDAYS.forEach(day => {
+          SCHEDULE_SLOTS.forEach(slot => {
+            if (activeSch.days?.[day]?.[slot.id] === id) {
+              const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
+              daySlots.push(`${dayLabel} - ${getSlotLabel(slot.id)}`);
+            }
+          });
+        });
+
+        if (daySlots.length > 0) {
+          const persons = activeSch.persons || 4;
+          const portions = r.portions || 1;
+          const X = Math.max(1, Math.ceil(persons / portions));
+          setActiveInfo({
+            persons,
+            portions,
+            X,
+            occurrences: daySlots.length,
+            daySlots,
+            selectedDays: 1,
+          });
+        } else {
+          setActiveInfo(null);
+        }
+      } else {
+        setActiveInfo(null);
+      }
     } catch (err: any) {
       show('Fout: ' + err.message, 'error');
     } finally {
@@ -176,11 +217,13 @@ export function RecipeDetailScreen({ route, navigation }: any) {
               <View style={styles.tagTime}>
                 <Text style={styles.tagTimeText}>⏱ {recipe.cookingTime} min</Text>
               </View>
-              <View style={styles.tagPortions}>
-                <Text style={styles.tagPortionsText}>
-                  🍰 {recipe.portions} {recipe.portions === 1 ? 'portie' : 'porties'}
-                </Text>
-              </View>
+              {!activeInfo && (
+                <View style={styles.tagPortions}>
+                  <Text style={styles.tagPortionsText}>
+                    🍰 {recipe.portions} {recipe.portions === 1 ? 'portie' : 'porties'}
+                  </Text>
+                </View>
+              )}
             </View>
             {(recipe.allergens || []).length > 0 && (
               <View style={[styles.tagRow, { marginTop: spacing.sm }]}>
@@ -194,22 +237,88 @@ export function RecipeDetailScreen({ route, navigation }: any) {
             )}
           </View>
 
+          {/* Actief weekschema info */}
+          {activeInfo && (
+            <View style={styles.activeScheduleInfo}>
+              <View style={styles.dayPills}>
+                {activeInfo.daySlots.map((ds, i) => (
+                  <View key={i} style={styles.dayPill}>
+                    <Text style={styles.dayPillText}>{ds}</Text>
+                  </View>
+                ))}
+              </View>
+              {activeInfo.occurrences >= 2 && (
+                <>
+                  <Text style={styles.daySelectorHint}>
+                    Recept komt meer dan 1 keer voor in je actief weekschema.
+                    Selecteer voor hoeveel dagen je het recept wil voorbereiden.
+                  </Text>
+                  <View style={styles.daySelectorBar}>
+                    {Array.from({ length: activeInfo.occurrences }, (_, i) => i + 1).map(n => (
+                      <Pressable
+                        key={n}
+                        style={[
+                          styles.daySelectorBtn,
+                          activeInfo.selectedDays === n && styles.daySelectorBtnActive,
+                        ]}
+                        onPress={() =>
+                          setActiveInfo(prev => prev ? { ...prev, selectedDays: n } : null)
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.daySelectorBtnText,
+                            activeInfo.selectedDays === n && styles.daySelectorBtnTextActive,
+                          ]}
+                        >
+                          {n === 1 ? '1 dag' : `${n} dagen`}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+
           {/* Ingrediënten */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               Ingrediënten{' '}
               <Text style={styles.sectionSub}>
-                (voor {recipe.portions} {recipe.portions === 1 ? 'portie' : 'porties'})
+                {activeInfo
+                  ? `(${activeInfo.X * activeInfo.portions * activeInfo.selectedDays} ${
+                      activeInfo.X * activeInfo.portions * activeInfo.selectedDays === 1
+                        ? 'portie'
+                        : 'porties'
+                    } · ${activeInfo.persons} personen)`
+                  : `(voor ${recipe.portions} ${recipe.portions === 1 ? 'portie' : 'porties'})`}
               </Text>
             </Text>
-            {(recipe.ingredients || []).map((ing, i) => (
-              <View key={i} style={styles.ingredientRow}>
-                <Text style={styles.ingredientName}>{ing.name}</Text>
-                <Text style={styles.ingredientAmount}>
-                  {ing.amount} {ing.unit}
-                </Text>
-              </View>
-            ))}
+            {(recipe.ingredients || []).map((ing, i) => {
+              const amount = parseFloat(ing.amount as any);
+              let displayAmount: string;
+              if (activeInfo && !isNaN(amount)) {
+                const multiplier = activeInfo.X * activeInfo.selectedDays;
+                const adjusted = Math.max(1, Math.ceil(amount * multiplier * 100) / 100);
+                displayAmount = Number.isInteger(adjusted)
+                  ? adjusted.toString()
+                  : adjusted
+                      .toFixed(2)
+                      .replace(/\.?0+$/, '')
+                      .replace('.', ',');
+              } else {
+                displayAmount = String(ing.amount);
+              }
+              return (
+                <View key={i} style={styles.ingredientRow}>
+                  <Text style={styles.ingredientName}>{ing.name}</Text>
+                  <Text style={styles.ingredientAmount}>
+                    {displayAmount} {ing.unit}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
 
           {/* Bereidingswijze */}
@@ -414,6 +523,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   tagAllergenText: { color: colors.danger, fontSize: 12, fontWeight: '500' },
+  activeScheduleInfo: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.secondary,
+    ...shadows.sm,
+  },
+  dayPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  dayPill: {
+    backgroundColor: 'rgba(152, 195, 164, 0.2)',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+  },
+  dayPillText: {
+    color: '#4a7c59',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  daySelectorHint: {
+    fontSize: 12,
+    color: colors.gray,
+    marginBottom: spacing.sm,
+  },
+  daySelectorBar: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  daySelectorBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 4,
+  },
+  daySelectorBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  daySelectorBtnText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  daySelectorBtnTextActive: {
+    color: colors.white,
+  },
   ingredientRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

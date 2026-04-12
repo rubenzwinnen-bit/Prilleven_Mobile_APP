@@ -41,7 +41,7 @@ import {
 import type { Schedule, Recipe } from '../types';
 
 export function ShoppingListScreen({ route, navigation }: any) {
-  const { id } = route.params;
+  const { id, persons: routePersons } = route.params;
   const { show } = useToast();
   const { setList } = useShoppingList();
 
@@ -152,14 +152,25 @@ export function ShoppingListScreen({ route, navigation }: any) {
       }
     });
 
-    /* Aggregeer ingrediënten */
+    /* Aggregeer ingrediënten met X-vermenigvuldiger voor personen */
+    const persons = routePersons || schedule.persons || 4;
+    const isActive = schedule.isActive || false;
+
     const map = new Map<string, AggregatedIngredient>();
     for (const [recipeId, count] of Object.entries(recipeCounts)) {
       const recipe = recipeMap.get(recipeId);
       if (!recipe) continue;
+
+      // X = ceil(persons / portions) wanneer actief, anders 1
+      const X = isActive
+        ? Math.max(1, Math.ceil(persons / (recipe.portions || 1)))
+        : 1;
+
       (recipe.ingredients || []).forEach(ing => {
-        const k = (ing.name || '').toLowerCase().trim();
-        if (!k) return;
+        const nameLower = (ing.name || '').toLowerCase().trim();
+        if (!nameLower) return;
+        const unitLower = (ing.unit || '').toLowerCase().trim();
+        const k = `${nameLower}|${unitLower}`;
         if (!map.has(k)) {
           map.set(k, {
             key: k,
@@ -173,7 +184,7 @@ export function ShoppingListScreen({ route, navigation }: any) {
         const entry = map.get(k)!;
         const amount = parseFloat(ing.amount as any);
         if (!isNaN(amount)) {
-          entry.totalAmount += amount * count;
+          entry.totalAmount += amount * X * count;
           entry.isNumeric = true;
         }
       });
@@ -190,6 +201,7 @@ export function ShoppingListScreen({ route, navigation }: any) {
       generatedAt: Date.now(),
       ingredients: sorted,
       basket: [],
+      persons: isActive ? persons : undefined,
     });
 
     show(`${sorted.length} ingrediënten op je lijst!`);

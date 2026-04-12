@@ -96,7 +96,12 @@ export function ShoppingListTabScreen({ navigation }: any) {
       <UsernameHeader subtitle="Boodschappenlijst" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>🛒 Boodschappenlijst</Text>
-        <Text style={styles.subtitle}>{list.scheduleName}</Text>
+        <View style={styles.activeInfoBanner}>
+          <Text style={styles.activeInfoText}>
+            Actief weekschema: <Text style={styles.activeInfoBold}>{list.scheduleName}</Text>
+            {list.persons ? ` · ${list.persons} personen` : ''}
+          </Text>
+        </View>
         <Text style={styles.helperTop}>
           Tik op een ingrediënt om het in je winkelmandje te leggen.
           Per ongeluk getikt? Tik nog een keer in het mandje om hem terug
@@ -173,6 +178,23 @@ const styles = StyleSheet.create({
   subtitle: {
     color: colors.gray,
     marginBottom: spacing.sm,
+  },
+  activeInfoBanner: {
+    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.secondary,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  activeInfoText: {
+    fontSize: 13,
+    color: colors.darkLight,
+  },
+  activeInfoBold: {
+    fontWeight: '700',
+    color: colors.secondaryDark,
   },
   helperTop: {
     fontSize: 13,

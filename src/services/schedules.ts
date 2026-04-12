@@ -36,6 +36,8 @@ export async function getSavedSchedules(user: string): Promise<Schedule[]> {
     name: s.name,
     days: s.days || {},
     excludedAllergens: s.excluded_allergens || [],
+    persons: s.persons || 4,
+    isActive: s.is_active || false,
     createdAt: s.created_at,
   }));
   cacheSet(key, schedules);
@@ -62,6 +64,8 @@ export async function getSchedule(id: string): Promise<Schedule | null> {
     name: data.name,
     days: data.days || {},
     excludedAllergens: data.excluded_allergens || [],
+    persons: data.persons || 4,
+    isActive: data.is_active || false,
     createdAt: data.created_at,
   };
   cacheSet(`schedule:${id}`, schedule);
@@ -104,4 +108,88 @@ export async function deleteSchedule(id: string) {
   if (error) throw error;
   cacheInvalidate('schedules:');
   cacheInvalidate(`schedule:${id}`);
+}
+
+/** Haal het actieve weekschema op voor een gebruiker (max 1). */
+export async function getActiveSchedule(user: string): Promise<Schedule | null> {
+  if (!user) return null;
+
+  const key = `active_schedule:${user}`;
+  const cached = cacheGet<Schedule>(key);
+  if (cached !== undefined) return cached;
+
+  const { data, error } = await supabase
+    .from('schedules')
+    .select('*')
+    .eq('user_name', user)
+    .eq('is_active', true)
+    .limit(1);
+
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    cacheSet(key, null as any);
+    return null;
+  }
+
+  const s = data[0];
+  const schedule: Schedule = {
+    id: s.id,
+    name: s.name,
+    days: s.days || {},
+    excludedAllergens: s.excluded_allergens || [],
+    persons: s.persons || 4,
+    isActive: true,
+    createdAt: s.created_at,
+  };
+  cacheSet(key, schedule);
+  return schedule;
+}
+
+/** Activeer een weekschema met een bepaald aantal personen. Deactiveert alle andere schema's. */
+export async function setActiveSchedule(scheduleId: string, persons: number) {
+  // Deactiveer alle actieve schema's van deze gebruiker
+  // We halen eerst het schema op om de user_name te weten
+  const schedule = await getSchedule(scheduleId);
+  if (!schedule) throw new Error('Schema niet gevonden');
+
+  // We moeten de user_name via een aparte query ophalen
+  const { data: schData } = await supabase
+    .from('schedules')
+    .select('user_name')
+    .eq('id', scheduleId)
+    .single();
+
+  if (schData?.user_name) {
+    await supabase
+      .from('schedules')
+      .update({ is_active: false })
+      .eq('user_name', schData.user_name)
+      .eq('is_active', true);
+  }
+
+  // Activeer het gekozen schema
+  const { error } = await supabase
+    .from('schedules')
+    .update({ is_active: true, persons })
+    .eq('id', scheduleId);
+
+  if (error) throw error;
+
+  cacheInvalidate('schedules:');
+  cacheInvalidate('schedule:');
+  cacheInvalidate('active_schedule:');
+}
+
+/** Deactiveer een weekschema. */
+export async function deactivateSchedule(scheduleId: string) {
+  const { error } = await supabase
+    .from('schedules')
+    .update({ is_active: false })
+    .eq('id', scheduleId);
+
+  if (error) throw error;
+
+  cacheInvalidate('schedules:');
+  cacheInvalidate('schedule:');
+  cacheInvalidate('active_schedule:');
 }

@@ -134,9 +134,8 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
         >
           {/* Logo / welkom */}
           <View style={styles.header}>
-            <Text style={styles.logo}>🍳</Text>
-            <Text style={styles.title}>Prilleven</Text>
-            <Text style={styles.subtitle}>Receptenboek</Text>
+            <Text style={styles.logo}>🌿</Text>
+            <Text style={styles.title}>Community Pril leven</Text>
           </View>
 
           {/* Tab knoppen */}

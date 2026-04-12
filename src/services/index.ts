@@ -40,4 +40,7 @@ export {
   getSchedule,
   saveSchedule,
   deleteSchedule,
+  getActiveSchedule,
+  setActiveSchedule,
+  deactivateSchedule,
 } from './schedules';
