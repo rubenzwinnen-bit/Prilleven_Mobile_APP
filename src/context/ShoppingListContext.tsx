@@ -20,6 +20,8 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getIngredientIconMap } from '../services/ingredientIcons';
+import { normalizeIngredientName } from '../constants/ingredientIcons';
 
 const STORAGE_KEY = 'receptenboek_shoppinglist_v1';
 
@@ -68,18 +70,52 @@ export function ShoppingListProvider({
   const [list, setListState] = useState<ShoppingList | null>(null);
   const [loading, setLoading] = useState(true);
 
-  /* Laad eerder bewaarde lijst bij start */
+  /**
+   * Ververs iconUrl's op de ingrediënten in een lijst.
+   * Haalt de laatste iconen op uit Supabase en update de lijst.
+   */
+  const refreshIconUrls = useCallback(async (currentList: ShoppingList): Promise<ShoppingList> => {
+    try {
+      const iconMap = await getIngredientIconMap();
+      if (iconMap.size === 0) return currentList;
+
+      let changed = false;
+      const updatedIngredients = currentList.ingredients.map(ing => {
+        const normalized = normalizeIngredientName(ing.name);
+        const newUrl = iconMap.get(normalized) || undefined;
+        if (newUrl !== ing.iconUrl) {
+          changed = true;
+          return { ...ing, iconUrl: newUrl };
+        }
+        return ing;
+      });
+
+      if (changed) {
+        const updated = { ...currentList, ingredients: updatedIngredients };
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      }
+    } catch {
+      // Icon refresh is non-critical — silently continue
+    }
+    return currentList;
+  }, []);
+
+  /* Laad eerder bewaarde lijst bij start + ververs iconen */
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
-      .then(raw => {
+      .then(async raw => {
         if (raw) {
           try {
-            setListState(JSON.parse(raw));
+            let parsed: ShoppingList = JSON.parse(raw);
+            // Ververs icoon-URLs in de achtergrond
+            parsed = await refreshIconUrls(parsed);
+            setListState(parsed);
           } catch {}
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshIconUrls]);
 
   const persist = useCallback(async (next: ShoppingList | null) => {
     setListState(next);
