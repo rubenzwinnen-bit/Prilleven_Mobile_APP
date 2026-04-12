@@ -27,6 +27,7 @@ export interface AggregatedIngredient {
   key: string;
   name: string;
   icon: string;
+  iconUrl?: string;
   totalAmount: number;
   unit: string;
   isNumeric: boolean;

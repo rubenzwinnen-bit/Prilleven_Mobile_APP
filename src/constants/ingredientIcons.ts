@@ -100,3 +100,72 @@ export function getIngredientIcon(name: string): string {
   }
   return '🥘';
 }
+
+/**
+ * Normaliseer een ingrediënt-naam voor icoon-lookup EN aggregatie.
+ * Zelfde logica als op de website zodat de matching consistent is.
+ * - lowercase + trim
+ * - strip hoeveelheidwoorden aan het begin (bijv. "snuifje", "scheutje", "teentje(s)")
+ * - strip hoeveelheden/eenheden aan het begin (bijv. "120ml", "50g", "2 eetlepel")
+ * - strip notities tussen haakjes overal (bijv. "(vers of uit blik)", "(s)")
+ * - strip beschrijvende woorden (bijv. "verse", "geraspte", "fijngemalen")
+ * - strip Nederlandse meervoudsvormen (-en, -'s, -s), maar niet bij dubbele klinkers (kaas)
+ */
+export function normalizeIngredientName(name: string): string {
+  if (!name) return '';
+  let n = name.toLowerCase().trim();
+
+  // 1a. Strip hoeveelheid-woorden aan het begin (zonder getal ervoor)
+  n = n.replace(
+    /^(?:snuifje|snufje|snuf|scheutje|schepje|teentje(?:\(s\))?|sneetje(?:\(s\))?|takje(?:s)?|plakje(?:s)?|bosje|blaadje(?:s)?|handje(?:vol)?|beetje|stukje|blokje(?:s)?|potje|zakje|flesje|kopje|bakje)\s+/i,
+    ''
+  );
+
+  // 1b. Strip hoeveelheden + eenheden aan het begin (met getal)
+  n = n.replace(
+    /^[\d.,/]+\s*(?:gram|g|kg|ml|liter|l|dl|cl|eetlepel|el|theelepel|tl|snuf|snufje|teen|tenen|takje|takjes|blaadjes|stuk|stuks|plak|plakken|schijf|schijfjes|blok|blokje|blokjes|mespunt|snede|sneetje|sneetjes|beker|bekers|portie|porties|kop|kopje|kopjes|bos|bosje|bosjes|cm|zakje|zakjes|pot|potje|potjes|blik|blikje|blikjes|fles|flesje|flesjes|pakje|pakjes|doos|doosje|doosjes|vel|vellen)\s*/i,
+    ''
+  );
+
+  // 2. Strip ALLE haakjes-notities overal (inclusief "(s)", "(vegan)", "(vers of uit blik)")
+  n = n.replace(/\s*\([^)]*\)/g, '').trim();
+
+  // 3. Strip beschrijvende bijvoeglijke naamwoorden aan het begin
+  n = n.replace(
+    /^(?:verse?|grof|grove|fijn|fijne|fijngemalen|geraspte?|gehakte?|gesneden|gedroogde?|gesmolten|gekookte?|gebakken|ontpitte?|groene?|rode?|gele|witte?|zwarte?|volle|halve|hele|biologische?|bio|grote?|kleine?)\s+/i,
+    ''
+  );
+
+  // 4. Strip " om te bakken/braden" etc. aan het einde
+  n = n.replace(/\s+om\s+te\s+\w+$/, '').trim();
+
+  // 5. Strip ", ontpit" etc. aan het einde
+  n = n.replace(/,\s*\w+$/, '').trim();
+
+  // 6. Strip niet-letter tekens aan begin/einde
+  n = n.replace(/^[^a-zà-ÿ]+|[^a-zà-ÿ]+$/g, '').trim();
+
+  if (!n || n.length < 2) return '';
+
+  // 7. Strip Nederlandse meervoudsvormen
+  // NIET strippen bij dubbele klinker + s (kaas, kaas → kaas, niet kaa)
+  const doubleVowelS = /([aeiou])\1s$/.test(n);
+  if (doubleVowelS) {
+    // "kaas", "nootjes" etc. — niet strippen
+  } else if (n.length > 4 && n.endsWith('en')) {
+    n = n.slice(0, -2);
+  } else if (n.endsWith("'s")) {
+    n = n.slice(0, -2);
+  } else if (n.length > 3 && n.endsWith('s')) {
+    n = n.slice(0, -1);
+  }
+
+  // 8. Strip "tjes" en "je" verkleinwoorden
+  if (n.endsWith('tjes')) {
+    n = n.slice(0, -4);
+  } else if (n.length > 4 && n.endsWith('je')) {
+    n = n.slice(0, -2);
+  }
+
+  return n.trim();
+}

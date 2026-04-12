@@ -44,3 +44,7 @@ export {
   setActiveSchedule,
   deactivateSchedule,
 } from './schedules';
+export {
+  getIngredientIconMap,
+  clearIngredientIconCache,
+} from './ingredientIcons';

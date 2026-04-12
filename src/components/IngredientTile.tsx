@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
+import { Pressable, Text, Image, StyleSheet } from 'react-native';
 import { colors, radius } from '../constants/theme';
 import type { AggregatedIngredient } from '../context/ShoppingListContext';
 
@@ -35,9 +35,16 @@ export function IngredientTile({ item, inBasket, onPress }: IngredientTileProps)
       style={[styles.tile, inBasket && styles.tileBasket]}
       onPress={onPress}
     >
-      <Text style={[styles.tileIcon, inBasket && styles.tileIconBasket]}>
-        {item.icon}
-      </Text>
+      {item.iconUrl ? (
+        <Image
+          source={{ uri: item.iconUrl }}
+          style={[styles.tileIconImage, inBasket && styles.tileIconBasket]}
+        />
+      ) : (
+        <Text style={[styles.tileIcon, inBasket && styles.tileIconBasket]}>
+          {item.icon}
+        </Text>
+      )}
       <Text
         style={[styles.tileName, inBasket && styles.tileNameBasket]}
         numberOfLines={2}
@@ -82,6 +89,12 @@ const styles = StyleSheet.create({
   },
   tileIcon: {
     fontSize: 32,
+    marginBottom: 4,
+  },
+  tileIconImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
     marginBottom: 4,
   },
   tileIconBasket: {

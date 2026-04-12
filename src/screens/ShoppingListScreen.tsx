@@ -28,12 +28,12 @@ import { CommonActions } from '@react-navigation/native';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { UsernameHeader } from '../components/UsernameHeader';
-import { getSchedule, getRecipesByIds } from '../services';
+import { getSchedule, getRecipesByIds, getIngredientIconMap } from '../services';
 import {
   WEEKDAYS,
   SCHEDULE_SLOTS,
 } from '../constants/data';
-import { getIngredientIcon } from '../constants/ingredientIcons';
+import { getIngredientIcon, normalizeIngredientName } from '../constants/ingredientIcons';
 import {
   useShoppingList,
   type AggregatedIngredient,
@@ -156,6 +156,9 @@ export function ShoppingListScreen({ route, navigation }: any) {
     const persons = routePersons || schedule.persons || 4;
     const isActive = schedule.isActive || false;
 
+    /* Haal custom iconen op uit Supabase */
+    const iconMap = await getIngredientIconMap();
+
     const map = new Map<string, AggregatedIngredient>();
     for (const [recipeId, count] of Object.entries(recipeCounts)) {
       const recipe = recipeMap.get(recipeId);
@@ -167,15 +170,29 @@ export function ShoppingListScreen({ route, navigation }: any) {
         : 1;
 
       (recipe.ingredients || []).forEach(ing => {
-        const nameLower = (ing.name || '').toLowerCase().trim();
-        if (!nameLower) return;
-        const unitLower = (ing.unit || '').toLowerCase().trim();
-        const k = `${nameLower}|${unitLower}`;
+        const normalized = normalizeIngredientName(ing.name);
+        if (!normalized) return;
+        const unitRaw = (ing.unit || '').toLowerCase().trim();
+        // Normaliseer eenheden zodat "g" en "gram", "ml" en "milliliter" etc. samengevoegd worden
+        const unitMap: Record<string, string> = {
+          'g': 'gram', 'gr': 'gram', 'kg': 'kg',
+          'ml': 'ml', 'dl': 'dl', 'cl': 'cl', 'l': 'liter',
+          'el': 'eetlepel', 'tl': 'theelepel',
+          'stuk': 'stuk', 'stuks': 'stuk',
+          'snuf': 'snufje', 'snufje': 'snufje',
+          'plak': 'plak', 'plakken': 'plak',
+          'teen': 'teen', 'tenen': 'teen',
+        };
+        const unitLower = unitMap[unitRaw] || unitRaw;
+        const k = `${normalized}|${unitLower}`;
         if (!map.has(k)) {
+          // Mooie weergavenaam: genormaliseerd met hoofdletter
+          const displayName = normalized.charAt(0).toUpperCase() + normalized.slice(1);
           map.set(k, {
             key: k,
-            name: ing.name,
+            name: displayName,
             icon: getIngredientIcon(ing.name),
+            iconUrl: iconMap.get(normalized) || undefined,
             totalAmount: 0,
             unit: ing.unit || '',
             isNumeric: false,
