@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+    "owner": "prilleven",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -14,19 +15,25 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "be.prilleven.mobileapp"
+      "bundleIdentifier": "be.prilleven.mobileapp",
+      "buildNumber": "1"
     },
     "android": {
       "package": "be.prilleven.mobileapp",
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#C98966"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "edgeToEdgeEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "996391c7-00d0-4d2e-8113-fa3f9b79e0a9"
+      }
     }
   }
 }
