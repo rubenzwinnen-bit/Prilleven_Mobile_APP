@@ -10,8 +10,11 @@
  *           └── UserProvider
  *                 └── ShoppingListProvider
  *                       └── AppGate
- *                             ├── AuthScreen     (niet ingelogd)
- *                             └── MainTabs       (ingelogd)
+ *                             ├── AuthScreen          (niet ingelogd)
+ *                             └── RootStackNavigator  (ingelogd)
+ *                                   ├── Landing       (tegels)
+ *                                   ├── Main          (MainTabs)
+ *                                   └── HapjesHeld    (chat stack)
  */
 
 import 'react-native-url-polyfill/auto';
@@ -25,7 +28,7 @@ import { colors } from './src/constants/theme';
 import { UserProvider, useUser } from './src/context/UserContext';
 import { ShoppingListProvider } from './src/context/ShoppingListContext';
 import { ToastProvider } from './src/components/Toast';
-import { MainTabs } from './src/navigation';
+import { RootStackNavigator } from './src/navigation/RootStack';
 import { AuthScreen } from './src/screens/AuthScreen';
 
 /* ----------------------------------------
@@ -57,7 +60,7 @@ function AppGate() {
   /* Ingelogd → toon de app */
   return (
     <NavigationContainer>
-      <MainTabs />
+      <RootStackNavigator />
     </NavigationContainer>
   );
 }

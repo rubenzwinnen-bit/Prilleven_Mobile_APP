@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+<title>Boodschappenmandje in gebreide wol (groen)</title>
+<defs>
+<pattern id="knit" x="0" y="0" width="14" height="16" patternUnits="userSpaceOnUse">
+<path d="M0 0 L7 8 L14 0" fill="none" stroke="#8fbc94" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M-7 8 L0 16 L7 8" fill="none" stroke="#8fbc94" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7 8 L14 16 L21 8" fill="none" stroke="#8fbc94" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M0 1 L7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M14 1 L7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M0 17 L-7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M14 17 L7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M14 17 L21 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+</pattern>
+<pattern id="knitCream" x="0" y="0" width="14" height="16" patternUnits="userSpaceOnUse">
+<path d="M0 0 L7 8 L14 0" fill="none" stroke="#e8d8b8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M-7 8 L0 16 L7 8" fill="none" stroke="#e8d8b8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7 8 L14 16 L21 8" fill="none" stroke="#e8d8b8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M0 1 L7 9" stroke="#fff5e0" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.8"/>
+<path d="M14 1 L7 9" stroke="#fff5e0" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.8"/>
+<path d="M0 17 L-7 9" stroke="#fff5e0" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.8"/>
+<path d="M14 17 L7 9" stroke="#fff5e0" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.8"/>
+<path d="M14 17 L21 9" stroke="#fff5e0" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.8"/>
+</pattern>
+<path id="basket" d="M-100-65 L100-65 L75 110 Q75 120 65 120 L-65 120 Q-75 120-75 110 Z"/>
+<clipPath id="basketClip"><use href="#basket"/></clipPath>
+<radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
+<stop offset="0" stop-color="#000" stop-opacity="0.18"/>
+<stop offset="1" stop-color="#000" stop-opacity="0"/>
+</radialGradient>
+<filter id="fuzz" x="-10%" y="-10%" width="120%" height="120%">
+<feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="5"/>
+<feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0 0.25 0"/>
+<feComposite in2="SourceGraphic" operator="in"/>
+</filter>
+</defs>
+
+<g transform="translate(200 200)">
+<ellipse cx="0" cy="135" rx="115" ry="14" fill="url(#shadow)"/>
+
+<g>
+<use href="#basket" fill="#7ab088"/>
+<use href="#basket" fill="url(#knit)"/>
+
+<g clip-path="url(#basketClip)">
+<rect x="-100" y="-5" width="200" height="20" fill="#d4b896"/>
+<rect x="-100" y="-5" width="200" height="20" fill="url(#knitCream)"/>
+<rect x="-100" y="55" width="200" height="20" fill="#d4b896"/>
+<rect x="-100" y="55" width="200" height="20" fill="url(#knitCream)"/>
+</g>
+
+<g clip-path="url(#basketClip)">
+<rect x="-100" y="-65" width="200" height="22" fill="#5a8a68"/>
+<g stroke="#8fbc94" stroke-width="2.5" stroke-linecap="round" fill="none">
+<line x1="-92" y1="-63" x2="-92" y2="-43"/>
+<line x1="-82" y1="-63" x2="-82" y2="-43"/>
+<line x1="-72" y1="-63" x2="-72" y2="-43"/>
+<line x1="-62" y1="-63" x2="-62" y2="-43"/>
+<line x1="-52" y1="-63" x2="-52" y2="-43"/>
+<line x1="-42" y1="-63" x2="-42" y2="-43"/>
+<line x1="-32" y1="-63" x2="-32" y2="-43"/>
+<line x1="-22" y1="-63" x2="-22" y2="-43"/>
+<line x1="-12" y1="-63" x2="-12" y2="-43"/>
+<line x1="-2" y1="-63" x2="-2" y2="-43"/>
+<line x1="8" y1="-63" x2="8" y2="-43"/>
+<line x1="18" y1="-63" x2="18" y2="-43"/>
+<line x1="28" y1="-63" x2="28" y2="-43"/>
+<line x1="38" y1="-63" x2="38" y2="-43"/>
+<line x1="48" y1="-63" x2="48" y2="-43"/>
+<line x1="58" y1="-63" x2="58" y2="-43"/>
+<line x1="68" y1="-63" x2="68" y2="-43"/>
+<line x1="78" y1="-63" x2="78" y2="-43"/>
+<line x1="88" y1="-63" x2="88" y2="-43"/>
+</g>
+</g>
+
+<g clip-path="url(#basketClip)">
+<g transform="translate(0 38)">
+<path d="M0-15 C-7-22-21-21-21-5 C-21 6-8 16 0 27 C8 16 21 6 21-5 C21-21 7-22 0-15 Z" fill="#d4b896"/>
+<path d="M0-15 C-7-22-21-21-21-5 C-21 6-8 16 0 27 C8 16 21 6 21-5 C21-21 7-22 0-15 Z" fill="url(#knitCream)"/>
+</g>
+</g>
+
+<g clip-path="url(#basketClip)">
+<rect x="-100" y="100" width="200" height="22" fill="#000" opacity="0.1"/>
+<ellipse cx="-50" cy="-30" rx="40" ry="25" fill="#fff" opacity="0.06"/>
+</g>
+
+<g clip-path="url(#basketClip)" opacity="0.4">
+<rect x="-100" y="-65" width="200" height="190" fill="#fff" filter="url(#fuzz)"/>
+</g>
+
+<use href="#basket" fill="none" stroke="#3a5a48" stroke-width="1.5" opacity="0.5"/>
+</g>
+
+<g>
+<path d="M-60-60 C-65-115-25-140-20-65" fill="none" stroke="#7ab088" stroke-width="15" stroke-linecap="round"/>
+<g stroke="#b5d8be" stroke-width="1.2" fill="none" stroke-linecap="round">
+<path d="M-65-70 l3 3 l3-3"/>
+<path d="M-65-85 l3 3 l3-3"/>
+<path d="M-62-100 l3 3 l3-3"/>
+<path d="M-55-115 l3 3 l3-3"/>
+<path d="M-42-125 l3 3 l3-3"/>
+<path d="M-28-122 l3 3 l3-3"/>
+<path d="M-22-108 l3 3 l3-3"/>
+<path d="M-20-92 l3 3 l3-3"/>
+<path d="M-19-77 l3 3 l3-3"/>
+</g>
+</g>
+<g>
+<path d="M60-60 C65-115 25-140 20-65" fill="none" stroke="#7ab088" stroke-width="15" stroke-linecap="round"/>
+<g stroke="#b5d8be" stroke-width="1.2" fill="none" stroke-linecap="round">
+<path d="M59-70 l3 3 l3-3"/>
+<path d="M59-85 l3 3 l3-3"/>
+<path d="M56-100 l3 3 l3-3"/>
+<path d="M49-115 l3 3 l3-3"/>
+<path d="M36-125 l3 3 l3-3"/>
+<path d="M22-122 l3 3 l3-3"/>
+<path d="M16-108 l3 3 l3-3"/>
+<path d="M14-92 l3 3 l3-3"/>
+<path d="M13-77 l3 3 l3-3"/>
+</g>
+</g>
+</g>
+</svg>

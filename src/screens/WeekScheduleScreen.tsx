@@ -23,21 +23,47 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
-import { UsernameHeader } from '../components/UsernameHeader';
-import { getRecipes, saveSchedule } from '../services';
+import { CompactHeader } from '../navigation/RootStack';
+import { Stars } from '../components/Stars';
+import { getRecipes, saveSchedule, getActiveSchedule, getAllRatings } from '../services';
 import {
   ALLERGENS,
   WEEKDAYS,
   SCHEDULE_SLOTS,
   slotToMealMoment,
+  getSlotLabel,
 } from '../constants/data';
-import type { Recipe, ActiveSchedule } from '../types';
+import type { Recipe, ActiveSchedule, Schedule, RatingSummary } from '../types';
 
 const ACTIVE_KEY_PREFIX = 'receptenboek_active_schedule_';
+const SUBTAB_KEY_PREFIX = 'receptenboek_schedule_subtab_';
+const PRESET_KEY_PREFIX = 'receptenboek_active_preset_';
+
+type Subtab = 'active' | 'generate';
+type Preset = 'today' | 'today-tomorrow' | 'week';
+
+function getTodayWeekdayIndex(): number {
+  // JS getDay(): Sun=0..Sat=6, WEEKDAYS: maandag=0..zondag=6
+  return (new Date().getDay() + 6) % 7;
+}
+
+function getDaysForPreset(preset: Preset): readonly string[] {
+  const today = getTodayWeekdayIndex();
+  if (preset === 'today') return [WEEKDAYS[today]];
+  if (preset === 'today-tomorrow') {
+    return [WEEKDAYS[today], WEEKDAYS[(today + 1) % 7]];
+  }
+  return Array.from({ length: 7 }, (_, i) => WEEKDAYS[(today + i) % 7]);
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export function WeekScheduleScreen({ navigation }: any) {
   const { user } = useUser();
   const { show } = useToast();
+  const goToLanding = () => navigation.getParent()?.getParent()?.goBack();
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +71,15 @@ export function WeekScheduleScreen({ navigation }: any) {
   const [excluded, setExcluded] = useState<string[]>([]);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [scheduleName, setScheduleName] = useState('');
+
+  /* Sub-tab + preset (persistent per gebruiker) */
+  const [subtab, setSubtab] = useState<Subtab>('active');
+  const [preset, setPreset] = useState<Preset>('today');
+
+  /* Het actieve weekschema uit de DB (via Favorieten geactiveerd)
+     + ratings om sterren bij elk gerecht te tonen. */
+  const [activeSchedule, setActiveSchedule] = useState<Schedule | null>(null);
+  const [ratings, setRatings] = useState<Record<string, RatingSummary>>({});
 
   const recipeMap = useMemo(
     () => new Map(recipes.map(r => [r.id, r])),
@@ -57,15 +92,25 @@ export function WeekScheduleScreen({ navigation }: any) {
     return set;
   }, [recipes]);
 
-  const activeKey = `${ACTIVE_KEY_PREFIX}${user || 'anoniem'}`;
+  const userKey = user || 'anoniem';
+  const activeKey = `${ACTIVE_KEY_PREFIX}${userKey}`;
+  const subtabKey = `${SUBTAB_KEY_PREFIX}${userKey}`;
+  const presetKey = `${PRESET_KEY_PREFIX}${userKey}`;
 
   const load = useCallback(async () => {
     try {
-      const [r, savedRaw] = await Promise.all([
+      const [r, savedRaw, subtabRaw, presetRaw, active, allRatings] = await Promise.all([
         getRecipes(),
         AsyncStorage.getItem(activeKey),
+        AsyncStorage.getItem(subtabKey),
+        AsyncStorage.getItem(presetKey),
+        getActiveSchedule(user),
+        getAllRatings(),
       ]);
       setRecipes(r);
+      setActiveSchedule(active);
+      setRatings(allRatings);
+
       if (savedRaw) {
         try {
           const parsed = JSON.parse(savedRaw);
@@ -77,12 +122,35 @@ export function WeekScheduleScreen({ navigation }: any) {
           /* ignore */
         }
       }
+
+      if (subtabRaw === 'active' || subtabRaw === 'generate') {
+        setSubtab(subtabRaw);
+      }
+      if (presetRaw === 'today' || presetRaw === 'today-tomorrow' || presetRaw === 'week') {
+        setPreset(presetRaw);
+      }
     } catch (err: any) {
       show('Fout bij laden: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeKey, show]);
+  }, [activeKey, subtabKey, presetKey, user, show]);
+
+  const persistSubtab = useCallback(
+    (s: Subtab) => {
+      setSubtab(s);
+      AsyncStorage.setItem(subtabKey, s).catch(() => {});
+    },
+    [subtabKey]
+  );
+
+  const persistPreset = useCallback(
+    (p: Preset) => {
+      setPreset(p);
+      AsyncStorage.setItem(presetKey, p).catch(() => {});
+    },
+    [presetKey]
+  );
 
   useEffect(() => {
     load();
@@ -215,144 +283,303 @@ export function WeekScheduleScreen({ navigation }: any) {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <UsernameHeader subtitle="Weekschema" />
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Weekschema Generator</Text>
-        <View style={styles.intro}>
-          <Text style={styles.introText}>
-            💡 Bewaar je weekschema in <Text style={styles.bold}>Favorieten</Text> en
-            genereer er nadien een <Text style={styles.bold}>boodschappenlijst</Text> van.
-            Die verschijnt automatisch in de tab{' '}
-            <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
-          </Text>
-        </View>
+  const todayDay = WEEKDAYS[getTodayWeekdayIndex()];
 
-        <View style={styles.controls}>
-          <Text style={styles.subTitle}>Allergenen uitsluiten</Text>
-          <Text style={styles.helperText}>
-            Vink allergenen aan die je wilt uitsluiten. Recepten met deze
-            allergenen worden niet gebruikt.
+  return (
+    <SafeAreaView style={styles.container} edges={[]}>
+      <CompactHeader onBack={goToLanding} />
+
+      {/* Sub-tab bar */}
+      <View style={styles.subtabBar}>
+        <Pressable
+          style={[styles.subtabBtn, subtab === 'active' && styles.subtabBtnActive]}
+          onPress={() => persistSubtab('active')}
+        >
+          <Text
+            style={[
+              styles.subtabBtnText,
+              subtab === 'active' && styles.subtabBtnTextActive,
+            ]}
+          >
+            Actief weekschema
           </Text>
-          <View style={styles.allergenRow}>
-            {ALLERGENS.filter(a => usedAllergens.has(a)).map(a => {
-              const active = excluded.includes(a);
-              return (
+        </Pressable>
+        <Pressable
+          style={[styles.subtabBtn, subtab === 'generate' && styles.subtabBtnActive]}
+          onPress={() => persistSubtab('generate')}
+        >
+          <Text
+            style={[
+              styles.subtabBtnText,
+              subtab === 'generate' && styles.subtabBtnTextActive,
+            ]}
+          >
+            Genereren
+          </Text>
+        </Pressable>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {subtab === 'active' ? (
+          /* ============ ACTIEF WEEKSCHEMA ============ */
+          !activeSchedule ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>📅</Text>
+              <Text style={styles.emptyTitle}>Nog geen actief weekschema</Text>
+              <Text style={styles.emptyText}>
+                Genereer eerst een weekschema in het tabblad{' '}
+                <Text style={styles.bold}>Genereren</Text>, sla het op in
+                Favorieten en activeer het daar.
+              </Text>
+              <Pressable
+                style={[styles.btn, styles.btnPrimary, { marginTop: spacing.lg }]}
+                onPress={() => persistSubtab('generate')}
+              >
+                <Text style={styles.btnPrimaryText}>Ga naar Genereren</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View>
+              <Text style={styles.title} numberOfLines={2}>
+                {activeSchedule.name || 'Actief weekschema'}
+              </Text>
+
+              {/* Preset-bar */}
+              <View style={styles.presetBar}>
                 <Pressable
-                  key={a}
-                  onPress={() => toggleAllergen(a)}
-                  style={[styles.allergenChip, active && styles.allergenChipActive]}
+                  style={[styles.presetBtn, preset === 'today' && styles.presetBtnActive]}
+                  onPress={() => persistPreset('today')}
                 >
                   <Text
                     style={[
-                      styles.allergenChipText,
-                      active && styles.allergenChipTextActive,
+                      styles.presetBtnText,
+                      preset === 'today' && styles.presetBtnTextActive,
                     ]}
                   >
-                    {active ? '✓ ' : ''}
-                    {a}
+                    Vandaag
                   </Text>
                 </Pressable>
-              );
-            })}
-            {usedAllergens.size === 0 && (
-              <Text style={styles.helperText}>
-                Geen allergenen gevonden in de recepten.
-              </Text>
-            )}
-          </View>
+                <Pressable
+                  style={[
+                    styles.presetBtn,
+                    preset === 'today-tomorrow' && styles.presetBtnActive,
+                  ]}
+                  onPress={() => persistPreset('today-tomorrow')}
+                >
+                  <Text
+                    style={[
+                      styles.presetBtnText,
+                      preset === 'today-tomorrow' && styles.presetBtnTextActive,
+                    ]}
+                  >
+                    Vandaag & morgen
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.presetBtn, preset === 'week' && styles.presetBtnActive]}
+                  onPress={() => persistPreset('week')}
+                >
+                  <Text
+                    style={[
+                      styles.presetBtnText,
+                      preset === 'week' && styles.presetBtnTextActive,
+                    ]}
+                  >
+                    Heel weekschema
+                  </Text>
+                </Pressable>
+              </View>
 
-          <View style={styles.buttonRow}>
-            <Pressable
-              style={[styles.btn, styles.btnPrimary, styles.btnLg]}
-              onPress={generate}
-            >
-              <Text style={styles.btnPrimaryText}>🎲 Genereer Weekschema</Text>
-            </Pressable>
-            {schedule && (
-              <Pressable
-                style={[styles.btn, styles.btnSecondary]}
-                onPress={() => setSaveModalVisible(true)}
-              >
-                <Text style={styles.btnPrimaryText}>💾 Opslaan</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-
-        {schedule ? (
-          <View>
-            {WEEKDAYS.map(day => {
-              const dayData = schedule.days[day] || {};
-              const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
-              return (
-                <View key={day} style={styles.dayBlock}>
-                  <Text style={styles.dayTitle}>{dayLabel}</Text>
-                  {SCHEDULE_SLOTS.map(slot => {
-                    const recipeId = dayData[slot.id];
-                    const recipe = recipeId ? recipeMap.get(recipeId) : null;
-                    return (
-                      <View key={slot.id} style={styles.slotRow}>
-                        <Text style={styles.slotLabel}>{slot.label}</Text>
-                        <Pressable
-                          style={styles.slotContent}
-                          onPress={() =>
-                            recipe &&
-                            navigation.navigate('RecipeDetail', { id: recipe.id })
-                          }
-                        >
+              {getDaysForPreset(preset).map(day => {
+                const dayData = activeSchedule.days[day] || {};
+                const isToday = day === todayDay;
+                return (
+                  <View
+                    key={day}
+                    style={[styles.activeDayBlock, isToday && styles.activeDayBlockToday]}
+                  >
+                    <View style={styles.activeDayHeader}>
+                      <Text style={styles.activeDayHeaderText}>{capitalize(day)}</Text>
+                      {isToday ? (
+                        <View style={styles.activeDayBadge}>
+                          <Text style={styles.activeDayBadgeText}>VANDAAG</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {SCHEDULE_SLOTS.map(slot => {
+                      const recipeId = dayData[slot.id];
+                      const recipe = recipeId ? recipeMap.get(recipeId) : null;
+                      const userRating =
+                        recipeId && ratings[recipeId]?.average ? ratings[recipeId].average : 0;
+                      return (
+                        <View key={slot.id} style={styles.activeRow}>
+                          <Text style={styles.activeRowSlot}>
+                            {getSlotLabel(slot.id)}
+                          </Text>
                           {recipe ? (
-                            <View style={styles.recipeChip}>
-                              {recipe.image ? (
-                                <Image
-                                  source={{ uri: recipe.image }}
-                                  style={styles.recipeChipImg}
-                                />
-                              ) : (
-                                <View
-                                  style={[
-                                    styles.recipeChipImg,
-                                    styles.recipeChipPlaceholder,
-                                  ]}
-                                >
-                                  <Text style={{ fontSize: 18 }}>🍽️</Text>
-                                </View>
-                              )}
-                              <Text
-                                style={styles.recipeChipName}
-                                numberOfLines={2}
-                              >
+                            <Pressable
+                              style={styles.activeRowRecipe}
+                              onPress={() =>
+                                navigation.navigate('RecipeDetail', { id: recipe.id })
+                              }
+                            >
+                              <Text style={styles.activeRowName} numberOfLines={1}>
                                 {recipe.name}
                               </Text>
-                            </View>
+                              {userRating > 0 ? (
+                                <Stars rating={userRating} size={12} />
+                              ) : null}
+                            </Pressable>
                           ) : (
-                            <Text style={styles.slotEmpty}>Geen recept</Text>
+                            <Text style={styles.activeRowEmpty}>—</Text>
                           )}
-                        </Pressable>
-                        <Pressable
-                          style={styles.refreshBtn}
-                          onPress={() => refreshSlot(day, slot.id)}
-                          hitSlop={6}
-                        >
-                          <Text style={styles.refreshBtnText}>↻</Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })}
-                </View>
-              );
-            })}
-          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })}
+            </View>
+          )
         ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyTitle}>Klik op "Genereer"</Text>
-            <Text style={styles.emptyText}>
-              Er wordt automatisch een weekmenu samengesteld op basis van je
-              recepten.
-            </Text>
-          </View>
+          /* ============ GENEREREN ============ */
+          <>
+            <Text style={styles.title}>Weekschema Generator</Text>
+            <View style={styles.intro}>
+              <Text style={styles.introText}>
+                💡 Bewaar je weekschema in <Text style={styles.bold}>Favorieten</Text> en
+                genereer er nadien een <Text style={styles.bold}>boodschappenlijst</Text> van.
+                Die verschijnt automatisch in de tab{' '}
+                <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
+              </Text>
+            </View>
+
+            <View style={styles.controls}>
+              <Text style={styles.subTitle}>Allergenen uitsluiten</Text>
+              <Text style={styles.helperText}>
+                Vink allergenen aan die je wilt uitsluiten. Recepten met deze
+                allergenen worden niet gebruikt.
+              </Text>
+              <View style={styles.allergenRow}>
+                {ALLERGENS.filter(a => usedAllergens.has(a)).map(a => {
+                  const active = excluded.includes(a);
+                  return (
+                    <Pressable
+                      key={a}
+                      onPress={() => toggleAllergen(a)}
+                      style={[styles.allergenChip, active && styles.allergenChipActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.allergenChipText,
+                          active && styles.allergenChipTextActive,
+                        ]}
+                      >
+                        {active ? '✓ ' : ''}
+                        {a}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {usedAllergens.size === 0 && (
+                  <Text style={styles.helperText}>
+                    Geen allergenen gevonden in de recepten.
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.buttonRow}>
+                <Pressable
+                  style={[styles.btn, styles.btnPrimary, styles.btnLg]}
+                  onPress={generate}
+                >
+                  <Text style={styles.btnPrimaryText}>🎲 Genereer Weekschema</Text>
+                </Pressable>
+                {schedule && (
+                  <Pressable
+                    style={[styles.btn, styles.btnSecondary]}
+                    onPress={() => setSaveModalVisible(true)}
+                  >
+                    <Text style={styles.btnPrimaryText}>💾 Opslaan</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            {schedule ? (
+              <View>
+                {WEEKDAYS.map(day => {
+                  const dayData = schedule.days[day] || {};
+                  const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
+                  return (
+                    <View key={day} style={styles.dayBlock}>
+                      <Text style={styles.dayTitle}>{dayLabel}</Text>
+                      {SCHEDULE_SLOTS.map(slot => {
+                        const recipeId = dayData[slot.id];
+                        const recipe = recipeId ? recipeMap.get(recipeId) : null;
+                        return (
+                          <View key={slot.id} style={styles.slotRow}>
+                            <Text style={styles.slotLabel}>{slot.label}</Text>
+                            <Pressable
+                              style={styles.slotContent}
+                              onPress={() =>
+                                recipe &&
+                                navigation.navigate('RecipeDetail', { id: recipe.id })
+                              }
+                            >
+                              {recipe ? (
+                                <View style={styles.recipeChip}>
+                                  {recipe.image ? (
+                                    <Image
+                                      source={{ uri: recipe.image }}
+                                      style={styles.recipeChipImg}
+                                    />
+                                  ) : (
+                                    <View
+                                      style={[
+                                        styles.recipeChipImg,
+                                        styles.recipeChipPlaceholder,
+                                      ]}
+                                    >
+                                      <Text style={{ fontSize: 18 }}>🍽️</Text>
+                                    </View>
+                                  )}
+                                  <Text
+                                    style={styles.recipeChipName}
+                                    numberOfLines={2}
+                                  >
+                                    {recipe.name}
+                                  </Text>
+                                </View>
+                              ) : (
+                                <Text style={styles.slotEmpty}>Geen recept</Text>
+                              )}
+                            </Pressable>
+                            <Pressable
+                              style={styles.refreshBtn}
+                              onPress={() => refreshSlot(day, slot.id)}
+                              hitSlop={6}
+                            >
+                              <Text style={styles.refreshBtnText}>↻</Text>
+                            </Pressable>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>📅</Text>
+                <Text style={styles.emptyTitle}>Klik op "Genereer"</Text>
+                <Text style={styles.emptyText}>
+                  Er wordt automatisch een weekmenu samengesteld op basis van je
+                  recepten.
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -625,5 +852,127 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'flex-end',
+  },
+
+  /* ====== Sub-tab bar ====== */
+  subtabBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light,
+  },
+  subtabBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  subtabBtnActive: {
+    borderBottomColor: colors.primary,
+  },
+  subtabBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray,
+  },
+  subtabBtnTextActive: {
+    color: colors.primary,
+  },
+
+  /* ====== Preset bar (Vandaag / Vandaag & morgen / Heel weekschema) ====== */
+  presetBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: spacing.lg,
+  },
+  presetBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: radius.sm,
+    backgroundColor: colors.white,
+  },
+  presetBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  presetBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  presetBtnTextActive: {
+    color: colors.white,
+  },
+
+  /* ====== Actief weekschema dag-blokken ====== */
+  activeDayBlock: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.sm,
+  },
+  activeDayBlockToday: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+  },
+  activeDayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.light,
+  },
+  activeDayHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primaryDark,
+  },
+  activeDayBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  activeDayBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  activeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    gap: spacing.sm,
+  },
+  activeRowSlot: {
+    width: 90,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.gray,
+    textTransform: 'uppercase',
+  },
+  activeRowRecipe: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  activeRowName: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.dark,
+    fontWeight: '500',
+  },
+  activeRowEmpty: {
+    flex: 1,
+    color: colors.grayLight,
+    fontStyle: 'italic',
   },
 });

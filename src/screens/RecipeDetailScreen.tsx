@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, shadows } from '../constants/theme';
+import { CompactHeader } from '../navigation/RootStack';
 import { Stars } from '../components/Stars';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
@@ -113,6 +114,10 @@ export function RecipeDetailScreen({ route, navigation }: any) {
     load();
   }, [load]);
 
+  const goToLanding = useCallback(() => {
+    navigation.getParent()?.getParent()?.goBack();
+  }, [navigation]);
+
   const handleFav = async () => {
     try {
       const isF = await toggleFavorite(id, user);
@@ -176,16 +181,16 @@ export function RecipeDetailScreen({ route, navigation }: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <CompactHeader
+        onBack={() => navigation.goBack()}
+        onHome={goToLanding}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>← Terug</Text>
-          </Pressable>
-
           {recipe.image ? (
             <Image source={{ uri: recipe.image }} style={styles.image} />
           ) : (
@@ -419,8 +424,16 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
   },
   backBtn: {
-    paddingVertical: 8,
-    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    marginBottom: spacing.sm,
+  },
+  backChevron: {
+    fontSize: 32,
+    color: colors.primary,
+    fontWeight: '300',
+    lineHeight: 32,
   },
   backText: {
     color: colors.primary,

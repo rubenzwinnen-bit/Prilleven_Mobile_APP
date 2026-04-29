@@ -46,5 +46,7 @@ export {
 } from './schedules';
 export {
   getIngredientIconMap,
+  getIngredientIconMaps,
   clearIngredientIconCache,
 } from './ingredientIcons';
+export type { IngredientIconMaps } from './ingredientIcons';

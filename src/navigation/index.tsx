@@ -4,15 +4,14 @@
  * Combineert alle stacks in een bottom-tab navigator.
  * Dit is het enige navigatie-bestand dat App.tsx importeert.
  *
- * Tabs:
- *   🍽️ Recepten        → RecipesStack
- *   📅 Weekschema      → ScheduleStack
- *   ❤️ Favorieten      → FavoritesStack
- *   🛒 Boodschappen    → ShoppingListTabScreen (geen stack nodig)
+ * Tabs (alleen iconen, geen labels):
+ *   Recepten        → RecipesStack          (groen-bestek)
+ *   Weekschema      → ScheduleStack         (groen-kalender)
+ *   Favorieten      → FavoritesStack        (groen-hart)
+ *   Boodschappen    → ShoppingListTabScreen (groen-mandje)
  */
 
 import React from 'react';
-import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { colors } from '../constants/theme';
 import type { MainTabParamList } from './types';
@@ -21,6 +20,12 @@ import { RecipesStackNavigator } from './RecipesStack';
 import { ScheduleStackNavigator } from './ScheduleStack';
 import { FavoritesStackNavigator } from './FavoritesStack';
 import { ShoppingListTabScreen } from '../screens/ShoppingListTabScreen';
+import {
+  RecipesIcon,
+  ScheduleIcon,
+  FavoritesIcon,
+  ShoppingIcon,
+} from '../components/TabIcons';
 
 const Tabs = createBottomTabNavigator<MainTabParamList>();
 
@@ -29,18 +34,22 @@ export function MainTabs() {
     <Tabs.Navigator
       screenOptions={{
         headerShown: false,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.gray,
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.light,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: 60,
+          paddingTop: 0,
+          paddingBottom: 0,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
+        tabBarItemStyle: {
+          height: 60,
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          paddingTop: 0,
+          paddingBottom: 2,
         },
       }}
     >
@@ -48,37 +57,28 @@ export function MainTabs() {
         name="Recepten"
         component={RecipesStackNavigator}
         options={{
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>🍽️</Text>
-          ),
+          tabBarIcon: ({ focused }) => <RecipesIcon focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="Weekschema"
         component={ScheduleStackNavigator}
         options={{
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>📅</Text>
-          ),
+          tabBarIcon: ({ focused }) => <ScheduleIcon focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="Favorieten"
         component={FavoritesStackNavigator}
         options={{
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>❤️</Text>
-          ),
+          tabBarIcon: ({ focused }) => <FavoritesIcon focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="Boodschappenlijst"
         component={ShoppingListTabScreen}
         options={{
-          tabBarLabel: 'Boodschappen',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22, color }}>🛒</Text>
-          ),
+          tabBarIcon: ({ focused }) => <ShoppingIcon focused={focused} />,
         }}
       />
     </Tabs.Navigator>

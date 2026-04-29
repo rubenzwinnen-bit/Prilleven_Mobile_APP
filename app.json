@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Prilleven Receptenboek",
+    "name": "Prilleven",
     "slug": "prilleven-mobile-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,9 +16,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "be.prilleven.mobileapp",
-      "buildNumber": "2",
+      "buildNumber": "5",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Laat je HapjesHeld een foto nemen van ingrediënten of een etiket om een antwoord te krijgen.",
+        "NSPhotoLibraryUsageDescription": "Kies een foto uit je galerij om die naar HapjesHeld te sturen voor een antwoord over kindervoeding."
       }
     },
     "android": {

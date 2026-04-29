@@ -23,6 +23,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, shadows } from '../constants/theme';
@@ -134,7 +135,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
         >
           {/* Logo / welkom */}
           <View style={styles.header}>
-            <Text style={styles.logo}>🌿</Text>
+            <Image
+              source={require('../../assets/prilleven-logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Community Pril leven</Text>
           </View>
 
@@ -296,7 +301,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.white,
   },
   flex: { flex: 1 },
   scroll: {
@@ -308,8 +313,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  logo: {
-    fontSize: 64,
+  logoImage: {
+    width: 120,
+    height: 120,
     marginBottom: spacing.sm,
   },
   title: {

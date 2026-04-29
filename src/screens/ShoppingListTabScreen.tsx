@@ -20,18 +20,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, shadows } from '../constants/theme';
-import { UsernameHeader } from '../components/UsernameHeader';
+import { CompactHeader } from '../navigation/RootStack';
 import { IngredientTile, ingredientTileStyles } from '../components/IngredientTile';
 import { useShoppingList } from '../context/ShoppingListContext';
 
 export function ShoppingListTabScreen({ navigation }: any) {
   const { list, clearList, moveToBasket, moveBackToList } = useShoppingList();
+  const goToLanding = () => navigation.getParent()?.goBack();
 
   /* ----- Lege staat: nog geen lijst gegenereerd ----- */
   if (!list) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <UsernameHeader subtitle="Boodschappenlijst" />
+      <SafeAreaView style={styles.container} edges={[]}>
+        <CompactHeader onBack={goToLanding} />
         <ScrollView contentContainerStyle={styles.scroll}>
           <Text style={styles.title}>🛒 Boodschappenlijst</Text>
 
@@ -92,8 +93,8 @@ export function ShoppingListTabScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <UsernameHeader subtitle="Boodschappenlijst" />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <CompactHeader onBack={goToLanding} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>🛒 Boodschappenlijst</Text>
         <View style={styles.activeInfoBanner}>

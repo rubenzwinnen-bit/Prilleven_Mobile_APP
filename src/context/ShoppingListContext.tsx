@@ -20,7 +20,7 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getIngredientIconMap } from '../services/ingredientIcons';
+import { getIngredientIconMaps } from '../services/ingredientIcons';
 import { normalizeIngredientName } from '../constants/ingredientIcons';
 
 const STORAGE_KEY = 'receptenboek_shoppinglist_v1';
@@ -71,21 +71,25 @@ export function ShoppingListProvider({
   const [loading, setLoading] = useState(true);
 
   /**
-   * Ververs iconUrl's op de ingrediënten in een lijst.
-   * Haalt de laatste iconen op uit Supabase en update de lijst.
+   * Ververs icoon-URLs én admin-display-namen op de ingrediënten in
+   * een lijst. Haalt de laatste data op uit Supabase en update de
+   * lijst (en AsyncStorage) wanneer er iets gewijzigd is.
    */
   const refreshIconUrls = useCallback(async (currentList: ShoppingList): Promise<ShoppingList> => {
     try {
-      const iconMap = await getIngredientIconMap();
-      if (iconMap.size === 0) return currentList;
+      const { iconUrl: iconMap, displayName: nameMap } = await getIngredientIconMaps();
+      if (iconMap.size === 0 && nameMap.size === 0) return currentList;
 
       let changed = false;
       const updatedIngredients = currentList.ingredients.map(ing => {
         const normalized = normalizeIngredientName(ing.name);
         const newUrl = iconMap.get(normalized) || undefined;
-        if (newUrl !== ing.iconUrl) {
+        const adminName = nameMap.get(normalized);
+        const newName = adminName || ing.name;
+
+        if (newUrl !== ing.iconUrl || newName !== ing.name) {
           changed = true;
-          return { ...ing, iconUrl: newUrl };
+          return { ...ing, iconUrl: newUrl, name: newName };
         }
         return ing;
       });
@@ -96,7 +100,7 @@ export function ShoppingListProvider({
         return updated;
       }
     } catch {
-      // Icon refresh is non-critical — silently continue
+      // Refresh is non-critical — silently continue
     }
     return currentList;
   }, []);

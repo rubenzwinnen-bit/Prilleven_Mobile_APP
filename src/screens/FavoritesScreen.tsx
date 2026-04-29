@@ -20,7 +20,7 @@ import { colors, radius, spacing, shadows } from '../constants/theme';
 import { RecipeCard } from '../components/RecipeCard';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
-import { UsernameHeader } from '../components/UsernameHeader';
+import { CompactHeader } from '../navigation/RootStack';
 import {
   getFavoriteRecipes,
   getAllRatings,
@@ -37,6 +37,7 @@ import type { Recipe, RatingSummary, Schedule } from '../types';
 export function FavoritesScreen({ navigation }: any) {
   const { user } = useUser();
   const { show } = useToast();
+  const goToLanding = () => navigation.getParent()?.getParent()?.goBack();
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [ratings, setRatings] = useState<Record<string, RatingSummary>>({});
@@ -179,8 +180,8 @@ export function FavoritesScreen({ navigation }: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <UsernameHeader subtitle="Favorieten" />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <CompactHeader onBack={goToLanding} />
       <FlatList
         data={recipes}
         keyExtractor={r => r.id}
