@@ -33,13 +33,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { colors, radius, spacing, shadows } from '../constants/theme';
-import { sendChatMessage, getConversation } from '../services/hapjesheld';
+import {
+  sendChatMessage,
+  getConversation,
+  getProfile,
+  type MonthlyUsage,
+  type DailyImageUsage,
+} from '../services/hapjesheld';
 import {
   pickImageFromCamera,
   pickImageFromGallery,
   type PickedImage,
 } from '../services/hapjesheld-image';
 import type { HapjesHeldStackParamList } from '../navigation/types';
+import { useToast } from '../components/Toast';
 
 type Role = 'user' | 'assistant';
 
@@ -51,6 +58,84 @@ interface Message {
 }
 
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+/* ----------------------------------------
+   USAGE BAR
+   Compacte maandbarometer bovenaan de chat.
+   Toont percentage van AI-budget verbruikt deze maand,
+   met kleur-feedback bij 70%+ (warn) en 100% (danger).
+---------------------------------------- */
+function UsageBar({ usage }: { usage: MonthlyUsage }) {
+  const pct = Math.max(0, Math.min(100, Math.round(usage.percent || 0)));
+  const reached = pct >= 100;
+  const warning = pct >= 70 && !reached;
+  const fillColor = reached
+    ? colors.danger
+    : warning
+      ? '#e08e3f' /* terracotta-warning */
+      : colors.primary;
+  return (
+    <View style={usageBarStyles.wrap}>
+      <View style={usageBarStyles.header}>
+        <Text style={usageBarStyles.label}>AI-gebruik deze maand</Text>
+        <Text style={usageBarStyles.pct}>{pct}%</Text>
+      </View>
+      <View style={usageBarStyles.track}>
+        <View
+          style={[
+            usageBarStyles.fill,
+            { width: `${pct}%`, backgroundColor: fillColor },
+          ]}
+        />
+      </View>
+      {reached ? (
+        <Text style={usageBarStyles.notice}>
+          Maandlimiet bereikt — vanaf de 1e van volgende maand kan je weer
+          vragen stellen.
+        </Text>
+      ) : warning ? (
+        <Text style={usageBarStyles.noticeWarn}>
+          Je nadert de maandlimiet — gebruik je vragen bewust.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const usageBarStyles = StyleSheet.create({
+  wrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+    backgroundColor: colors.bg,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  label: { fontSize: 12, color: colors.gray, fontWeight: '600' },
+  pct: { fontSize: 12, color: colors.gray, fontWeight: '700' },
+  track: {
+    height: 6,
+    backgroundColor: colors.light,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  fill: { height: '100%', borderRadius: 3 },
+  notice: {
+    fontSize: 11,
+    color: colors.danger,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  noticeWarn: {
+    fontSize: 11,
+    color: '#a06420',
+    marginTop: 4,
+  },
+});
 
 type Props = NativeStackScreenProps<HapjesHeldStackParamList, 'Chat'>;
 
@@ -68,7 +153,33 @@ export function HapjesHeldScreen({ route }: Props) {
   const [loadingHistory, setLoadingHistory] = useState<boolean>(
     !!initialConversationId
   );
+  const [usage, setUsage] = useState<MonthlyUsage | null>(null);
+  const [imageUsage, setImageUsage] = useState<DailyImageUsage | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
+  const { show: showToast } = useToast();
+
+  /* Quota state — afgeleid van usage voor disable-logica */
+  const monthlyReached = !!usage && usage.percent >= 100;
+  const noImagesLeft = !!imageUsage && imageUsage.remaining <= 0;
+
+  /* Haal usage op bij mount, zodat barometer + image-counter
+     direct juist staan zonder eerst een vraag te moeten sturen. */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getProfile();
+        if (cancelled) return;
+        if (profile.usage) setUsage(profile.usage);
+        if (profile.imageUsage) setImageUsage(profile.imageUsage);
+      } catch {
+        // Stille fallback: zonder usage tonen we gewoon niets
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* Laad oude berichten als we met een bestaande conversatie starten */
   useEffect(() => {
@@ -192,18 +303,39 @@ export function HapjesHeldScreen({ route }: Props) {
       };
       setMessages((prev) => [...prev, asstMsg]);
       scrollToEnd();
+
+      /* Update barometer + image-counter live na elke succesvolle chat */
+      if (res.usage) setUsage(res.usage);
+      if (res.imageUsage) setImageUsage(res.imageUsage);
     } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
       const msg =
         err instanceof Error
           ? err.message
           : 'Er ging iets mis. Probeer het later opnieuw.';
-      const errorMsg: Message = {
-        id: uid(),
-        role: 'assistant',
-        text: `⚠️ ${msg}`,
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-      scrollToEnd();
+
+      if (status === 429) {
+        /* Rate-limit / quota / image-limit bereikt: toast i.p.v. chat-bubble.
+           De server-message is al netjes Nederlands ("Te veel vragen binnen
+           een uur (max 50)..."). Refresh ook de UI-tellers zodat de barometer
+           accuraat is na de blokkade. */
+        showToast(msg, 'error');
+        try {
+          const profile = await getProfile();
+          if (profile.usage) setUsage(profile.usage);
+          if (profile.imageUsage) setImageUsage(profile.imageUsage);
+        } catch {
+          /* niet kritisch */
+        }
+      } else {
+        const errorMsg: Message = {
+          id: uid(),
+          role: 'assistant',
+          text: `⚠️ ${msg}`,
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+        scrollToEnd();
+      }
     } finally {
       setLoading(false);
     }
@@ -241,7 +373,8 @@ export function HapjesHeldScreen({ route }: Props) {
   };
 
   const isEmpty = messages.length === 0 && !loading && !loadingHistory;
-  const canSend = (!!input.trim() || !!pendingImage) && !loading;
+  const canSend =
+    (!!input.trim() || !!pendingImage) && !loading && !monthlyReached;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -250,6 +383,9 @@ export function HapjesHeldScreen({ route }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
+        {/* Maandelijkse AI-budget barometer */}
+        {usage ? <UsageBar usage={usage} /> : null}
+
         {loadingHistory ? (
           <View style={styles.empty}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -307,22 +443,51 @@ export function HapjesHeldScreen({ route }: Props) {
 
         {/* Input bar */}
         <View style={styles.inputRow}>
-          <TouchableOpacity
-            style={styles.photoButton}
-            onPress={handlePickImage}
-            disabled={loading}
-            hitSlop={8}
-          >
-            <Text style={styles.photoIcon}>📷</Text>
-          </TouchableOpacity>
+          <View style={styles.photoButtonWrap}>
+            <TouchableOpacity
+              style={[
+                styles.photoButton,
+                noImagesLeft && styles.photoButtonDisabled,
+              ]}
+              onPress={() => {
+                if (noImagesLeft) {
+                  showToast(
+                    `Je hebt vandaag al ${imageUsage?.limit ?? 50} foto-vragen gesteld. Morgen kan je weer.`,
+                    'info'
+                  );
+                  return;
+                }
+                handlePickImage();
+              }}
+              disabled={loading}
+              hitSlop={8}
+            >
+              <Text style={styles.photoIcon}>📷</Text>
+            </TouchableOpacity>
+            {imageUsage ? (
+              <Text
+                style={[
+                  styles.photoCounter,
+                  noImagesLeft && styles.photoCounterDanger,
+                ]}
+                numberOfLines={1}
+              >
+                {imageUsage.remaining}/{imageUsage.limit}
+              </Text>
+            ) : null}
+          </View>
           <TextInput
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Stel je vraag..."
+            placeholder={
+              monthlyReached
+                ? 'Maandlimiet bereikt — terug op de 1e van volgende maand'
+                : 'Stel je vraag...'
+            }
             placeholderTextColor={colors.gray}
             multiline
-            editable={!loading}
+            editable={!loading && !monthlyReached}
             maxLength={500}
           />
           <TouchableOpacity
@@ -450,6 +615,10 @@ const styles = StyleSheet.create({
     borderTopColor: colors.light,
     backgroundColor: colors.white,
   },
+  photoButtonWrap: {
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
   photoButton: {
     width: 44,
     height: 44,
@@ -457,10 +626,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
+  },
+  photoButtonDisabled: {
+    opacity: 0.4,
   },
   photoIcon: {
     fontSize: 22,
+  },
+  photoCounter: {
+    fontSize: 10,
+    color: colors.gray,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  photoCounterDanger: {
+    color: colors.danger,
   },
   input: {
     flex: 1,

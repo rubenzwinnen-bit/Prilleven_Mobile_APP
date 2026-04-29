@@ -28,6 +28,20 @@ export interface ChatRequest {
   image_mime?: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 }
 
+/** Maandelijks AI-budgetverbruik (€-cap), voor de barometer-UI. */
+export interface MonthlyUsage {
+  spentCents: number;
+  capCents: number;
+  percent: number;
+}
+
+/** Dagelijks foto-vragen verbruik, voor de teller naast de camera-knop. */
+export interface DailyImageUsage {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
 export interface ChatResponse {
   answer: string;
   sources?: string[];
@@ -37,12 +51,23 @@ export interface ChatResponse {
   modelReason?: string;
   conversation_id: string;
   assistant_message_id?: string;
+  /** Maandbarometer-update na deze chat-call. */
+  usage?: MonthlyUsage;
+  /** Dagelijkse image-teller, ook bij text-only chats meegestuurd. */
+  imageUsage?: DailyImageUsage;
 }
 
 export interface ChatError {
   error: string;
   reason?: string;
   status: number;
+}
+
+/** Antwoord van GET /api/profile — gebruikt door de chat-UI bij mount. */
+export interface ProfileResponse {
+  profile: unknown;
+  usage?: MonthlyUsage;
+  imageUsage?: DailyImageUsage;
 }
 
 /* Conversatie-lijst items (sidebar / history view) */
@@ -117,6 +142,18 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
     throw error;
   }
   return data as T;
+}
+
+/* ----------------------------------------
+   getProfile
+   GET /api/profile → { profile, usage, imageUsage }
+
+   Gebruikt door de chat-UI bij mount om de maandbarometer en
+   image-counter direct te kunnen tonen, vóór de eerste chat.
+---------------------------------------- */
+export async function getProfile(): Promise<ProfileResponse> {
+  const response = await authedFetch('/api/profile');
+  return parseOrThrow<ProfileResponse>(response);
 }
 
 /* ----------------------------------------
