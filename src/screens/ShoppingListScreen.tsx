@@ -28,7 +28,7 @@ import { CommonActions } from '@react-navigation/native';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { UsernameHeader } from '../components/UsernameHeader';
-import { getSchedule, getRecipesByIds, getIngredientIconMap } from '../services';
+import { getSchedule, getRecipesByIds, getIngredientIconMaps } from '../services';
 import {
   WEEKDAYS,
   SCHEDULE_SLOTS,
@@ -156,8 +156,9 @@ export function ShoppingListScreen({ route, navigation }: any) {
     const persons = routePersons || schedule.persons || 4;
     const isActive = schedule.isActive || false;
 
-    /* Haal custom iconen op uit Supabase */
-    const iconMap = await getIngredientIconMap();
+    /* Haal custom iconen + admin display-names op uit Supabase */
+    const { iconUrl: iconMap, displayName: displayNameMap } =
+      await getIngredientIconMaps();
 
     const map = new Map<string, AggregatedIngredient>();
     for (const [recipeId, count] of Object.entries(recipeCounts)) {
@@ -186,8 +187,12 @@ export function ShoppingListScreen({ route, navigation }: any) {
         const unitLower = unitMap[unitRaw] || unitRaw;
         const k = `${normalized}|${unitLower}`;
         if (!map.has(k)) {
-          // Mooie weergavenaam: genormaliseerd met hoofdletter
-          const displayName = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+          // Weergavenaam: admin-bewerkbaar via Supabase, anders fallback
+          // op de genormaliseerde sleutel met hoofdletter.
+          const adminName = displayNameMap.get(normalized);
+          const displayName =
+            adminName ||
+            normalized.charAt(0).toUpperCase() + normalized.slice(1);
           map.set(k, {
             key: k,
             name: displayName,
