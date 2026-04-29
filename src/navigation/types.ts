@@ -13,12 +13,25 @@
 
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
+/* ---- Root Stack (Landing → Main of HapjesHeld) ---- */
+export type RootStackParamList = {
+  Landing: undefined;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
+  HapjesHeld: NavigatorScreenParams<HapjesHeldStackParamList> | undefined;
+};
+
 /* ---- Bottom Tabs ---- */
 export type MainTabParamList = {
   Recepten: NavigatorScreenParams<RecipesStackParamList>;
   Weekschema: NavigatorScreenParams<ScheduleStackParamList>;
   Favorieten: NavigatorScreenParams<FavoritesStackParamList>;
   Boodschappenlijst: undefined;
+};
+
+/* ---- HapjesHeld 2.0 stack ---- */
+export type HapjesHeldStackParamList = {
+  Conversations: undefined;
+  Chat: { conversationId?: string } | undefined;
 };
 
 /* ---- Recepten tab stack ---- */

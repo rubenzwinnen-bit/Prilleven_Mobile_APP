@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+<title>Hart in gebreide wol (groen)</title>
+<defs>
+<pattern id="knit" x="0" y="0" width="14" height="16" patternUnits="userSpaceOnUse">
+<path d="M0 0 L7 8 L14 0" fill="none" stroke="#8fbc94" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M-7 8 L0 16 L7 8" fill="none" stroke="#8fbc94" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7 8 L14 16 L21 8" fill="none" stroke="#8fbc94" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M0 1 L7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M14 1 L7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M0 17 L-7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M14 17 L7 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+<path d="M14 17 L21 9" stroke="#b5d8be" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.7"/>
+</pattern>
+<path id="heartShape" d="M0-55 C-25-80-75-75-75-20 C-75 20-30 55 0 95 C30 55 75 20 75-20 C75-75 25-80 0-55 Z"/>
+<clipPath id="heartClip"><use href="#heartShape"/></clipPath>
+<radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
+<stop offset="0" stop-color="#000" stop-opacity="0.18"/>
+<stop offset="1" stop-color="#000" stop-opacity="0"/>
+</radialGradient>
+<filter id="fuzz" x="-10%" y="-10%" width="120%" height="120%">
+<feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/>
+<feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0 0.25 0"/>
+<feComposite in2="SourceGraphic" operator="in"/>
+</filter>
+</defs>
+<g transform="translate(200 195)">
+<ellipse cx="0" cy="105" rx="80" ry="14" fill="url(#shadow)"/>
+<use href="#heartShape" fill="#7ab088"/>
+<use href="#heartShape" fill="url(#knit)"/>
+<g clip-path="url(#heartClip)">
+<ellipse cx="-25" cy="-30" rx="25" ry="18" fill="#fff" opacity="0.08"/>
+<ellipse cx="0" cy="80" rx="60" ry="12" fill="#000" opacity="0.12"/>
+<rect x="-100" y="-100" width="200" height="200" fill="#fff" filter="url(#fuzz)" opacity="0.4"/>
+</g>
+<use href="#heartShape" fill="none" stroke="#3a5a48" stroke-width="1.5" opacity="0.5"/>
+</g>
+</svg>

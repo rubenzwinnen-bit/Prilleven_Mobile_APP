@@ -16,10 +16,11 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../constants/theme';
+import { ChevronBack, HEADER_CONTENT_HEIGHT } from '../navigation/RootStack';
 import { RecipeCard } from '../components/RecipeCard';
 import { useToast } from '../components/Toast';
-import { UsernameHeader } from '../components/UsernameHeader';
 import {
   getRecipes,
   getAllRatings,
@@ -43,6 +44,17 @@ export function RecipeListScreen({ navigation }: any) {
   const [search, setSearch] = useState('');
   const [momentFilter, setMomentFilter] = useState('');
   const [allergenFilter, setAllergenFilter] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const filtersActive = momentFilter !== '' || allergenFilter !== '';
+
+  /* Helper om naar Landing te gaan (twee niveaus omhoog vanaf RecipesStack). */
+  const goToLanding = useCallback(() => {
+    navigation.getParent()?.getParent()?.goBack();
+  }, [navigation]);
+
+  /* Scroll-positie wordt automatisch bewaard door native-stack —
+     de FlatList blijft gemount terwijl we naar RecipeDetail navigeren. */
 
   const loadData = useCallback(async () => {
     try {
@@ -101,56 +113,80 @@ export function RecipeListScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <UsernameHeader subtitle="Recepten" />
-      <View style={styles.toolbar}>
+      <View style={styles.headerRow}>
+        <ChevronBack onPress={goToLanding} />
         <TextInput
-          style={styles.searchInput}
+          style={styles.headerSearch}
           placeholder="🔍  Zoek recepten..."
           placeholderTextColor={colors.gray}
           value={search}
           onChangeText={setSearch}
+          returnKeyType="search"
         />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
+        <Pressable
+          style={[
+            styles.headerFilter,
+            (filtersOpen || filtersActive) && styles.headerFilterActive,
+          ]}
+          onPress={() => setFiltersOpen(v => !v)}
+          hitSlop={6}
         >
-          <FilterChip
-            label="Alle eetmomenten"
-            active={momentFilter === ''}
-            onPress={() => setMomentFilter('')}
+          <Feather
+            name="sliders"
+            size={18}
+            color={
+              filtersOpen || filtersActive ? colors.white : colors.primary
+            }
           />
-          {MEAL_MOMENTS.map(m => (
-            <FilterChip
-              key={m.id}
-              label={m.label}
-              active={momentFilter === m.id}
-              onPress={() => setMomentFilter(m.id)}
-            />
-          ))}
-        </ScrollView>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          <FilterChip
-            label="Geen allergenen filter"
-            active={allergenFilter === ''}
-            onPress={() => setAllergenFilter('')}
-          />
-          {ALLERGENS.map(a => (
-            <FilterChip
-              key={a}
-              label={`zonder ${a}`}
-              active={allergenFilter === a}
-              onPress={() => setAllergenFilter(a)}
-            />
-          ))}
-        </ScrollView>
+          {filtersActive && !filtersOpen ? (
+            <View style={styles.filterDot} />
+          ) : null}
+        </Pressable>
       </View>
+
+      {filtersOpen ? (
+        <View style={styles.filtersPanel}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            <FilterChip
+              label="Alle eetmomenten"
+              active={momentFilter === ''}
+              onPress={() => setMomentFilter('')}
+            />
+            {MEAL_MOMENTS.map(m => (
+              <FilterChip
+                key={m.id}
+                label={m.label}
+                active={momentFilter === m.id}
+                onPress={() => setMomentFilter(m.id)}
+              />
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            <FilterChip
+              label="Geen allergenen filter"
+              active={allergenFilter === ''}
+              onPress={() => setAllergenFilter('')}
+            />
+            {ALLERGENS.map(a => (
+              <FilterChip
+                key={a}
+                label={`zonder ${a}`}
+                active={allergenFilter === a}
+                onPress={() => setAllergenFilter(a)}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <FlatList
         data={filtered}
@@ -221,23 +257,54 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     color: colors.gray,
   },
-  toolbar: {
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.white,
-    ...shadows.sm,
+  /* Inline screen-header */
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    height: HEADER_CONTENT_HEIGHT,
+    gap: spacing.sm,
+    backgroundColor: colors.bg,
   },
-  searchInput: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    paddingVertical: 10,
+  headerSearch: {
+    flex: 1,
+    paddingVertical: 6,
     paddingHorizontal: spacing.md,
     borderRadius: radius.sm,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.light,
     backgroundColor: colors.white,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.dark,
+  },
+  headerFilter: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.light,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerFilterActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  /* Filterpanel onder de header (chip-rijen, alleen zichtbaar als open) */
+  filtersPanel: {
+    backgroundColor: colors.white,
+    paddingVertical: spacing.xs,
+    ...shadows.sm,
+  },
+  filterDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
   },
   chipRow: {
     paddingHorizontal: spacing.lg,

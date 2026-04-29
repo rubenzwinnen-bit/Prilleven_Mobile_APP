@@ -27,7 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CommonActions } from '@react-navigation/native';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
-import { UsernameHeader } from '../components/UsernameHeader';
+import { CompactHeader } from '../navigation/RootStack';
 import { getSchedule, getRecipesByIds, getIngredientIconMaps } from '../services';
 import {
   WEEKDAYS,
@@ -44,6 +44,8 @@ export function ShoppingListScreen({ route, navigation }: any) {
   const { id, persons: routePersons } = route.params;
   const { show } = useToast();
   const { setList } = useShoppingList();
+
+  const goToLanding = () => navigation.getParent()?.getParent()?.goBack();
 
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [recipeMap, setRecipeMap] = useState<Map<string, Recipe>>(new Map());
@@ -247,13 +249,12 @@ export function ShoppingListScreen({ route, navigation }: any) {
   if (!schedule) return null;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <UsernameHeader subtitle="Boodschappenlijst genereren" />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <CompactHeader
+        onBack={() => navigation.goBack()}
+        onHome={goToLanding}
+      />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Terug</Text>
-        </Pressable>
-
         <Text style={styles.title}>🛒 Boodschappenlijst</Text>
         <Text style={styles.subtitle}>{schedule.name}</Text>
 
