@@ -28,6 +28,7 @@ import {
   Image,
   ActionSheetIOS,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -47,6 +48,7 @@ import {
 } from '../services/hapjesheld-image';
 import type { HapjesHeldStackParamList } from '../navigation/types';
 import { useToast } from '../components/Toast';
+import { HealthDisclaimerModal } from '../components/HealthDisclaimerModal';
 
 type Role = 'user' | 'assistant';
 
@@ -342,6 +344,41 @@ export function HapjesHeldScreen({ route }: Props) {
   };
 
   /* ---- Render helpers ---- */
+  // Parse markdown-links [label](url) en bare http(s) URLs in assistant-tekst.
+  // Geeft een array van string|JSX terug om binnen één <Text> te embedden.
+  const renderTextWithLinks = (text: string) => {
+    const re = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>]+[^\s<>.,;:!?)\]"'])/g;
+    const out: Array<React.ReactNode> = [];
+    let lastIndex = 0;
+    let m: RegExpExecArray | null;
+    let key = 0;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > lastIndex) {
+        out.push(text.slice(lastIndex, m.index));
+      }
+      const url = m[1] && m[2] ? m[2] : m[3];
+      const label = m[1] && m[2] ? m[1] : m[3];
+      out.push(
+        <Text
+          key={`lnk-${key++}`}
+          style={styles.assistantLink}
+          onPress={() => {
+            Linking.openURL(url).catch(() => {
+              Alert.alert('Kon link niet openen', url);
+            });
+          }}
+        >
+          {label}
+        </Text>
+      );
+      lastIndex = re.lastIndex;
+    }
+    if (lastIndex < text.length) {
+      out.push(text.slice(lastIndex));
+    }
+    return out;
+  };
+
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
     return (
@@ -365,7 +402,7 @@ export function HapjesHeldScreen({ route }: Props) {
               isUser ? styles.userText : styles.assistantText,
             ]}
           >
-            {item.text}
+            {isUser ? item.text : renderTextWithLinks(item.text)}
           </Text>
         ) : null}
       </View>
@@ -378,11 +415,23 @@ export function HapjesHeldScreen({ route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      {/* Disclaimer modal: getoond bij eerste gebruik. Verplicht voor Google
+          Play "Beleid voor content over en services voor gezondheid". */}
+      <HealthDisclaimerModal />
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
+        {/* Permanente health-disclaimer banner — zichtbaar in elke chat. */}
+        <View style={styles.disclaimerBanner}>
+          <Text style={styles.disclaimerText}>
+            ⓘ HapjesHeld geeft algemene info, geen medisch advies, diagnose
+            of behandeling. Raadpleeg bij twijfel altijd een arts.
+          </Text>
+        </View>
+
         {/* Maandelijkse AI-budget barometer */}
         {usage ? <UsageBar usage={usage} /> : null}
 
@@ -397,6 +446,11 @@ export function HapjesHeldScreen({ route }: Props) {
               Stel me gerust een vraag over kindervoeding. Bijvoorbeeld over
               allergenen, eetgedrag of recepten voor jouw kindje. Je kan ook
               een foto toevoegen van ingrediënten of een etiket.
+            </Text>
+            <Text style={styles.emptyDisclaimer}>
+              Mijn antwoorden zijn algemene info en geen medisch advies. Bij
+              gezondheidsvragen of een allergie: raadpleeg altijd een arts
+              of kinderarts.
             </Text>
           </View>
         ) : (
@@ -513,6 +567,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   flex: { flex: 1 },
+  /* Health-disclaimer banner — altijd zichtbaar in chat. */
+  disclaimerBanner: {
+    backgroundColor: '#fff8ec',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0e3c8',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  disclaimerText: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: '#7a5a1f',
+    textAlign: 'center',
+  },
   empty: {
     flex: 1,
     alignItems: 'center',
@@ -531,6 +599,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 320,
+  },
+  emptyDisclaimer: {
+    fontSize: 12,
+    color: colors.gray,
+    textAlign: 'center',
+    lineHeight: 17,
+    maxWidth: 320,
+    marginTop: spacing.lg,
+    fontStyle: 'italic',
   },
   list: {
     padding: spacing.lg,
@@ -559,6 +636,11 @@ const styles = StyleSheet.create({
   },
   userText: { color: colors.white },
   assistantText: { color: colors.dark },
+  assistantLink: {
+    color: '#0066cc',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+  },
   bubbleImage: {
     width: 200,
     height: 200,

@@ -31,6 +31,10 @@ yarn-error.*
 .env*.local
 .env
 
+# Google Play service account (sensitive — never commit)
+google-service-account.json
+*-service-account.json
+
 # IDE
 .vscode/
 .idea/

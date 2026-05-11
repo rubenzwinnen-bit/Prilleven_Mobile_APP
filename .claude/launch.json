@@ -4,8 +4,8 @@
     {
       "name": "website",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["/Users/anneleenplettinx/Desktop/project_weekschema/server.js"],
-      "port": 3000
+      "runtimeArgs": ["/Users/anneleenplettinx/Desktop/Project_weekschema_Productie/.claude/static-server.mjs"],
+      "port": 5500
     },
     {
       "name": "mobile-web",
