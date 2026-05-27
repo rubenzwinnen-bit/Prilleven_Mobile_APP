@@ -22,6 +22,7 @@ import {
   Switch,
   ActivityIndicator,
   Pressable,
+  TouchableOpacity,
   Modal,
   TextInput,
   Alert,
@@ -40,12 +41,37 @@ import {
   exportUserData,
   deleteAccount,
 } from '../services';
-import { ChevronBack, HEADER_CONTENT_HEIGHT } from '../navigation/RootStack';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
 const CONFIRM_WORD = 'VERWIJDER';
+
+/* Lokale chevron-back — geïnlined om een require-cycle met RootStack te vermijden
+   (RootStack importeert ProfileScreen; ProfileScreen mag dus niets uit
+   RootStack importeren). Visueel identiek aan ChevronBack in RootStack. */
+const HEADER_CONTENT_HEIGHT = 42;
+
+function ChevronBack({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      hitSlop={12}
+      style={{ paddingRight: spacing.md }}
+    >
+      <Text
+        style={{
+          fontSize: 28,
+          color: colors.primary,
+          fontWeight: '300',
+          marginTop: -2,
+        }}
+      >
+        ‹
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 export function ProfileScreen({ navigation }: Props) {
   const { user, logout } = useUser();
