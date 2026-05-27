@@ -13,11 +13,12 @@
 
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
-/* ---- Root Stack (Landing → Main of HapjesHeld) ---- */
+/* ---- Root Stack (Landing → Main of HapjesHeld of Profile) ---- */
 export type RootStackParamList = {
   Landing: undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   HapjesHeld: NavigatorScreenParams<HapjesHeldStackParamList> | undefined;
+  Profile: undefined;
 };
 
 /* ---- Bottom Tabs ---- */

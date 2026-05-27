@@ -19,6 +19,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../constants/theme';
 import { LandingScreen } from '../screens/LandingScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { MainTabs } from './index';
 import { HapjesHeldStackNavigator } from './HapjesHeldStack';
 import type { RootStackParamList } from './types';
@@ -155,6 +156,11 @@ export function RootStackNavigator() {
         options={{
           headerShown: false,
         }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

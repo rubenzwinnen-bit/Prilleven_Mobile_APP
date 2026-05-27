@@ -13,7 +13,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
   ScrollView,
   ImageBackground,
@@ -24,6 +23,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useUser } from '../context/UserContext';
+import { AvatarButton } from '../components/AvatarButton';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Landing'>;
@@ -98,12 +98,12 @@ function AnimatedTile({
    LandingScreen
 ---------------------------------------- */
 export function LandingScreen({ navigation }: Props) {
-  const { user, logout } = useUser();
+  const { user } = useUser();
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Header — ingelogd als + logout */}
+        {/* Header — ingelogd als + avatar (opent Profile) */}
         <View style={styles.header}>
           <View style={styles.userInfo}>
             <Text style={styles.userLabel}>INGELOGD ALS</Text>
@@ -111,9 +111,10 @@ export function LandingScreen({ navigation }: Props) {
               👤 {user}
             </Text>
           </View>
-          <TouchableOpacity onPress={logout} hitSlop={10}>
-            <Text style={styles.logout}>Uitloggen</Text>
-          </TouchableOpacity>
+          <AvatarButton
+            email={user}
+            onPress={() => navigation.navigate('Profile')}
+          />
         </View>
 
         {/* Titel */}
@@ -171,11 +172,6 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 14,
     color: colors.primary,
-    fontWeight: '600',
-  },
-  logout: {
-    fontSize: 14,
-    color: colors.danger,
     fontWeight: '600',
   },
   title: {

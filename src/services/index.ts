@@ -50,3 +50,9 @@ export {
   clearIngredientIconCache,
 } from './ingredientIcons';
 export type { IngredientIconMaps } from './ingredientIcons';
+export {
+  getMemoryEnabled,
+  setMemoryEnabled,
+  exportUserData,
+  deleteAccount,
+} from './profile';
