@@ -1,12 +1,13 @@
 /**
- * PROFILE SCREEN — fase 1 + 1.5
+ * PROFILE SCREEN — fase 1 + 1.5 + 2
  *
- * Vier secties:
+ * Vijf secties:
  *   1. Account         — e-mail tonen + uitloggen
  *   2. Community       — nickname + avatar (publiek zichtbaar in
  *                        community / chatruimtes / tijdlijn)
- *   3. Voorkeuren      — HapjesHeld memory-toggle
- *   4. Mijn gegevens   — GDPR: data-export + account verwijderen
+ *   3. Mijn kinderen   — link naar ChildrenScreen (CRUD)
+ *   4. Voorkeuren      — HapjesHeld memory-toggle
+ *   5. Mijn gegevens   — GDPR: data-export + account verwijderen
  *
  * Entry-point: AvatarButton rechtsboven in LandingScreen-header.
  * Header: ChevronBack (geen home — we komen van Landing).
@@ -490,7 +491,27 @@ export function ProfileScreen({ navigation }: Props) {
           )}
         </Section>
 
-        {/* ----- 3. VOORKEUREN ----- */}
+        {/* ----- 3. MIJN KINDEREN ----- */}
+        <Section title="Mijn kinderen">
+          <Text style={styles.sectionIntro}>
+            Beheer de profielen van je kinderen — naam, geboortedatum, eventuele
+            bekende allergieën — zodat HapjesHeld persoonlijker kan antwoorden.
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate('Children')}
+            style={({ pressed }) => [
+              styles.btnSecondary,
+              pressed && styles.btnPressed,
+            ]}
+          >
+            <Feather name="users" size={16} color={colors.primary} />
+            <Text style={styles.btnSecondaryTextPrimary}>
+              Kinderen beheren
+            </Text>
+          </Pressable>
+        </Section>
+
+        {/* ----- 4. VOORKEUREN ----- */}
         <Section title="Voorkeuren & privacy">
           <View style={styles.toggleRow}>
             <View style={styles.toggleTextWrap}>
@@ -521,7 +542,7 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
         </Section>
 
-        {/* ----- 4. MIJN GEGEVENS (GDPR) ----- */}
+        {/* ----- 5. MIJN GEGEVENS (GDPR) ----- */}
         <Section title="Mijn gegevens">
           <Text style={styles.gdprIntro}>
             Onder de AVG/GDPR heb je recht op inzage en op verwijdering van je

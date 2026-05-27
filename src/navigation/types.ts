@@ -19,6 +19,8 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   HapjesHeld: NavigatorScreenParams<HapjesHeldStackParamList> | undefined;
   Profile: undefined;
+  Children: undefined;
+  ChildForm: { childId?: string };
 };
 
 /* ---- Bottom Tabs ---- */

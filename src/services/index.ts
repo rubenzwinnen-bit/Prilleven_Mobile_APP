@@ -64,3 +64,15 @@ export {
   NICKNAME_REGEX,
 } from './communityProfile';
 export type { CommunityProfile } from './communityProfile';
+export {
+  getChildren,
+  createChild,
+  updateChild,
+  archiveChild,
+  BIRTHDATE_REGEX,
+  KNOWN_ALLERGEN_OPTIONS,
+  TEXTURE_OPTIONS,
+  ageInMonths,
+  formatAge,
+} from './children';
+export type { Child, ChildInput, TexturePreference } from './children';

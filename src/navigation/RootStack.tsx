@@ -20,6 +20,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../constants/theme';
 import { LandingScreen } from '../screens/LandingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { ChildrenScreen } from '../screens/ChildrenScreen';
+import { ChildFormScreen } from '../screens/ChildFormScreen';
 import { MainTabs } from './index';
 import { HapjesHeldStackNavigator } from './HapjesHeldStack';
 import type { RootStackParamList } from './types';
@@ -160,6 +162,16 @@ export function RootStackNavigator() {
       <Stack.Screen
         name="Profile"
         component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Children"
+        component={ChildrenScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ChildForm"
+        component={ChildFormScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
