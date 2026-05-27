@@ -1,6 +1,6 @@
 # CLAUDE.md — Pril Leven Mobile App
 
-Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.3.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
+Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.4.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
 
 > Zusterproject: de **web-app** in `~/Desktop/Project_weekschema_Productie/` heeft een eigen, uitgebreide `CLAUDE.md` per laag (root, `/js`, `/api`, `/supabase-migrations`). De mobiele app deelt **dezelfde Supabase-database en dezelfde Vercel-API** als de web-app — niet duplicaten.
 
@@ -28,8 +28,8 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Image | `expo-image-picker` + `expo-image-manipulator` |
 | File/share (GDPR-export) | `expo-file-system` (~19) `File`/`Paths` API + `expo-sharing` |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `14` |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `18` |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `15` |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `19` |
 
 Node ≥ 20 lokaal voor Expo CLI.
 
@@ -41,7 +41,7 @@ Node ≥ 20 lokaal voor Expo CLI.
 /
 ├── App.tsx                          provider-boom + AppGate (zie §4)
 ├── index.ts                         expo entry
-├── app.json                         expo config (version 2.3.0, permissions in NL)
+├── app.json                         expo config (version 2.4.0, permissions in NL)
 ├── eas.json                         EAS profielen (development/preview/production)
 ├── tsconfig.json                    strict, extends expo/tsconfig.base
 ├── package.json                     dependencies
@@ -87,7 +87,7 @@ SafeAreaProvider
 
 `AppGate` leest `useUser().loading` en wisselt automatisch zodra `onAuthStateChange` triggert.
 
-### 4.2 Navigatie-tree (huidige stand v2.3.0)
+### 4.2 Navigatie-tree (huidige stand v2.4.0)
 
 ```
 RootStack  (native-stack, vaak headerless of CompactHeader inline)
@@ -98,7 +98,10 @@ RootStack  (native-stack, vaak headerless of CompactHeader inline)
 │   ├── Favorieten       → FavoritesStack  (FavoritesList → RecipeDetail / ShoppingList)
 │   └── Boodschappenlijst → ShoppingListTabScreen   (geen sub-stack)
 ├── HapjesHeld → HapjesHeldStack        (Conversations → Chat)
-└── Profile                              src/screens/ProfileScreen.tsx  (geopend via AvatarButton in Landing-header)
+├── Profile                              src/screens/ProfileScreen.tsx  (geopend via AvatarButton in Landing-header)
+├── Children                             src/screens/ChildrenScreen.tsx
+├── ChildForm                            src/screens/ChildFormScreen.tsx
+└── Memories                             src/screens/MemoriesScreen.tsx
 ```
 
 Types: `src/navigation/types.ts` — `RootStackParamList`, `MainTabParamList`, `RecipesStackParamList`, `ScheduleStackParamList`, `FavoritesStackParamList`, `HapjesHeldStackParamList`.
@@ -121,15 +124,16 @@ navigation.getParent()?.getParent()?.goBack();
 
 ---
 
-## 5. Schermen (huidige stand v2.3.0)
+## 5. Schermen (huidige stand v2.4.0)
 
 | Bestand | Belangrijkste functies |
 |---|---|
 | `AuthScreen.tsx` | 3 tabs (login/register/reset). Whitelist-check vóór signup. Logo + sage/primary kleuren. |
 | `LandingScreen.tsx` | 2 grote `AnimatedTile`-tegels (spring scale 0.96 → 1) + `AvatarButton` rechtsboven die `Profile` opent. `useFocusEffect` refresht `community avatar_url` zodat een upload meteen zichtbaar is. |
-| `ProfileScreen.tsx` | 6 secties: **Account** (e-mail + uitloggen), **Community** (nickname-input met regex-validatie + Opslaan-knop, avatar-blok met `AvatarButton`-preview + "Foto kiezen/wijzigen/Verwijderen", upload-pipeline: `expo-image-picker` → `expo-image-manipulator` resize 512px JPEG q=0.8 → signed Storage URL → `PUT /api/community/profile { avatar_path }`), **Mijn kinderen** (knop → `ChildrenScreen`), **Dieet in het gezin** (9 chips uit `DIET_OPTIONS`, optimistic toggle met 400ms debounce + saveInFlight-ref + pending-queue, status-pill saving/saved/error, flush-on-unmount; vereist bestaand community-profile anders inline hint), **Voorkeuren & privacy** (HapjesHeld memory-toggle via `Switch`, optimistic + rollback), **Mijn gegevens** (GDPR-export via `File`/`Paths` + `Sharing.shareAsync`, GDPR-delete via 2-staps modal met `VERWIJDER`-bevestiging). Header: `ChevronBack` + titel. Lokale `ChevronBack` om require-cycle met RootStack te vermijden. |
+| `ProfileScreen.tsx` | 6 secties: **Account** (e-mail + uitloggen), **Community** (nickname-input met regex-validatie + Opslaan-knop, avatar-blok met `AvatarButton`-preview + "Foto kiezen/wijzigen/Verwijderen", upload-pipeline: `expo-image-picker` → `expo-image-manipulator` resize 512px JPEG q=0.8 → signed Storage URL → `PUT /api/community/profile { avatar_path }`), **Mijn kinderen** (knop → `ChildrenScreen`), **Dieet in het gezin** (9 chips uit `DIET_OPTIONS`, optimistic toggle met 400ms debounce + saveInFlight-ref + pending-queue, status-pill saving/saved/error, flush-on-unmount; vereist bestaand community-profile anders inline hint), **Voorkeuren & privacy** (HapjesHeld memory-toggle via `Switch`, optimistic + rollback, plus knop "Bekijk opgeslagen geheugen →" naar `MemoriesScreen`), **Mijn gegevens** (GDPR-export via `File`/`Paths` + `Sharing.shareAsync`, GDPR-delete via 2-staps modal met `VERWIJDER`-bevestiging). Header: `ChevronBack` + titel. Lokale `ChevronBack` om require-cycle met RootStack te vermijden. |
 | `ChildrenScreen.tsx` | Lijst van kinderen (cards met naam + leeftijd via `formatAge`, optionele detail-rows voor bekende allergieën, geïntroduceerde allergenen, eerdere reacties, opmerkingen). `useFocusEffect` herlaadt na terugkeer uit `ChildForm`. Edit-knop → `navigate('ChildForm', { childId })`, verwijder-knop → `Alert.alert` confirm → `archiveChild` (soft delete). "Kind toevoegen"-CTA onderaan. Header: `ChevronBack` + titel. |
 | `ChildFormScreen.tsx` | Add/edit-formulier voor een kind. Route-param `childId` bepaalt edit-modus (laadt via `getChildren()` + filter — geen aparte GET-by-id endpoint). Velden + validatie (parity met website-UI sinds verwijdering textuur/eczeem): naam (verplicht, max 50), geboortedatum (regex `^\d{4}-\d{2}-\d{2}$`, max vandaag, min 10 jaar terug), known_allergies (9 chips uit `KNOWN_ALLERGEN_OPTIONS`), previous_reactions (textarea max 1000), notes (textarea max 500). `KeyboardAvoidingView` op iOS. Op succes: `goBack()` → ChildrenScreen herlaadt automatisch. |
+| `MemoriesScreen.tsx` | Lijst van HapjesHeld-geheugen-items. Per item: importance-badge (1-5 met kleur-tier), content, "Opgeslagen X geleden · laatst gebruikt Y geleden" via `relTime()`-helper, ✕-knop met `Alert.alert` confirm → `deleteMemory(id)` + optimistic remove. "Alles wissen"-knop onderaan met `Alert.alert` confirm → `deleteAllMemories()`. Empty-state met `cpu`-icoon. Werkt onafhankelijk van memory-toggle: items blijven beheerbaar ook als toggle uit staat. `useFocusEffect` herlaadt bij elke focus. Header: `ChevronBack` + titel. |
 | `RecipeListScreen.tsx` | Zoekbalk + filterpanel (eetmoment + allergeen chip-rijen). `Promise.all`-load. `FlatList` met `RefreshControl`. |
 | `RecipeDetailScreen.tsx` | Foto, fav-toggle, info-tags, **portion-scaling** o.b.v. actief weekschema (`X = ceil(persons/portions)`), ingredients, steps, sterren + comments. |
 | `WeekScheduleScreen.tsx` | 2 sub-tabs (`active` / `generate`), 3 presets (`today` / `today-tomorrow` / `week`). Genereer-knop + per-slot 🔄 refresh. Modal "Opslaan met naam". |
@@ -140,6 +144,8 @@ navigation.getParent()?.getParent()?.goBack();
 | `ConversationsScreen.tsx` | Gesprekkenlijst met `useFocusEffect` + `RefreshControl`. Long-press → delete. |
 
 **Nog te bouwen (zie §14):** `AllergenenScreen`, `TimelineScreen`, `ChatRoomsScreen`.
+
+**Routes** in `RootStackParamList`: `Landing` · `Main` · `HapjesHeld` · `Profile` · `Children` · `ChildForm` · `Memories`.
 
 ---
 
@@ -163,6 +169,7 @@ Barrel: `src/services/index.ts`. Iedere service exporteert pure functies (geen k
 | `communityProfile.ts` | Eigen `authedFetch` + `jsonOrThrow`. Type `CommunityProfile` (`user_id`, `nickname`, `avatar_path`, `avatar_url` (signed, 1u TTL), `created_at`, `updated_at`). `NICKNAME_REGEX = /^[A-Za-z0-9_\- ]{2,30}$/`. Endpoints: `getCommunityProfile()` (GET `/api/community/profile`, returnt `null` als nog niet gemaakt), `updateCommunityProfile({ nickname?, avatar_path? })` (PUT), `getAvatarUploadUrl()` (POST `/api/community/profile/avatar-url` → `{ path, uploadUrl }`, 5min TTL), `uploadAvatarToStorage(localUri, uploadUrl, mime?)` (PUT blob direct naar Supabase Storage signed URL — bucket `community-images`, pad `{user_id}/avatars/{random}.jpg`). |
 | `children.ts` | Eigen `authedFetch` + `jsonOrThrow`. Types `Child`, `ChildInput`. `BIRTHDATE_REGEX = /^\d{4}-\d{2}-\d{2}$/`. `KNOWN_ALLERGEN_OPTIONS` (9 hoofdallergenen: kippen-ei, pinda, noten, sesam, vis, schaaldieren, soja, tarwe, koemelk — keys identiek aan `js/content/eersteHapjes-allergen-flow.js`). Endpoints: `getChildren()` (GET `/api/children`, server vult `introduced_allergens`-summary), `createChild(input)` (POST), `updateChild(id, patch)` (PATCH `{ id, ...patch }`), `archiveChild(id)` (DELETE `{ id }` → soft delete via `archived_at`). Helpers: `ageInMonths(birthdate)`, `formatAge(birthdate)` → "3 maanden" / "1 jaar 2 maanden". **NB**: `texture_preference` en `has_eczema` zijn op de website verwijderd uit UI sinds v2.2.1 — de DB-kolommen bestaan nog maar de mobile-app stuurt/toont ze niet meer. |
 | `family.ts` | Eigen `authedFetch` + `jsonOrThrow`. `DIET_OPTIONS` (9 dieet-keys: vegetarisch, veganistisch, glutenvrij, lactosevrij, pescotarisch, halal, kosher, geen-varken, geen-rund — keys identiek aan server `api/family.mjs` ALLOWED_DIET). `MAX_DIET_ITEMS = 9`. Endpoints: `getFamilyDiet()` (GET `/api/family` → `string[]`), `setFamilyDiet(diet)` (PUT `/api/family` { family_diet }, server sanitizet + dedupliceert + whitelist + capt op 9). Vereist bestaand community-profile (anders 409). Opgeslagen op `community_profiles.family_diet` (`text[]`). |
+| `memory.ts` | Eigen `authedFetch` + `jsonOrThrow` + `okOrThrow` (voor 204-DELETE). Type `Memory` (`id`, `content`, `importance` 1-5, `created_at`, `last_used_at`). Endpoints: `getMemories()` (GET `/api/memory` → `Memory[]`), `deleteMemory(id)` (DELETE `/api/memory?id=<uuid>`), `deleteAllMemories()` (DELETE `/api/memory`). Server-tabel `chat_user_memory` (RLS owner-only). Helper `relTime(iso)` voor "5 min" / "3 u" / "12 d" / NL-datum, identiek aan website `js/chat.js::relTime`. Werkt onafhankelijk van `memory_enabled`-flag. |
 
 **Patroon voor nieuwe services:**
 - **Supabase-direct** (legacy email-keyed tabellen): kopieer `recipes.ts`/`favorites.ts`.
@@ -268,8 +275,8 @@ Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen 
 - Branch `main` = productie. Grotere features → feature branch + merge.
 
 ### Versionering
-- `app.json.expo.version` = user-facing string (huidig `2.3.0`).
-- `app.json.ios.buildNumber` (`14`) + `app.json.android.versionCode` (`18`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
+- `app.json.expo.version` = user-facing string (huidig `2.4.0`).
+- `app.json.ios.buildNumber` (`15`) + `app.json.android.versionCode` (`19`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
 - `package.json.version` wordt **niet** actief gebruikt — niet syncen.
 
 ---
@@ -340,7 +347,7 @@ EXPO_PUBLIC_RAG_API_URL    optioneel, override van community-web.prilleven.be
 | `…/api/community/profile/avatar-url` POST | Signed upload-URL voor avatar | `services/communityProfile.ts::getAvatarUploadUrl` |
 | `…/api/children` GET/POST/PATCH/DELETE | Kinderen-CRUD (soft delete) | `services/children.ts::getChildren` / `createChild` / `updateChild` / `archiveChild` |
 | `…/api/family` GET/PUT | Gezins-dieet (9 keys, max 9 items) | `services/family.ts::getFamilyDiet` / `setFamilyDiet` |
-| `…/api/memory` | **(toekomst)** HapjesHeld memories-lijst | nieuwe `services/memory.ts` |
+| `…/api/memory` GET/DELETE | HapjesHeld memories-lijst (list + single + delete-all) | `services/memory.ts::getMemories` / `deleteMemory` / `deleteAllMemories` |
 | Supabase RPC `match_*` | Server-side — **niet** vanuit mobile aanroepen | — |
 
 **Regel:** alles wat in de webversie via `/api/*` op `community-web.prilleven.be` loopt, loopt in de mobiele app ook via diezelfde URL — niet duplicaten.
@@ -398,7 +405,7 @@ Bron: `Project_weekschema_Productie/PLAN-TIMELINE.md` (web v3.0.0).
    - ✅ Community-profiel (nickname + avatar) in v2.1.0.
    - ✅ Kinderen-CRUD (parity met website-UI: naam, geboortedatum, allergieën, eerdere reacties, opmerkingen) in v2.2.1.
    - ✅ Gezins-dieet (9 chips, autosave met debounce + inflight-queue) in v2.3.0.
-   - ⬜ Volgende: memories-lijst.
+   - ✅ Memories-lijst (bekijken + delete-one + delete-all) in v2.4.0.
 3. ⬜ **Allergenen-introductieflow** — 9 hoofdallergenen (kippen-ei, pinda, noten, sesam, vis, schaaldieren, soja, tarwe, koemelk), doses + symptoomlog (mild/twijfel/ernstig).
 4. ⬜ **Community-tijdlijn** — posts, replies, likes, polls, foto's, notificaties.
 5. ⬜ **Chatruimtes** — categorische rooms (Melk & voeding, Eerste hapjes, Allergieën, Feedback) + topics.

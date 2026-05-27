@@ -21,6 +21,7 @@ export type RootStackParamList = {
   Profile: undefined;
   Children: undefined;
   ChildForm: { childId?: string };
+  Memories: undefined;
 };
 
 /* ---- Bottom Tabs ---- */

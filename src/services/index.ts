@@ -81,3 +81,10 @@ export {
   DIET_OPTIONS,
   MAX_DIET_ITEMS,
 } from './family';
+export {
+  getMemories,
+  deleteMemory,
+  deleteAllMemories,
+  relTime,
+} from './memory';
+export type { Memory } from './memory';

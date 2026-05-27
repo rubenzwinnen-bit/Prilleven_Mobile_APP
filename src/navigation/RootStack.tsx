@@ -22,6 +22,7 @@ import { LandingScreen } from '../screens/LandingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { ChildrenScreen } from '../screens/ChildrenScreen';
 import { ChildFormScreen } from '../screens/ChildFormScreen';
+import { MemoriesScreen } from '../screens/MemoriesScreen';
 import { MainTabs } from './index';
 import { HapjesHeldStackNavigator } from './HapjesHeldStack';
 import type { RootStackParamList } from './types';
@@ -172,6 +173,11 @@ export function RootStackNavigator() {
       <Stack.Screen
         name="ChildForm"
         component={ChildFormScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Memories"
+        component={MemoriesScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

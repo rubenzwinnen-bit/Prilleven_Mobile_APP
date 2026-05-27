@@ -7,7 +7,7 @@
  *                             community / chatruimtes / tijdlijn)
  *   3. Mijn kinderen        — link naar ChildrenScreen (CRUD)
  *   4. Dieet in het gezin   — 9 dieet-chips met autosave (400 ms debounce)
- *   5. Voorkeuren           — HapjesHeld memory-toggle
+ *   5. Voorkeuren           — HapjesHeld memory-toggle + link naar MemoriesScreen
  *   6. Mijn gegevens        — GDPR: data-export + account verwijderen
  *
  * Entry-point: AvatarButton rechtsboven in LandingScreen-header.
@@ -719,6 +719,20 @@ export function ProfileScreen({ navigation }: Props) {
               />
             )}
           </View>
+
+          <Pressable
+            onPress={() => navigation.navigate('Memories')}
+            style={({ pressed }) => [
+              styles.btnSecondary,
+              pressed && styles.btnPressed,
+              { marginTop: spacing.md },
+            ]}
+          >
+            <Feather name="cpu" size={16} color={colors.primary} />
+            <Text style={styles.btnSecondaryTextPrimary}>
+              Bekijk opgeslagen geheugen
+            </Text>
+          </Pressable>
         </Section>
 
         {/* ----- 6. MIJN GEGEVENS (GDPR) ----- */}
