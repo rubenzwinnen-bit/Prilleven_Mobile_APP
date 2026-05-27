@@ -23,6 +23,8 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { ChildrenScreen } from '../screens/ChildrenScreen';
 import { ChildFormScreen } from '../screens/ChildFormScreen';
 import { MemoriesScreen } from '../screens/MemoriesScreen';
+import { EersteHapjesScreen } from '../screens/EersteHapjesScreen';
+import { DoseFormScreen } from '../screens/DoseFormScreen';
 import { MainTabs } from './index';
 import { HapjesHeldStackNavigator } from './HapjesHeldStack';
 import type { RootStackParamList } from './types';
@@ -178,6 +180,16 @@ export function RootStackNavigator() {
       <Stack.Screen
         name="Memories"
         component={MemoriesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="EersteHapjes"
+        component={EersteHapjesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="DoseForm"
+        component={DoseFormScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

@@ -223,6 +223,23 @@ export function ChildrenScreen({ navigation }: Props) {
                   multiline
                 />
               )}
+
+              {/* Allergenen-introductieflow */}
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('EersteHapjes', { childId: child.id })
+                }
+                style={({ pressed }) => [
+                  styles.allergenBtn,
+                  pressed && styles.btnPressed,
+                ]}
+                accessibilityLabel={`Allergenen voor ${child.name}`}
+              >
+                <Feather name="shield" size={14} color={colors.primary} />
+                <Text style={styles.allergenBtnText}>
+                  Allergenen-introductie →
+                </Text>
+              </Pressable>
             </View>
           ))
         )}
@@ -368,6 +385,24 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: colors.primary,
     marginTop: spacing.md,
+  },
+  allergenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.light,
+    backgroundColor: colors.bg,
+    marginTop: spacing.md,
+  },
+  allergenBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
   },
   addBtnText: {
     fontSize: 15,

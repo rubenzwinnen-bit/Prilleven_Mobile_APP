@@ -88,3 +88,31 @@ export {
   relTime,
 } from './memory';
 export type { Memory } from './memory';
+export {
+  ALLERGEN_FLOW,
+  ALLERGEN_COOLDOWN_DAYS,
+  ALLERGEN_TARGET_DOSES,
+  REACTION_LEVELS,
+  getEhState,
+  patchEhState,
+  getEhDoses,
+  createEhDose,
+  updateEhDose,
+  deleteEhDose,
+  buildAllergenContext,
+  getAllergenStatus,
+  successfulDoseCount,
+  nextDoseNumber,
+  todayIsoDate,
+} from './eersteHapjes';
+export type {
+  AllergenFlowItem,
+  ReactionLevel,
+  ReactionLevelInfo,
+  AllergenStatus,
+  AllergenStateData,
+  EhState,
+  EhDose,
+  EhDoseInput,
+  AllergenContext,
+} from './eersteHapjes';
