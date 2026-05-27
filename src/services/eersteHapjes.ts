@@ -5,12 +5,14 @@
  * website (`js/content/eersteHapjes-allergen-flow.js`,
  * `js/eersteHapjesStateApi.js`) en gebruikt dezelfde Vercel-API.
  *
- * MVP v2.5.0 dekt:
- *   - State (GET/PATCH /api/eerste-hapjes/state)
- *   - Doses (GET/POST/PATCH/DELETE /api/eerste-hapjes/doses[/:id])
+ * Dekking:
+ *   - State (GET/PATCH /api/eerste-hapjes/state)            — v2.5.0
+ *   - Doses (GET/POST/PATCH/DELETE /api/eerste-hapjes/doses[/:id])  — v2.5.0
+ *   - Symptomen (GET/POST/PATCH/DELETE /api/eerste-hapjes/symptoms[/:id])  — v2.6.0
+ *   - Red-flag detectie (mirror van server)                  — v2.6.0
  *   - Lokale helpers: buildAllergenContext, getAllergenStatus
  *
- * Symptomen + pause-flow komen in een volgende versie.
+ * Pause-flow + setup-flow komen in v2.7.0.
  *
  * Auth: Supabase JWT (Bearer-token), identiek aan andere services.
  */
@@ -180,6 +182,132 @@ export type AllergenStatus =
   | 'locked-age';
 
 /* ----------------------------------------
+   Symptoom-constanten (v2.6.0)
+---------------------------------------- */
+
+/** Severity-niveau van een gelogd symptoom. */
+export type SymptomSeverity = 'mild' | 'matig' | 'heftig';
+
+/** Een van de 16 symptoom-types. */
+export type SymptomType =
+  | 'huid'
+  | 'buik'
+  | 'diarree'
+  | 'braken'
+  | 'slaap'
+  | 'koorts'
+  | 'jeuk'
+  | 'zwelling'
+  | 'ademhaling'
+  | 'anders'
+  | 'gewicht'
+  | 'hoesten'
+  | 'verstopping'
+  | 'geen_eetlust'
+  | 'prikkelbaar'
+  | 'lethargie';
+
+export interface SymptomTypeInfo {
+  key: SymptomType;
+  label: string;
+  icon: string;
+  /** Severities die een red-flag triggeren. Mirror van server-side
+   *  `RED_FLAG_SEVERITIES` in `api/_lib/eersteHapjes-logs.mjs`. */
+  redFlagSeverity: SymptomSeverity[];
+}
+
+/** 16 symptoom-types in display-volgorde. */
+export const SYMPTOM_TYPES: SymptomTypeInfo[] = [
+  { key: 'huid', label: 'Huid', icon: '🌡', redFlagSeverity: ['heftig'] },
+  { key: 'buik', label: 'Buikpijn', icon: '🤰', redFlagSeverity: ['heftig'] },
+  { key: 'diarree', label: 'Diarree', icon: '💧', redFlagSeverity: ['heftig'] },
+  { key: 'braken', label: 'Braken', icon: '🤢', redFlagSeverity: ['matig', 'heftig'] },
+  { key: 'slaap', label: 'Slaap', icon: '😴', redFlagSeverity: ['heftig'] },
+  { key: 'koorts', label: 'Koorts', icon: '🤒', redFlagSeverity: ['matig', 'heftig'] },
+  { key: 'jeuk', label: 'Jeuk', icon: '✋', redFlagSeverity: ['heftig'] },
+  { key: 'zwelling', label: 'Zwelling', icon: '🫧', redFlagSeverity: ['matig', 'heftig'] },
+  {
+    key: 'ademhaling',
+    label: 'Ademhaling',
+    icon: '🫁',
+    redFlagSeverity: ['mild', 'matig', 'heftig'],
+  },
+  { key: 'hoesten', label: 'Hoesten', icon: '😷', redFlagSeverity: ['matig', 'heftig'] },
+  { key: 'gewicht', label: 'Gewicht', icon: '⚖️', redFlagSeverity: ['matig', 'heftig'] },
+  { key: 'verstopping', label: 'Verstopping', icon: '🚧', redFlagSeverity: ['heftig'] },
+  {
+    key: 'geen_eetlust',
+    label: 'Geen eetlust',
+    icon: '🍽️',
+    redFlagSeverity: ['heftig'],
+  },
+  {
+    key: 'prikkelbaar',
+    label: 'Prikkelbaar',
+    icon: '😣',
+    redFlagSeverity: ['heftig'],
+  },
+  {
+    key: 'lethargie',
+    label: 'Lethargie',
+    icon: '😶',
+    redFlagSeverity: ['mild', 'matig', 'heftig'],
+  },
+  { key: 'anders', label: 'Anders', icon: '❓', redFlagSeverity: ['heftig'] },
+];
+
+export interface SymptomSeverityInfo {
+  key: SymptomSeverity;
+  label: string;
+  description: string;
+}
+
+export const SYMPTOM_SEVERITIES: Record<SymptomSeverity, SymptomSeverityInfo> = {
+  mild: {
+    key: 'mild',
+    label: 'Mild',
+    description: 'Lichte klacht, weinig hinder.',
+  },
+  matig: {
+    key: 'matig',
+    label: 'Matig',
+    description: 'Duidelijke klacht, kind merkbaar uit zijn doen.',
+  },
+  heftig: {
+    key: 'heftig',
+    label: 'Heftig',
+    description: 'Ernstige klacht — overweeg contact met arts.',
+  },
+};
+
+/** Optionele context-velden bij een symptoom. Identiek aan server enums. */
+export type TimeAfterEating =
+  | 'direct'
+  | 'snel'
+  | 'later'
+  | 'veel-later'
+  | 'onbekend';
+
+export type SymptomDuration =
+  | 'kort'
+  | 'paar-uur'
+  | 'halve-dag'
+  | 'dag-of-langer'
+  | 'nog-bezig';
+
+export type SymptomWorsened =
+  | 'stabiel'
+  | 'langzaam-erger'
+  | 'snel-erger'
+  | 'minder';
+
+export type SymptomBehavior =
+  | 'normaal'
+  | 'onrustig'
+  | 'ongemakkelijk'
+  | 'suf';
+
+/* ----------------------------------------
    Types — server response shapes
 ---------------------------------------- */
 
@@ -240,6 +368,41 @@ export interface EhDoseInput {
   notes?: string | null;
 }
 
+export interface EhSymptom {
+  id: string;
+  user_id: string;
+  child_id: string;
+  occurred_at: string; // ISO timestamp
+  symptom_type: SymptomType;
+  severity: SymptomSeverity;
+  notes: string | null;
+  linked_allergen: string | null;
+  linked_dose_id: string | null;
+  /** Server-side berekende red-flag (mirror van isRedFlag). */
+  red_flag: boolean;
+  /** Optionele context-velden — kunnen ontbreken in legacy rows. */
+  time_after_eating?: TimeAfterEating | null;
+  duration?: SymptomDuration | null;
+  worsened?: SymptomWorsened | null;
+  behavior?: SymptomBehavior | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EhSymptomInput {
+  child_id: string;
+  symptom_type: SymptomType;
+  severity: SymptomSeverity;
+  occurred_at?: string; // default = now()
+  notes?: string | null;
+  linked_allergen?: string | null;
+  linked_dose_id?: string | null;
+  time_after_eating?: TimeAfterEating | null;
+  duration?: SymptomDuration | null;
+  worsened?: SymptomWorsened | null;
+  behavior?: SymptomBehavior | null;
+}
+
 interface StateEnvelope {
   state: EhState;
 }
@@ -250,6 +413,14 @@ interface DosesEnvelope {
 
 interface DoseEnvelope {
   dose: EhDose;
+}
+
+interface SymptomsEnvelope {
+  symptoms: EhSymptom[];
+}
+
+interface SymptomEnvelope {
+  symptom: EhSymptom;
 }
 
 /* ----------------------------------------
@@ -403,6 +574,79 @@ export async function deleteEhDose(id: string): Promise<void> {
 }
 
 /* ----------------------------------------
+   Symptomen API (v2.6.0)
+   GET /api/eerste-hapjes/symptoms?child_id=...[&since=ISO][&limit=N]
+   POST /api/eerste-hapjes/symptoms  body: EhSymptomInput
+   PATCH /api/eerste-hapjes/symptoms/:id  body: partial fields
+   DELETE /api/eerste-hapjes/symptoms/:id
+---------------------------------------- */
+export async function getEhSymptoms(
+  childId: string,
+  opts?: { since?: string; limit?: number }
+): Promise<EhSymptom[]> {
+  const qs = new URLSearchParams({ child_id: childId });
+  if (opts?.since) qs.set('since', opts.since);
+  if (opts?.limit) qs.set('limit', String(opts.limit));
+  const response = await authedFetch(
+    `/api/eerste-hapjes/symptoms?${qs.toString()}`
+  );
+  const data = await jsonOrThrow<SymptomsEnvelope>(response);
+  return Array.isArray(data?.symptoms) ? data.symptoms : [];
+}
+
+export async function createEhSymptom(
+  input: EhSymptomInput
+): Promise<EhSymptom> {
+  const response = await authedFetch('/api/eerste-hapjes/symptoms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const data = await jsonOrThrow<SymptomEnvelope>(response);
+  if (!data?.symptom) throw new Error('Symptoom kon niet worden opgeslagen.');
+  return data.symptom;
+}
+
+export async function updateEhSymptom(
+  id: string,
+  patch: Partial<
+    Pick<
+      EhSymptom,
+      | 'symptom_type'
+      | 'severity'
+      | 'occurred_at'
+      | 'notes'
+      | 'linked_allergen'
+      | 'linked_dose_id'
+      | 'time_after_eating'
+      | 'duration'
+      | 'worsened'
+      | 'behavior'
+    >
+  >
+): Promise<EhSymptom> {
+  const response = await authedFetch(
+    `/api/eerste-hapjes/symptoms/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }
+  );
+  const data = await jsonOrThrow<SymptomEnvelope>(response);
+  if (!data?.symptom) throw new Error('Symptoom kon niet worden bijgewerkt.');
+  return data.symptom;
+}
+
+export async function deleteEhSymptom(id: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/eerste-hapjes/symptoms/${encodeURIComponent(id)}`,
+    { method: 'DELETE' }
+  );
+  await okOrThrow(response);
+}
+
+/* ----------------------------------------
    Helpers — afgeleide allergeen-context
 ---------------------------------------- */
 
@@ -515,4 +759,23 @@ export function todayIsoDate(): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** Triggert deze (type, severity)-combinatie een red-flag-banner?
+ *  Mirror van server-side `RED_FLAG_SEVERITIES` in
+ *  `api/_lib/eersteHapjes-logs.mjs`. We vertrouwen normaal op
+ *  `symptom.red_flag` van de server, maar deze helper laat ons al een
+ *  banner tonen voor het opslaan (live in het symptoomformulier). */
+export function isRedFlag(
+  type: SymptomType,
+  severity: SymptomSeverity
+): boolean {
+  const info = SYMPTOM_TYPES.find(s => s.key === type);
+  return !!info?.redFlagSeverity.includes(severity);
+}
+
+/** Lookup van een symptoom-type-info (label, icon, …). Geeft `null` als
+ *  de key onbekend is (b.v. legacy data uit een toekomstige uitbreiding). */
+export function symptomTypeInfo(type: string): SymptomTypeInfo | null {
+  return SYMPTOM_TYPES.find(s => s.key === (type as SymptomType)) ?? null;
 }

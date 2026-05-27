@@ -23,8 +23,11 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { ChildrenScreen } from '../screens/ChildrenScreen';
 import { ChildFormScreen } from '../screens/ChildFormScreen';
 import { MemoriesScreen } from '../screens/MemoriesScreen';
+import { AllergenenChildrenScreen } from '../screens/AllergenenChildrenScreen';
 import { EersteHapjesScreen } from '../screens/EersteHapjesScreen';
 import { DoseFormScreen } from '../screens/DoseFormScreen';
+import { SymptomLogScreen } from '../screens/SymptomLogScreen';
+import { SymptomFormScreen } from '../screens/SymptomFormScreen';
 import { MainTabs } from './index';
 import { HapjesHeldStackNavigator } from './HapjesHeldStack';
 import type { RootStackParamList } from './types';
@@ -183,6 +186,11 @@ export function RootStackNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="AllergenenChildren"
+        component={AllergenenChildrenScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="EersteHapjes"
         component={EersteHapjesScreen}
         options={{ headerShown: false }}
@@ -190,6 +198,16 @@ export function RootStackNavigator() {
       <Stack.Screen
         name="DoseForm"
         component={DoseFormScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SymptomLog"
+        component={SymptomLogScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SymptomForm"
+        component={SymptomFormScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

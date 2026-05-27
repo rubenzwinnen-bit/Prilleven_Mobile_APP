@@ -1,6 +1,6 @@
 # CLAUDE.md — Pril Leven Mobile App
 
-Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.5.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
+Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
 
 > Zusterproject: de **web-app** in `~/Desktop/Project_weekschema_Productie/` heeft een eigen, uitgebreide `CLAUDE.md` per laag (root, `/js`, `/api`, `/supabase-migrations`). De mobiele app deelt **dezelfde Supabase-database en dezelfde Vercel-API** als de web-app — niet duplicaten.
 
@@ -41,7 +41,7 @@ Node ≥ 20 lokaal voor Expo CLI.
 /
 ├── App.tsx                          provider-boom + AppGate (zie §4)
 ├── index.ts                         expo entry
-├── app.json                         expo config (version 2.5.0, permissions in NL)
+├── app.json                         expo config (version 2.6.0, permissions in NL)
 ├── eas.json                         EAS profielen (development/preview/production)
 ├── tsconfig.json                    strict, extends expo/tsconfig.base
 ├── package.json                     dependencies
@@ -87,7 +87,7 @@ SafeAreaProvider
 
 `AppGate` leest `useUser().loading` en wisselt automatisch zodra `onAuthStateChange` triggert.
 
-### 4.2 Navigatie-tree (huidige stand v2.5.0)
+### 4.2 Navigatie-tree (huidige stand v2.6.0)
 
 ```
 RootStack  (native-stack, vaak headerless of CompactHeader inline)
@@ -102,8 +102,11 @@ RootStack  (native-stack, vaak headerless of CompactHeader inline)
 ├── Children                             src/screens/ChildrenScreen.tsx
 ├── ChildForm                            src/screens/ChildFormScreen.tsx
 ├── Memories                             src/screens/MemoriesScreen.tsx
+├── AllergenenChildren                   src/screens/AllergenenChildrenScreen.tsx
 ├── EersteHapjes                         src/screens/EersteHapjesScreen.tsx
-└── DoseForm                             src/screens/DoseFormScreen.tsx
+├── DoseForm                             src/screens/DoseFormScreen.tsx
+├── SymptomLog                           src/screens/SymptomLogScreen.tsx
+└── SymptomForm                          src/screens/SymptomFormScreen.tsx
 ```
 
 Types: `src/navigation/types.ts` — `RootStackParamList`, `MainTabParamList`, `RecipesStackParamList`, `ScheduleStackParamList`, `FavoritesStackParamList`, `HapjesHeldStackParamList`.
@@ -126,17 +129,20 @@ navigation.getParent()?.getParent()?.goBack();
 
 ---
 
-## 5. Schermen (huidige stand v2.5.0)
+## 5. Schermen (huidige stand v2.6.0)
 
 | Bestand | Belangrijkste functies |
 |---|---|
 | `AuthScreen.tsx` | 3 tabs (login/register/reset). Whitelist-check vóór signup. Logo + sage/primary kleuren. |
-| `LandingScreen.tsx` | 2 grote `AnimatedTile`-tegels (spring scale 0.96 → 1) + `AvatarButton` rechtsboven die `Profile` opent. `useFocusEffect` refresht `community avatar_url` zodat een upload meteen zichtbaar is. |
+| `LandingScreen.tsx` | 3 grote `AnimatedTile`-tegels (spring scale 0.96 → 1) — Receptenboek & Weekschema, HapjesHeld 2.0, Allergenen-introductie — + `AvatarButton` rechtsboven die `Profile` opent. `useFocusEffect` refresht `community avatar_url` zodat een upload meteen zichtbaar is. De allergenen-tile navigeert naar `AllergenenChildren` (kind-picker). |
 | `ProfileScreen.tsx` | 6 secties: **Account** (e-mail + uitloggen), **Community** (nickname-input met regex-validatie + Opslaan-knop, avatar-blok met `AvatarButton`-preview + "Foto kiezen/wijzigen/Verwijderen", upload-pipeline: `expo-image-picker` → `expo-image-manipulator` resize 512px JPEG q=0.8 → signed Storage URL → `PUT /api/community/profile { avatar_path }`), **Mijn kinderen** (knop → `ChildrenScreen`), **Dieet in het gezin** (9 chips uit `DIET_OPTIONS`, optimistic toggle met 400ms debounce + saveInFlight-ref + pending-queue, status-pill saving/saved/error, flush-on-unmount; vereist bestaand community-profile anders inline hint), **Voorkeuren & privacy** (HapjesHeld memory-toggle via `Switch`, optimistic + rollback, plus knop "Bekijk opgeslagen geheugen →" naar `MemoriesScreen`), **Mijn gegevens** (GDPR-export via `File`/`Paths` + `Sharing.shareAsync`, GDPR-delete via 2-staps modal met `VERWIJDER`-bevestiging). Header: `ChevronBack` + titel. Lokale `ChevronBack` om require-cycle met RootStack te vermijden. |
-| `ChildrenScreen.tsx` | Lijst van kinderen (cards met naam + leeftijd via `formatAge`, optionele detail-rows voor bekende allergieën, geïntroduceerde allergenen, eerdere reacties, opmerkingen). Onderaan elke kaart een "Allergenen-introductie →"-knop die naar `EersteHapjesScreen { childId }` navigeert. `useFocusEffect` herlaadt na terugkeer uit `ChildForm`. Edit-knop → `navigate('ChildForm', { childId })`, verwijder-knop → `Alert.alert` confirm → `archiveChild` (soft delete). "Kind toevoegen"-CTA onderaan. Header: `ChevronBack` + titel. |
+| `ChildrenScreen.tsx` | Lijst van kinderen (cards met naam + leeftijd via `formatAge`, optionele detail-rows voor bekende allergieën, geïntroduceerde allergenen, eerdere reacties, opmerkingen). `useFocusEffect` herlaadt na terugkeer uit `ChildForm`. Edit-knop → `navigate('ChildForm', { childId })`, verwijder-knop → `Alert.alert` confirm → `archiveChild` (soft delete). "Kind toevoegen"-CTA onderaan. Header: `ChevronBack` + titel. **NB v2.6.0**: de allergeen-flow start niet meer hier maar vanaf het landingscherm (Allergenen-tile → `AllergenenChildrenScreen`). |
 | `ChildFormScreen.tsx` | Add/edit-formulier voor een kind. Route-param `childId` bepaalt edit-modus (laadt via `getChildren()` + filter — geen aparte GET-by-id endpoint). Velden + validatie (parity met website-UI sinds verwijdering textuur/eczeem): naam (verplicht, max 50), geboortedatum (regex `^\d{4}-\d{2}-\d{2}$`, max vandaag, min 10 jaar terug), known_allergies (9 chips uit `KNOWN_ALLERGEN_OPTIONS`), previous_reactions (textarea max 1000), notes (textarea max 500). `KeyboardAvoidingView` op iOS. Op succes: `goBack()` → ChildrenScreen herlaadt automatisch. |
-| `EersteHapjesScreen.tsx` | Allergenen-grid per kind (v2.5.0 MVP). Laadt via `useFocusEffect`: `getChildren()` + `getEhState(childId)` + `getEhDoses(childId)`, dan `buildAllergenContext(doses, state, ageMonths)`. 9 tegels (kippen-ei → koemelk) met status-badge (Veilig / Bezig / Nog te doen / Allergisch / Gepauzeerd / Nog te jong) en `X/3 doses` teller. Pause-banner als globale flow gepauzeerd staat; cooldown-banner als laatste dose < 2 dagen geleden (`ALLERGEN_COOLDOWN_DAYS`). Tik op een tegel → `navigate('DoseForm', { childId, allergenKey })`. Locked-age tegels zijn niet-klikbaar. Header: `ChevronBack` + titel. |
+| `AllergenenChildrenScreen.tsx` | Kind-picker voor de allergeen-flow (v2.6.0). Bereikbaar via de "Allergenen-introductie"-tile op `LandingScreen`. Laadt `getChildren()` met `useFocusEffect`. Toont per kind een kaart (naam + leeftijd via `formatAge` + chevron); tap → `navigate('EersteHapjes', { childId })`. Bij 0 kinderen: empty-state met CTA naar `Children` om er eerst een aan te maken. Header: `ChevronBack` + titel. |
+| `EersteHapjesScreen.tsx` | Allergenen-grid per kind (v2.5.0 MVP). Laadt via `useFocusEffect`: `getChildren()` + `getEhState(childId)` + `getEhDoses(childId)`, dan `buildAllergenContext(doses, state, ageMonths)`. 9 tegels (kippen-ei → koemelk) met status-badge (Veilig / Bezig / Nog te doen / Allergisch / Gepauzeerd / Nog te jong) en `X/3 doses` teller. Pause-banner als globale flow gepauzeerd staat; cooldown-banner als laatste dose < 2 dagen geleden (`ALLERGEN_COOLDOWN_DAYS`). Tik op een tegel → `navigate('DoseForm', { childId, allergenKey })`. Locked-age tegels zijn niet-klikbaar. Onderaan een "Symptoomlog →"-knop → `navigate('SymptomLog', { childId })`. Header: `ChevronBack` + titel. |
 | `DoseFormScreen.tsx` | Modal-style add-dose form. Route-params `{ childId, allergenKey }`. Laadt bestaande doses via `getEhDoses(childId, allergenKey)`, suggesteert volgende vrije `dose_number` via `nextDoseNumber()`. Velden: dose nummer (3 chips 1-2-3, "al gedaan"-hint op bezette posities), reactie (3 radio-cards geen/mild/ernstig met description; bij ernstig een danger-banner "arts contacteren"), `intro_date` (TextInput jjjj-mm-dd, default `todayIsoDate()`, niet in toekomst), notes (textarea max 500). Save → `createEhDose()`. Op succes goBack → EersteHapjesScreen herlaadt. Header: `ChevronBack` + titel. |
+| `SymptomLogScreen.tsx` | Lijst van gelogde symptomen per kind (v2.6.0). Laadt `getChildren()` + `getEhSymptoms(childId, { limit: 100 })` met `useFocusEffect`. Per item: emoji-icon + label uit `SYMPTOM_TYPES`, severity-label, `formatOccurredAt(occurred_at)` ("27 mei · 14:32"), optioneel gelinkt allergeen + notities. Rode `red_flag`-badge als de server een red-flag heeft gevlagd; kaart krijgt dan een danger-border. + knop in header opent `SymptomForm` (nieuwe entry); tap kaart → edit-mode; trash-icoon → `Alert.alert` confirm → `deleteEhSymptom`. Empty-state met "Eerste symptoom loggen"-CTA. Header: `ChevronBack` + titel + plus-knop. |
+| `SymptomFormScreen.tsx` | Add/edit symptoom-form (v2.6.0). Route-params `{ childId, symptomId? }`. Bij edit laadt het bestaande item via `getEhSymptoms(childId, { limit: 200 })` (er is geen GET-by-id endpoint). Velden: symptoom-type (16 chips uit `SYMPTOM_TYPES` in 3-koloms grid), severity (3 radio-cards mild/matig/heftig met description), `occurred_at` (TextInput jjjj-mm-dd uu:mm, default `nowLocalDatetime()`, niet in toekomst → ISO via `localInputToIso`), gelinkt allergeen (chip-grid "Geen" + 9 allergenen), notes (textarea max 500). **Red-flag banner** verschijnt live zodra `isRedFlag(type, severity)` true is, met advies om contact op te nemen met een arts. Save → `createEhSymptom` of `updateEhSymptom`. Op succes goBack → SymptomLog herlaadt. Header: `ChevronBack` + titel ("Symptoom loggen"/"bewerken"). |
 | `MemoriesScreen.tsx` | Lijst van HapjesHeld-geheugen-items. Per item: importance-badge (1-5 met kleur-tier), content, "Opgeslagen X geleden · laatst gebruikt Y geleden" via `relTime()`-helper, ✕-knop met `Alert.alert` confirm → `deleteMemory(id)` + optimistic remove. "Alles wissen"-knop onderaan met `Alert.alert` confirm → `deleteAllMemories()`. Empty-state met `cpu`-icoon. Werkt onafhankelijk van memory-toggle: items blijven beheerbaar ook als toggle uit staat. `useFocusEffect` herlaadt bij elke focus. Header: `ChevronBack` + titel. |
 | `RecipeListScreen.tsx` | Zoekbalk + filterpanel (eetmoment + allergeen chip-rijen). `Promise.all`-load. `FlatList` met `RefreshControl`. |
 | `RecipeDetailScreen.tsx` | Foto, fav-toggle, info-tags, **portion-scaling** o.b.v. actief weekschema (`X = ceil(persons/portions)`), ingredients, steps, sterren + comments. |
@@ -149,7 +155,7 @@ navigation.getParent()?.getParent()?.goBack();
 
 **Nog te bouwen (zie §14):** Symptoom-log + red-flag banner, pause-flow, setup-flow (allemaal binnen Eerste Hapjes), `TimelineScreen`, `ChatRoomsScreen`.
 
-**Routes** in `RootStackParamList`: `Landing` · `Main` · `HapjesHeld` · `Profile` · `Children` · `ChildForm` · `Memories` · `EersteHapjes` · `DoseForm`.
+**Routes** in `RootStackParamList`: `Landing` · `Main` · `HapjesHeld` · `Profile` · `Children` · `ChildForm` · `Memories` · `AllergenenChildren` · `EersteHapjes` · `DoseForm` · `SymptomLog` · `SymptomForm`.
 
 ---
 
@@ -174,7 +180,7 @@ Barrel: `src/services/index.ts`. Iedere service exporteert pure functies (geen k
 | `children.ts` | Eigen `authedFetch` + `jsonOrThrow`. Types `Child`, `ChildInput`. `BIRTHDATE_REGEX = /^\d{4}-\d{2}-\d{2}$/`. `KNOWN_ALLERGEN_OPTIONS` (9 hoofdallergenen: kippen-ei, pinda, noten, sesam, vis, schaaldieren, soja, tarwe, koemelk — keys identiek aan `js/content/eersteHapjes-allergen-flow.js`). Endpoints: `getChildren()` (GET `/api/children`, server vult `introduced_allergens`-summary), `createChild(input)` (POST), `updateChild(id, patch)` (PATCH `{ id, ...patch }`), `archiveChild(id)` (DELETE `{ id }` → soft delete via `archived_at`). Helpers: `ageInMonths(birthdate)`, `formatAge(birthdate)` → "3 maanden" / "1 jaar 2 maanden". **NB**: `texture_preference` en `has_eczema` zijn op de website verwijderd uit UI sinds v2.2.1 — de DB-kolommen bestaan nog maar de mobile-app stuurt/toont ze niet meer. |
 | `family.ts` | Eigen `authedFetch` + `jsonOrThrow`. `DIET_OPTIONS` (9 dieet-keys: vegetarisch, veganistisch, glutenvrij, lactosevrij, pescotarisch, halal, kosher, geen-varken, geen-rund — keys identiek aan server `api/family.mjs` ALLOWED_DIET). `MAX_DIET_ITEMS = 9`. Endpoints: `getFamilyDiet()` (GET `/api/family` → `string[]`), `setFamilyDiet(diet)` (PUT `/api/family` { family_diet }, server sanitizet + dedupliceert + whitelist + capt op 9). Vereist bestaand community-profile (anders 409). Opgeslagen op `community_profiles.family_diet` (`text[]`). |
 | `memory.ts` | Eigen `authedFetch` + `jsonOrThrow` + `okOrThrow` (voor 204-DELETE). Type `Memory` (`id`, `content`, `importance` 1-5, `created_at`, `last_used_at`). Endpoints: `getMemories()` (GET `/api/memory` → `Memory[]`), `deleteMemory(id)` (DELETE `/api/memory?id=<uuid>`), `deleteAllMemories()` (DELETE `/api/memory`). Server-tabel `chat_user_memory` (RLS owner-only). Helper `relTime(iso)` voor "5 min" / "3 u" / "12 d" / NL-datum, identiek aan website `js/chat.js::relTime`. Werkt onafhankelijk van `memory_enabled`-flag. |
-| `eersteHapjes.ts` | Eigen `authedFetch` + `jsonOrThrow` + `okOrThrow`. Constants: `ALLERGEN_FLOW` (9 hoofdallergenen met `key`/`label`/`icon`/`order`/`introFromMonths` (4) / `introBeforeMonths` (12) / `suggestion`), `ALLERGEN_COOLDOWN_DAYS = 2`, `ALLERGEN_TARGET_DOSES = 3`, `REACTION_LEVELS` (geen/mild/ernstig met `counts`/`pauses`/`escalate` flags). Types: `EhState`, `EhDose`, `EhDoseInput`, `AllergenStatus` ('veilig' \| 'allergisch' \| 'paused' \| 'in-progress' \| 'wacht' \| 'locked-age'), `AllergenContext`, `AllergenStateData`. State-endpoints: `getEhState(childId)` (GET `/api/eerste-hapjes/state?child_id=...`), `patchEhState(childId, patch)` (PATCH met deep-merge op `allergen_state`). Dose-endpoints: `getEhDoses(childId, allergenKey?)` (GET), `createEhDose(input)` (POST, 409 op duplicate `(child, allergen, dose_number)`), `updateEhDose(id, patch)` (PATCH `/api/eerste-hapjes/doses/:id`), `deleteEhDose(id)` (DELETE → 204). Helpers: `buildAllergenContext(doses, state, ageMonths)` (telt `reaction === 'geen'` per allergeen → `completed[]` + `inProgress{key:count}` + `daysSinceLastDose`), `getAllergenStatus(key, ctx)` (status-derivatie), `successfulDoseCount(doses, key)`, `nextDoseNumber(doses, key)` (1\|2\|3\|null), `todayIsoDate()` (jjjj-mm-dd lokale tz). Spiegelt `js/content/eersteHapjes-allergen-flow.js` + `js/eersteHapjesStateApi.js` op de website. **MVP v2.5.0** dekt alleen state + doses; symptomen + pause-flow komen later. |
+| `eersteHapjes.ts` | Eigen `authedFetch` + `jsonOrThrow` + `okOrThrow`. **Allergen-constants**: `ALLERGEN_FLOW` (9 hoofdallergenen met `key`/`label`/`icon`/`order`/`introFromMonths` (4) / `introBeforeMonths` (12) / `suggestion`), `ALLERGEN_COOLDOWN_DAYS = 2`, `ALLERGEN_TARGET_DOSES = 3`, `REACTION_LEVELS` (geen/mild/ernstig met `counts`/`pauses`/`escalate` flags). **Symptom-constants** (v2.6.0): `SYMPTOM_TYPES` (16 items met `key`/`label`/`icon`/`redFlagSeverity[]` — mirror van server `RED_FLAG_SEVERITIES`; `ademhaling` & `lethargie` triggeren al bij `mild`, `braken`/`koorts`/`zwelling`/`hoesten`/`gewicht` vanaf `matig`, de rest enkel bij `heftig`), `SYMPTOM_SEVERITIES` (mild/matig/heftig met description). Types: `EhState`, `EhDose`, `EhDoseInput`, `AllergenStatus` ('veilig' \| 'allergisch' \| 'paused' \| 'in-progress' \| 'wacht' \| 'locked-age'), `AllergenContext`, `AllergenStateData`, `EhSymptom`, `EhSymptomInput`, `SymptomType`, `SymptomSeverity`, `TimeAfterEating`, `SymptomDuration`, `SymptomWorsened`, `SymptomBehavior`. State-endpoints: `getEhState(childId)`, `patchEhState(childId, patch)` (PATCH met deep-merge op `allergen_state`). Dose-endpoints: `getEhDoses`, `createEhDose` (409 op duplicate `(child, allergen, dose_number)`), `updateEhDose`, `deleteEhDose`. **Symptom-endpoints** (v2.6.0): `getEhSymptoms(childId, { since?, limit? })` (GET `/api/eerste-hapjes/symptoms`), `createEhSymptom(input)` (POST, server vult `red_flag` o.b.v. `RED_FLAG_SEVERITIES`), `updateEhSymptom(id, patch)` (PATCH), `deleteEhSymptom(id)` (DELETE → 204). Helpers: `buildAllergenContext`, `getAllergenStatus`, `successfulDoseCount`, `nextDoseNumber`, `todayIsoDate`, `isRedFlag(type, severity)` (lokale mirror voor live-banner in form), `symptomTypeInfo(type)` (label/icon lookup). Spiegelt `js/content/eersteHapjes-allergen-flow.js` + `js/eersteHapjesStateApi.js` + `api/_lib/eersteHapjes-logs.mjs` op de website. **v2.6.0** dekt state + doses + symptomen; pause-flow + setup-flow komen in v2.7.0. |
 
 **Patroon voor nieuwe services:**
 - **Supabase-direct** (legacy email-keyed tabellen): kopieer `recipes.ts`/`favorites.ts`.
@@ -280,7 +286,7 @@ Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen 
 - Branch `main` = productie. Grotere features → feature branch + merge.
 
 ### Versionering
-- `app.json.expo.version` = user-facing string (huidig `2.5.0`).
+- `app.json.expo.version` = user-facing string (huidig `2.6.0`).
 - `app.json.ios.buildNumber` (`16`) + `app.json.android.versionCode` (`20`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
 - `package.json.version` wordt **niet** actief gebruikt — niet syncen.
 
@@ -356,7 +362,7 @@ EXPO_PUBLIC_RAG_API_URL    optioneel, override van community-web.prilleven.be
 | `…/api/eerste-hapjes/state` GET/PATCH | Allergeen-state per kind (readiness + pause + dietary + meals_per_day) | `services/eersteHapjes.ts::getEhState` / `patchEhState` |
 | `…/api/eerste-hapjes/doses` GET/POST | Doses-log (3 per allergeen, reactie geen/mild/ernstig) | `services/eersteHapjes.ts::getEhDoses` / `createEhDose` |
 | `…/api/eerste-hapjes/doses/:id` PATCH/DELETE | Dose bewerken of wissen | `services/eersteHapjes.ts::updateEhDose` / `deleteEhDose` |
-| `…/api/eerste-hapjes/symptoms*` | **(toekomst v2.6.0)** Symptoom-log + red-flag detectie | nieuwe service |
+| `…/api/eerste-hapjes/symptoms*` | Symptoom-log per kind (CRUD) + server-side `red_flag` flag o.b.v. `RED_FLAG_SEVERITIES` | `services/eersteHapjes.ts` (v2.6.0) |
 | Supabase RPC `match_*` | Server-side — **niet** vanuit mobile aanroepen | — |
 
 **Regel:** alles wat in de webversie via `/api/*` op `community-web.prilleven.be` loopt, loopt in de mobiele app ook via diezelfde URL — niet duplicaten.
@@ -416,8 +422,8 @@ Bron: `Project_weekschema_Productie/PLAN-TIMELINE.md` (web v3.0.0).
    - ✅ Gezins-dieet (9 chips, autosave met debounce + inflight-queue) in v2.3.0.
    - ✅ Memories-lijst (bekijken + delete-one + delete-all) in v2.5.0.
 3. 🟡 **Allergenen-introductieflow** — 9 hoofdallergenen (kippen-ei, pinda, noten, sesam, vis, schaaldieren, soja, tarwe, koemelk), doses + symptoomlog (mild/twijfel/ernstig).
-   - ✅ MVP in v2.5.0: state + doses (CRUD), allergeen-grid per kind, status-derivatie (veilig/bezig/wacht/allergisch/paused/locked-age), cooldown-banner (2 dagen), dose-form (1-3 + reactie geen/mild/ernstig + datum + notes), entry vanaf `ChildrenScreen`.
-   - ⬜ v2.6.0: symptomen-log + red-flag detectie (`ademhaling`/`lethargie` triggert ook bij `mild`).
+   - ✅ MVP in v2.5.0: state + doses (CRUD), allergeen-grid per kind, status-derivatie (veilig/bezig/wacht/allergisch/paused/locked-age), cooldown-banner (2 dagen), dose-form (1-3 + reactie geen/mild/ernstig + datum + notes).
+   - ✅ v2.6.0: symptomen-log (16 types × 3 severities, CRUD), live red-flag detectie (mirror van server) met danger-banner in symptoom-form; `ademhaling`/`lethargie` triggeren al bij `mild`. Entry verplaatst van `ChildrenScreen` naar 3de landing-tile → `AllergenenChildrenScreen` (kind-picker) → `EersteHapjes` → `SymptomLog`/`DoseForm`.
    - ⬜ v2.7.0: pause-flow + setup-flow + readiness-checklist (volledige parity met website).
 4. ⬜ **Community-tijdlijn** — posts, replies, likes, polls, foto's, notificaties.
 5. ⬜ **Chatruimtes** — categorische rooms (Melk & voeding, Eerste hapjes, Allergieën, Feedback) + topics.

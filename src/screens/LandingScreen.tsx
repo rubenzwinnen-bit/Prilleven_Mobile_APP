@@ -1,9 +1,10 @@
 /**
  * LANDING SCREEN
  *
- * Eerste scherm na login. Toont 2 grote tegels met achtergrondfoto:
+ * Eerste scherm na login. Toont 3 grote tegels met achtergrondfoto:
  *   1. Receptenboek & Weekschema  → MainTabs (bestaande app)
  *   2. HapjesHeld 2.0             → Chat met RAG bot
+ *   3. Allergenen-introductie     → AllergenenChildren (kies kind)
  *
  * Klik-effect: tegel krimpt licht bij tap en veert terug (spring animation).
  */
@@ -32,6 +33,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Landing'>;
 
 const IMG_RECEPTEN = require('../../assets/landing-recepten.jpeg');
 const IMG_HAPJESHELD = require('../../assets/landing-hapjesheld.png');
+const IMG_ALLERGENEN = require('../../assets/landing-allergenen.png');
 
 /* ----------------------------------------
    AnimatedTile — spring scale effect bij press
@@ -161,6 +163,15 @@ export function LandingScreen({ navigation }: Props) {
           description="Stel je vragen over kindervoeding aan onze AI-assistent"
           badge="NIEUW"
           onPress={() => navigation.navigate('HapjesHeld')}
+        />
+
+        <AnimatedTile
+          image={IMG_ALLERGENEN}
+          overlayColor="rgba(201, 137, 102, 0.55)"
+          title="Allergenen-introductie"
+          description="Volg per kind de 9 hoofdallergenen en log eventuele symptomen"
+          badge="NIEUW"
+          onPress={() => navigation.navigate('AllergenenChildren')}
         />
       </ScrollView>
     </SafeAreaView>

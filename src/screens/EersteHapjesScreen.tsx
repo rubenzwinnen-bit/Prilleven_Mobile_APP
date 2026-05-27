@@ -302,9 +302,24 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
             })}
           </View>
 
+          {/* Symptoomlog-entry */}
+          <Pressable
+            onPress={() =>
+              navigation.navigate('SymptomLog', { childId: child.id })
+            }
+            style={({ pressed }) => [
+              styles.symptomLogBtn,
+              pressed && styles.btnPressed,
+            ]}
+            accessibilityLabel="Symptoomlog openen"
+          >
+            <Feather name="activity" size={16} color={colors.primary} />
+            <Text style={styles.symptomLogBtnText}>Symptoomlog →</Text>
+          </Pressable>
+
           <Text style={styles.footnote}>
-            Setup-flow, pauze-beheer en symptoomlog blijven voorlopig op de
-            website beschikbaar.
+            Setup-flow en pauze-beheer blijven voorlopig op de website
+            beschikbaar.
           </Text>
         </ScrollView>
       )}
@@ -417,6 +432,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.gray,
     marginTop: 2,
+  },
+  symptomLogBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.light,
+    backgroundColor: colors.white,
+    marginTop: spacing.lg,
+    ...shadows.sm,
+  },
+  symptomLogBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
   footnote: {
     fontSize: 11,

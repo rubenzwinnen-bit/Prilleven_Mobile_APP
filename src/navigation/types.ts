@@ -22,8 +22,11 @@ export type RootStackParamList = {
   Children: undefined;
   ChildForm: { childId?: string };
   Memories: undefined;
+  AllergenenChildren: undefined;
   EersteHapjes: { childId: string };
   DoseForm: { childId: string; allergenKey: string };
+  SymptomLog: { childId: string };
+  SymptomForm: { childId: string; symptomId?: string };
 };
 
 /* ---- Bottom Tabs ---- */
