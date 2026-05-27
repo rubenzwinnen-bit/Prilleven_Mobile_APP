@@ -75,3 +75,9 @@ export {
   formatAge,
 } from './children';
 export type { Child, ChildInput } from './children';
+export {
+  getFamilyDiet,
+  setFamilyDiet,
+  DIET_OPTIONS,
+  MAX_DIET_ITEMS,
+} from './family';

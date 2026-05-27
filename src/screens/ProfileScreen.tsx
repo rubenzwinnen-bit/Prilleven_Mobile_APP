@@ -1,19 +1,20 @@
 /**
- * PROFILE SCREEN — fase 1 + 1.5 + 2
+ * PROFILE SCREEN — fase 1 + 1.5 + 2 + 3
  *
- * Vijf secties:
- *   1. Account         — e-mail tonen + uitloggen
- *   2. Community       — nickname + avatar (publiek zichtbaar in
- *                        community / chatruimtes / tijdlijn)
- *   3. Mijn kinderen   — link naar ChildrenScreen (CRUD)
- *   4. Voorkeuren      — HapjesHeld memory-toggle
- *   5. Mijn gegevens   — GDPR: data-export + account verwijderen
+ * Zes secties:
+ *   1. Account              — e-mail tonen + uitloggen
+ *   2. Community            — nickname + avatar (publiek zichtbaar in
+ *                             community / chatruimtes / tijdlijn)
+ *   3. Mijn kinderen        — link naar ChildrenScreen (CRUD)
+ *   4. Dieet in het gezin   — 9 dieet-chips met autosave (400 ms debounce)
+ *   5. Voorkeuren           — HapjesHeld memory-toggle
+ *   6. Mijn gegevens        — GDPR: data-export + account verwijderen
  *
  * Entry-point: AvatarButton rechtsboven in LandingScreen-header.
  * Header: ChevronBack (geen home — we komen van Landing).
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -48,6 +49,10 @@ import {
   getAvatarUploadUrl,
   uploadAvatarToStorage,
   NICKNAME_REGEX,
+  getFamilyDiet,
+  setFamilyDiet,
+  DIET_OPTIONS,
+  MAX_DIET_ITEMS,
 } from '../services';
 import type { CommunityProfile } from '../services';
 import type { RootStackParamList } from '../navigation/types';
@@ -106,6 +111,21 @@ export function ProfileScreen({ navigation }: Props) {
   const [nicknameInput, setNicknameInput] = useState('');
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+
+  /* Family-diet state — chip-grid met autosave (400ms debounce).
+     Server geeft 409 als nog geen community-profile bestaat, dus we
+     laden pas wanneer de nickname gezet is. */
+  const [familyDiet, setFamilyDietState] = useState<string[] | null>(null);
+  const [dietStatus, setDietStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
+  const [dietError, setDietError] = useState<string | null>(null);
+  const dietDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dietInFlightRef = useRef(false);
+  const dietPendingRef = useRef<string[] | null>(null);
+  const dietStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   /* ----- Community-profile: initial load ----- */
   useEffect(() => {
@@ -229,6 +249,95 @@ export function ProfileScreen({ navigation }: Props) {
       },
     ]);
   }, [avatarUploading, communityProfile?.avatar_path, show]);
+
+  /* ----- Family-diet: initial load (alleen als community-profile er is) ----- */
+  useEffect(() => {
+    if (communityLoading) return;
+    if (!communityProfile?.nickname) {
+      // Server weigert anders met 409. Toon dan een lege grid (state blijft
+      // null → grid disabled met hint).
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await getFamilyDiet();
+        if (!cancelled) setFamilyDietState(list);
+      } catch (err: any) {
+        if (!cancelled) {
+          setFamilyDietState([]);
+          setDietStatus('error');
+          setDietError(err.message || 'Kon dieet niet laden.');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [communityLoading, communityProfile?.nickname]);
+
+  /* ----- Family-diet: autosave-handler -----
+     Debounce 400 ms; bij elke toggle binnen die window wordt een nieuwe
+     timer gestart. `dietInFlightRef` voorkomt concurrent PUTs — bij een
+     tweede toggle terwijl de eerste nog loopt parkeren we de pending
+     waarde en flushen direct na completion. */
+  const flushFamilyDiet = useCallback(async () => {
+    if (dietInFlightRef.current) return;
+    const target = dietPendingRef.current;
+    if (!target) return;
+    dietPendingRef.current = null;
+    dietInFlightRef.current = true;
+    setDietStatus('saving');
+    setDietError(null);
+    try {
+      const confirmed = await setFamilyDiet(target);
+      setFamilyDietState(confirmed);
+      setDietStatus('saved');
+      // status terug naar idle na 1.8s (komt overeen met website-UX)
+      if (dietStatusTimerRef.current) clearTimeout(dietStatusTimerRef.current);
+      dietStatusTimerRef.current = setTimeout(() => setDietStatus('idle'), 1800);
+    } catch (err: any) {
+      setDietStatus('error');
+      setDietError(err.message || 'Opslaan mislukt.');
+    } finally {
+      dietInFlightRef.current = false;
+      // Als er ondertussen een nieuwe pending-waarde gezet is: opnieuw saven.
+      if (dietPendingRef.current) {
+        flushFamilyDiet();
+      }
+    }
+  }, []);
+
+  const toggleDietChip = useCallback(
+    (key: string) => {
+      setFamilyDietState(prev => {
+        if (prev === null) return prev; // nog niet geladen
+        const has = prev.includes(key);
+        const next = has ? prev.filter(k => k !== key) : [...prev, key];
+        // Hard cap aan client-zijde, server kapt ook op MAX_DIET_ITEMS.
+        const capped = next.slice(0, MAX_DIET_ITEMS);
+        dietPendingRef.current = capped;
+        if (dietDebounceRef.current) clearTimeout(dietDebounceRef.current);
+        dietDebounceRef.current = setTimeout(flushFamilyDiet, 400);
+        return capped;
+      });
+    },
+    [flushFamilyDiet]
+  );
+
+  /* Bij unmount eventuele pending save direct flushen + timers opruimen. */
+  useEffect(() => {
+    return () => {
+      if (dietDebounceRef.current) clearTimeout(dietDebounceRef.current);
+      if (dietStatusTimerRef.current) clearTimeout(dietStatusTimerRef.current);
+      // Pending payload nog wegsturen (fire-and-forget).
+      if (dietPendingRef.current && !dietInFlightRef.current) {
+        const last = dietPendingRef.current;
+        dietPendingRef.current = null;
+        setFamilyDiet(last).catch(() => {});
+      }
+    };
+  }, []);
 
   /* ----- Memory-toggle: initial load ----- */
   useEffect(() => {
@@ -511,7 +620,77 @@ export function ProfileScreen({ navigation }: Props) {
           </Pressable>
         </Section>
 
-        {/* ----- 4. VOORKEUREN ----- */}
+        {/* ----- 4. DIEET IN HET GEZIN ----- */}
+        <Section title="Dieet in het gezin">
+          <Text style={styles.sectionIntro}>
+            Selecteer wat van toepassing is op jullie gezin. HapjesHeld en
+            weekschema's houden hiermee rekening.
+          </Text>
+
+          {!communityProfile?.nickname ? (
+            <Text style={styles.dietHint}>
+              Stel eerst een nickname in (zie sectie Community) voordat je een
+              gezins-dieet kan opslaan.
+            </Text>
+          ) : familyDiet === null ? (
+            <View style={styles.communityLoading}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : (
+            <>
+              <View style={styles.dietGrid}>
+                {DIET_OPTIONS.map(opt => {
+                  const active = familyDiet.includes(opt.key);
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      onPress={() => toggleDietChip(opt.key)}
+                      style={({ pressed }) => [
+                        styles.dietChip,
+                        active && styles.dietChipActive,
+                        pressed && styles.btnPressed,
+                      ]}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: active }}
+                      accessibilityLabel={opt.label}
+                    >
+                      <Feather
+                        name={active ? 'check-circle' : 'circle'}
+                        size={14}
+                        color={active ? colors.primary : colors.gray}
+                      />
+                      <Text
+                        style={[
+                          styles.dietChipText,
+                          active && styles.dietChipTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text
+                style={[
+                  styles.dietStatus,
+                  dietStatus === 'saved' && styles.dietStatusSaved,
+                  dietStatus === 'error' && styles.dietStatusError,
+                ]}
+              >
+                {dietStatus === 'saving'
+                  ? 'Opslaan…'
+                  : dietStatus === 'saved'
+                  ? 'Opgeslagen'
+                  : dietStatus === 'error'
+                  ? dietError || 'Opslaan mislukt.'
+                  : ' '}
+              </Text>
+            </>
+          )}
+        </Section>
+
+        {/* ----- 5. VOORKEUREN ----- */}
         <Section title="Voorkeuren & privacy">
           <View style={styles.toggleRow}>
             <View style={styles.toggleTextWrap}>
@@ -542,7 +721,7 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
         </Section>
 
-        {/* ----- 5. MIJN GEGEVENS (GDPR) ----- */}
+        {/* ----- 6. MIJN GEGEVENS (GDPR) ----- */}
         <Section title="Mijn gegevens">
           <Text style={styles.gdprIntro}>
             Onder de AVG/GDPR heb je recht op inzage en op verwijdering van je
@@ -829,6 +1008,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.white,
+  },
+  /* Family-diet */
+  dietGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  dietChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.light,
+    backgroundColor: colors.white,
+  },
+  dietChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.bg,
+  },
+  dietChipText: {
+    fontSize: 13,
+    color: colors.dark,
+    fontWeight: '500',
+  },
+  dietChipTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  dietStatus: {
+    fontSize: 12,
+    color: colors.gray,
+    marginTop: spacing.sm,
+    minHeight: 16,
+  },
+  dietStatusSaved: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  dietStatusError: {
+    color: colors.danger,
+    fontWeight: '600',
+  },
+  dietHint: {
+    fontSize: 12,
+    color: colors.gray,
+    fontStyle: 'italic',
+    lineHeight: 17,
   },
   /* GDPR */
   gdprIntro: {
