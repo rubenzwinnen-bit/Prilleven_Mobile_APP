@@ -1,6 +1,6 @@
 # CLAUDE.md — Pril Leven Mobile App
 
-Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.0.3`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
+Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.1.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
 
 > Zusterproject: de **web-app** in `~/Desktop/Project_weekschema_Productie/` heeft een eigen, uitgebreide `CLAUDE.md` per laag (root, `/js`, `/api`, `/supabase-migrations`). De mobiele app deelt **dezelfde Supabase-database en dezelfde Vercel-API** als de web-app — niet duplicaten.
 
@@ -28,8 +28,8 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Image | `expo-image-picker` + `expo-image-manipulator` |
 | File/share (GDPR-export) | `expo-file-system` (~19) `File`/`Paths` API + `expo-sharing` |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `10` |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `14` |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `11` |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `15` |
 
 Node ≥ 20 lokaal voor Expo CLI.
 
@@ -41,7 +41,7 @@ Node ≥ 20 lokaal voor Expo CLI.
 /
 ├── App.tsx                          provider-boom + AppGate (zie §4)
 ├── index.ts                         expo entry
-├── app.json                         expo config (version 2.0.3, permissions in NL)
+├── app.json                         expo config (version 2.1.0, permissions in NL)
 ├── eas.json                         EAS profielen (development/preview/production)
 ├── tsconfig.json                    strict, extends expo/tsconfig.base
 ├── package.json                     dependencies
@@ -87,7 +87,7 @@ SafeAreaProvider
 
 `AppGate` leest `useUser().loading` en wisselt automatisch zodra `onAuthStateChange` triggert.
 
-### 4.2 Navigatie-tree (huidige stand v2.0.3)
+### 4.2 Navigatie-tree (huidige stand v2.1.0)
 
 ```
 RootStack  (native-stack, vaak headerless of CompactHeader inline)
@@ -121,13 +121,13 @@ navigation.getParent()?.getParent()?.goBack();
 
 ---
 
-## 5. Schermen (huidige stand v2.0.3)
+## 5. Schermen (huidige stand v2.1.0)
 
 | Bestand | Belangrijkste functies |
 |---|---|
 | `AuthScreen.tsx` | 3 tabs (login/register/reset). Whitelist-check vóór signup. Logo + sage/primary kleuren. |
-| `LandingScreen.tsx` | 2 grote `AnimatedTile`-tegels (spring scale 0.96 → 1) + `AvatarButton` rechtsboven die `Profile` opent. |
-| `ProfileScreen.tsx` | 3 secties: **Account** (e-mail + uitloggen), **Voorkeuren & privacy** (HapjesHeld memory-toggle via `Switch`, optimistic + rollback bij failure), **Mijn gegevens** (GDPR-export via `File`/`Paths` + `Sharing.shareAsync`, GDPR-delete via 2-staps modal met `VERWIJDER`-bevestiging). Header: `CompactHeader`-stijl met `ChevronBack` + titel. |
+| `LandingScreen.tsx` | 2 grote `AnimatedTile`-tegels (spring scale 0.96 → 1) + `AvatarButton` rechtsboven die `Profile` opent. `useFocusEffect` refresht `community avatar_url` zodat een upload meteen zichtbaar is. |
+| `ProfileScreen.tsx` | 4 secties: **Account** (e-mail + uitloggen), **Community** (nickname-input met regex-validatie + Opslaan-knop, avatar-blok met `AvatarButton`-preview + "Foto kiezen/wijzigen/Verwijderen", upload-pipeline: `expo-image-picker` → `expo-image-manipulator` resize 512px JPEG q=0.8 → signed Storage URL → `PUT /api/community/profile { avatar_path }`), **Voorkeuren & privacy** (HapjesHeld memory-toggle via `Switch`, optimistic + rollback), **Mijn gegevens** (GDPR-export via `File`/`Paths` + `Sharing.shareAsync`, GDPR-delete via 2-staps modal met `VERWIJDER`-bevestiging). Header: `ChevronBack` + titel. Lokale `ChevronBack` om require-cycle met RootStack te vermijden. |
 | `RecipeListScreen.tsx` | Zoekbalk + filterpanel (eetmoment + allergeen chip-rijen). `Promise.all`-load. `FlatList` met `RefreshControl`. |
 | `RecipeDetailScreen.tsx` | Foto, fav-toggle, info-tags, **portion-scaling** o.b.v. actief weekschema (`X = ceil(persons/portions)`), ingredients, steps, sterren + comments. |
 | `WeekScheduleScreen.tsx` | 2 sub-tabs (`active` / `generate`), 3 presets (`today` / `today-tomorrow` / `week`). Genereer-knop + per-slot 🔄 refresh. Modal "Opslaan met naam". |
@@ -137,7 +137,7 @@ navigation.getParent()?.getParent()?.goBack();
 | `HapjesHeldScreen.tsx` | RAG-chat met `UsageBar` (maand-€-budget), foto-counter (`remaining/limit`), `HealthDisclaimerModal`, link-parser voor assistant-tekst. |
 | `ConversationsScreen.tsx` | Gesprekkenlijst met `useFocusEffect` + `RefreshControl`. Long-press → delete. |
 
-**Nog te bouwen (zie §14):** community-profiel (nickname + avatar), kinderen-CRUD, gezins-dieet, `AllergenenScreen`, `TimelineScreen`, `ChatRoomsScreen`.
+**Nog te bouwen (zie §14):** kinderen-CRUD, gezins-dieet, `AllergenenScreen`, `TimelineScreen`, `ChatRoomsScreen`.
 
 ---
 
@@ -158,6 +158,7 @@ Barrel: `src/services/index.ts`. Iedere service exporteert pure functies (geen k
 | `hapjesheld.ts` | `RAG_API_URL` (`EXPO_PUBLIC_RAG_API_URL` override). `getAuthToken`, `authedFetch`, `parseOrThrow<T>`. Endpoints: `getProfile`, `listConversations`, `getConversation`, `deleteConversation`, `sendChatMessage`. Types: `ChatRequest/Response`, `MonthlyUsage`, `DailyImageUsage`, `ProfileResponse`, `ConversationSummary`, `StoredMessage`, `ConversationDetail`, `ChatError`. |
 | `hapjesheld-image.ts` | `pickImageFromGallery`, `pickImageFromCamera`, `PickedImage`. `MAX_IMAGE_BYTES = 3 MB`, `DAILY_IMAGE_LIMIT = 50`. Compressie via `expo-image-manipulator`: `maxWidth 1600`, JPEG, quality start `0.85` → step −`0.15` → min `0.3`. EXIF-strip automatisch. |
 | `profile.ts` | Eigen `authedFetch` + `jsonOrThrow` (kleine variant van `hapjesheld.ts`-helpers, geen image-handling). Endpoints: `getMemoryEnabled()` (GET `/api/profile`), `setMemoryEnabled(b)` (PUT `/api/profile`), `exportUserData()` (GET `/api/me` → raw JSON-string), `deleteAccount()` (DELETE `/api/me` — 200 = succes, 207 = partial + throw met server-message). |
+| `communityProfile.ts` | Eigen `authedFetch` + `jsonOrThrow`. Type `CommunityProfile` (`user_id`, `nickname`, `avatar_path`, `avatar_url` (signed, 1u TTL), `created_at`, `updated_at`). `NICKNAME_REGEX = /^[A-Za-z0-9_\- ]{2,30}$/`. Endpoints: `getCommunityProfile()` (GET `/api/community/profile`, returnt `null` als nog niet gemaakt), `updateCommunityProfile({ nickname?, avatar_path? })` (PUT), `getAvatarUploadUrl()` (POST `/api/community/profile/avatar-url` → `{ path, uploadUrl }`, 5min TTL), `uploadAvatarToStorage(localUri, uploadUrl, mime?)` (PUT blob direct naar Supabase Storage signed URL — bucket `community-images`, pad `{user_id}/avatars/{random}.jpg`). |
 
 **Patroon voor nieuwe services:**
 - **Supabase-direct** (legacy email-keyed tabellen): kopieer `recipes.ts`/`favorites.ts`.
@@ -263,8 +264,8 @@ Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen 
 - Branch `main` = productie. Grotere features → feature branch + merge.
 
 ### Versionering
-- `app.json.expo.version` = user-facing string (huidig `2.0.3`).
-- `app.json.ios.buildNumber` (`10`) + `app.json.android.versionCode` (`14`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
+- `app.json.expo.version` = user-facing string (huidig `2.1.0`).
+- `app.json.ios.buildNumber` (`11`) + `app.json.android.versionCode` (`15`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
 - `package.json.version` wordt **niet** actief gebruikt — niet syncen.
 
 ---

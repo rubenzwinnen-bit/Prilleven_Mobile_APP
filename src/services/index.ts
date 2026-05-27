@@ -56,3 +56,11 @@ export {
   exportUserData,
   deleteAccount,
 } from './profile';
+export {
+  getCommunityProfile,
+  updateCommunityProfile,
+  getAvatarUploadUrl,
+  uploadAvatarToStorage,
+  NICKNAME_REGEX,
+} from './communityProfile';
+export type { CommunityProfile } from './communityProfile';

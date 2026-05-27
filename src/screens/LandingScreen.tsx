@@ -8,7 +8,7 @@
  * Klik-effect: tegel krimpt licht bij tap en veert terug (spring animation).
  */
 
-import React, { useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,9 +21,11 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useUser } from '../context/UserContext';
 import { AvatarButton } from '../components/AvatarButton';
+import { getCommunityProfile } from '../services';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Landing'>;
@@ -99,6 +101,27 @@ function AnimatedTile({
 ---------------------------------------- */
 export function LandingScreen({ navigation }: Props) {
   const { user } = useUser();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  /* Bij elke focus (incl. terugkeer van ProfileScreen) refresh
+     de community-avatar zodat een upload zichtbaar wordt. Stille
+     fout-afhandeling: bij failure tonen we initialen. */
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const profile = await getCommunityProfile();
+          if (!cancelled) setAvatarUrl(profile?.avatar_url ?? null);
+        } catch {
+          if (!cancelled) setAvatarUrl(null);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -113,6 +136,7 @@ export function LandingScreen({ navigation }: Props) {
           </View>
           <AvatarButton
             email={user}
+            avatarUrl={avatarUrl}
             onPress={() => navigation.navigate('Profile')}
           />
         </View>
