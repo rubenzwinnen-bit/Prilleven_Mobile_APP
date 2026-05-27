@@ -193,15 +193,6 @@ export function ChildrenScreen({ navigation }: Props) {
               </View>
 
               {/* Optionele detail-blokjes */}
-              {child.texture_preference && (
-                <DetailRow
-                  label="Textuur"
-                  value={textureLabel(child.texture_preference)}
-                />
-              )}
-              {child.has_eczema && (
-                <DetailRow label="Eczeem" value="Ja" />
-              )}
               {child.known_allergies.length > 0 && (
                 <DetailRow
                   label="Bekende allergieën"
@@ -271,13 +262,6 @@ function DetailRow({
       </Text>
     </View>
   );
-}
-
-function textureLabel(t: string): string {
-  if (t === 'puree') return 'Puree';
-  if (t === 'stukjes') return 'Stukjes';
-  if (t === 'combi') return 'Combinatie';
-  return t;
 }
 
 const styles = StyleSheet.create({

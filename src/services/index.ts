@@ -71,8 +71,7 @@ export {
   archiveChild,
   BIRTHDATE_REGEX,
   KNOWN_ALLERGEN_OPTIONS,
-  TEXTURE_OPTIONS,
   ageInMonths,
   formatAge,
 } from './children';
-export type { Child, ChildInput, TexturePreference } from './children';
+export type { Child, ChildInput } from './children';

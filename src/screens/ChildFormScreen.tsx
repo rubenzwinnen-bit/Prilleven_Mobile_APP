@@ -9,8 +9,6 @@
  *   - name                  (verplicht, trim, max 50)
  *   - birthdate             (verplicht, regex jjjj-mm-dd, max vandaag,
  *                            min 10 jaar terug)
- *   - texture_preference    (puree | stukjes | combi | null)
- *   - has_eczema            (boolean)
  *   - known_allergies       (chips uit KNOWN_ALLERGEN_OPTIONS)
  *   - previous_reactions    (textarea, max 1000)
  *   - notes                 (textarea, max 500)
@@ -28,7 +26,6 @@ import {
   ActivityIndicator,
   Pressable,
   TextInput,
-  Switch,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -44,9 +41,8 @@ import {
   updateChild,
   BIRTHDATE_REGEX,
   KNOWN_ALLERGEN_OPTIONS,
-  TEXTURE_OPTIONS,
 } from '../services';
-import type { Child, TexturePreference } from '../services';
+import type { Child } from '../services';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChildForm'>;
@@ -117,9 +113,6 @@ export function ChildFormScreen({ navigation, route }: Props) {
 
   const [name, setName] = useState('');
   const [birthdate, setBirthdate] = useState('');
-  const [texturePref, setTexturePref] =
-    useState<TexturePreference | null>(null);
-  const [hasEczema, setHasEczema] = useState(false);
   const [knownAllergies, setKnownAllergies] = useState<string[]>([]);
   const [previousReactions, setPreviousReactions] = useState('');
   const [notes, setNotes] = useState('');
@@ -141,8 +134,6 @@ export function ChildFormScreen({ navigation, route }: Props) {
         }
         setName(target.name);
         setBirthdate(target.birthdate);
-        setTexturePref(target.texture_preference);
-        setHasEczema(target.has_eczema);
         setKnownAllergies(target.known_allergies);
         setPreviousReactions(target.previous_reactions ?? '');
         setNotes(target.notes ?? '');
@@ -190,8 +181,6 @@ export function ChildFormScreen({ navigation, route }: Props) {
       const payload = {
         name: trimmedName.slice(0, 50),
         birthdate: trimmedBirthdate,
-        texture_preference: texturePref,
-        has_eczema: hasEczema,
         known_allergies: knownAllergies,
         previous_reactions: previousReactions.trim() || null,
         notes: notes.trim() || null,
@@ -216,8 +205,6 @@ export function ChildFormScreen({ navigation, route }: Props) {
     canSave,
     trimmedName,
     trimmedBirthdate,
-    texturePref,
-    hasEczema,
     knownAllergies,
     previousReactions,
     notes,
@@ -289,47 +276,6 @@ export function ChildFormScreen({ navigation, route }: Props) {
                 ? ` · ${birthdateError}`
                 : ''}
             </Text>
-
-            {/* Textuur */}
-            <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-              Voorkeur textuur
-            </Text>
-            <View style={styles.chipRow}>
-              <Chip
-                label="Geen voorkeur"
-                active={texturePref === null}
-                onPress={() => setTexturePref(null)}
-              />
-              {TEXTURE_OPTIONS.map(opt => (
-                <Chip
-                  key={opt.key}
-                  label={opt.label}
-                  active={texturePref === opt.key}
-                  onPress={() => setTexturePref(opt.key)}
-                />
-              ))}
-            </View>
-
-            {/* Eczeem */}
-            <View style={styles.toggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Heeft eczeem</Text>
-                <Text style={styles.fieldHint}>
-                  Relevant voor allergeen-introducties.
-                </Text>
-              </View>
-              <Switch
-                value={hasEczema}
-                onValueChange={setHasEczema}
-                disabled={saving}
-                trackColor={{
-                  false: colors.grayLight,
-                  true: colors.secondary,
-                }}
-                thumbColor={colors.white}
-                ios_backgroundColor={colors.grayLight}
-              />
-            </View>
 
             {/* Bekende allergieën */}
             <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
@@ -521,12 +467,6 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: colors.white,
     fontWeight: '700',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.lg,
   },
   saveBtn: {
     flexDirection: 'row',

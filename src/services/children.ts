@@ -21,15 +21,11 @@ import { RAG_API_URL } from './hapjesheld';
 /* ----------------------------------------
    Types
 ---------------------------------------- */
-export type TexturePreference = 'puree' | 'stukjes' | 'combi';
-
 export interface Child {
   id: string;
   user_id: string;
   name: string;
   birthdate: string; // YYYY-MM-DD
-  texture_preference: TexturePreference | null;
-  has_eczema: boolean;
   known_allergies: string[];
   previous_reactions: string | null;
   notes: string | null;
@@ -43,8 +39,6 @@ export interface Child {
 export interface ChildInput {
   name?: string;
   birthdate?: string;
-  texture_preference?: TexturePreference | null;
-  has_eczema?: boolean;
   known_allergies?: string[];
   previous_reactions?: string | null;
   notes?: string | null;
@@ -79,15 +73,6 @@ export const KNOWN_ALLERGEN_OPTIONS: Array<{
   { key: 'soja', label: 'Soja', icon: '🌱' },
   { key: 'tarwe', label: 'Tarwe', icon: '🌾' },
   { key: 'koemelk', label: 'Koemelk', icon: '🥛' },
-];
-
-export const TEXTURE_OPTIONS: Array<{
-  key: TexturePreference;
-  label: string;
-}> = [
-  { key: 'puree', label: 'Puree' },
-  { key: 'stukjes', label: 'Stukjes' },
-  { key: 'combi', label: 'Combinatie' },
 ];
 
 /* ----------------------------------------
