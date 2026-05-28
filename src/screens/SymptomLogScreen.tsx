@@ -173,12 +173,12 @@ export function SymptomLogScreen({ navigation, route }: Props) {
       {/* Header */}
       <View style={styles.header}>
         <ChevronBack onPress={() => navigation.goBack()} />
-        <Text style={styles.headerTitle}>Symptoomlog</Text>
+        <Text style={styles.headerTitle}>Reactie-historiek</Text>
         <Pressable
           onPress={() => navigation.navigate('SymptomForm', { childId })}
           hitSlop={12}
           style={({ pressed }) => [pressed && styles.btnPressed]}
-          accessibilityLabel="Symptoom toevoegen"
+          accessibilityLabel="Reactie toevoegen"
         >
           <Feather name="plus" size={22} color={colors.primary} />
         </Pressable>
@@ -205,7 +205,7 @@ export function SymptomLogScreen({ navigation, route }: Props) {
             <View style={styles.emptyBlock}>
               <Feather name="activity" size={28} color={colors.grayLight} />
               <Text style={styles.emptyText}>
-                Nog geen symptomen gelogd voor {child?.name ?? 'dit kind'}.
+                Nog geen reacties gelogd voor {child?.name ?? 'dit kind'}.
               </Text>
               <Pressable
                 onPress={() =>
@@ -218,7 +218,7 @@ export function SymptomLogScreen({ navigation, route }: Props) {
               >
                 <Feather name="plus" size={16} color={colors.white} />
                 <Text style={styles.addBtnInlineText}>
-                  Eerste symptoom loggen
+                  Eerste reactie loggen
                 </Text>
               </Pressable>
             </View>
@@ -285,9 +285,9 @@ export function SymptomLogScreen({ navigation, route }: Props) {
                     </Pressable>
                   </View>
 
-                  {item.linked_allergen && (
+                  {item.linked_allergen_key && (
                     <Text style={styles.cardDetail}>
-                      Gelinkt aan: {allergenLabel(item.linked_allergen)}
+                      Gelinkt aan: {allergenLabel(item.linked_allergen_key)}
                     </Text>
                   )}
                   {item.notes && (

@@ -37,12 +37,15 @@ export interface AllergenFlowItem {
   icon: string;
   /** Volgorde waarin we ze in de UI tonen (1-9). */
   order: number;
-  /** Pas introduceren vanaf deze leeftijd in maanden. */
-  introFromMonths: number;
   /** Bij voorkeur introduceren vóór deze leeftijd in maanden. */
   introBeforeMonths: number;
   /** Korte suggestie van een voedingsmiddel waarmee je kan starten. */
   suggestion: string;
+  /** Uitgebreide introductie-tips per textuur (mirror van website). */
+  content?: {
+    puree?: string[];
+    pieces?: string[];
+  };
 }
 
 /** De 9 hoofdallergenen — vaste volgorde uit de website. */
@@ -52,81 +55,156 @@ export const ALLERGEN_FLOW: AllergenFlowItem[] = [
     label: 'Kippenei',
     icon: '🥚',
     order: 1,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Goed gebakken of gekookt eitje',
+    content: {
+      puree: [
+        'Gebakken/gekookt eitje samen mixen met vaste voeding of mixen en apart aanbieden met een lepeltje',
+      ],
+      pieces: [
+        'Reepjes omelet',
+        'Hardgekookt ei in kleine stukjes of geplet',
+        'Geen lopend of rauw ei aanbieden',
+      ],
+    },
   },
   {
     key: 'pinda',
     label: 'Pinda',
     icon: '🥜',
     order: 2,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Een lepeltje verdunde 100 % pindakaas',
+    content: {
+      puree: [
+        '100% pindakaas mengen met een beetje moedermelk, kunstvoeding of water zodat het niet plakkerig is',
+      ],
+      pieces: [
+        'Geen volledige pinda’s',
+        'Dun laagje verdunde pindakaas op crackers of als dipje',
+      ],
+    },
   },
   {
     key: 'noten',
     label: 'Noten',
     icon: '🌰',
     order: 3,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Een lepeltje verdunde notenpasta',
+    content: {
+      puree: [
+        '100% notenpasta (amandel, cashew, hazelnoot …) mengen onder de maaltijd of apart met een lepeltje',
+        'Mengen met een beetje moedermelk, kunstvoeding of water zodat het niet plakkerig is',
+      ],
+      pieces: [
+        'Geen volledige noten of grove stukken',
+        'Dun laagje notenpasta op cracker of als dip',
+        'Fijn gemalen noten verwerkt in havermout, pannenkoekjes of muffins',
+      ],
+    },
   },
   {
     key: 'sesam',
     label: 'Sesam',
     icon: '🌻',
     order: 4,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Een lepeltje verdunde tahin',
+    content: {
+      puree: [
+        'Tahin (sesampasta) mengen onder puree, of verdunnen met moedermelk/kunstvoeding/water zodat het niet plakt',
+        'Hummus',
+      ],
+      pieces: [
+        'Geen losse sesamzaadjes in grote hoeveelheden',
+        'Hummus als dip',
+      ],
+    },
   },
   {
     key: 'vis',
     label: 'Vis',
     icon: '🐟',
     order: 5,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Goed gegaarde, graatvrije witvis',
+    content: {
+      puree: [
+        'Goed gegaarde vis mengen onder groentepap',
+        'Graten volledig verwijderen',
+      ],
+      pieces: [
+        'Stukje gebakken vis',
+        'Goed uit elkaar halen zodat er geen harde stukken of graten aanwezig zijn',
+      ],
+    },
   },
   {
     key: 'schaaldieren',
     label: 'Schaaldieren',
     icon: '🦐',
     order: 6,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Goed gegaarde, fijngeprakte garnaaltjes',
+    content: {
+      puree: [
+        'Garnaaltjes of rivierkreeftjes mixen door vaste voeding',
+        'Goed gaar aanbieden',
+      ],
+      pieces: [
+        'Garnaaltjes of rivierkreeftjes zo aanbieden',
+        'Goed gaar aanbieden',
+      ],
+    },
   },
   {
     key: 'soja',
     label: 'Soja',
     icon: '🌱',
     order: 7,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Tofu of een lepeltje sojayoghurt',
+    content: {
+      puree: ['Tofu gepureerd onder groenten', 'Sojayoghurt'],
+      pieces: ['Zachte tofureepjes'],
+    },
   },
   {
     key: 'tarwe',
     label: 'Tarwe',
     icon: '🌾',
     order: 8,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Volkoren pasta of een stukje zuurdesem',
+    content: {
+      puree: [
+        '(Volkoren) pasta met saus mixen',
+        'Zuurdesembrood (geen gist) geweekt in soep',
+      ],
+      pieces: [
+        'Geroosterde zuurdesem broodreepjes',
+        'Volkoren pasta',
+        'Pannenkoekjes of muffins o.b.v. bloem',
+      ],
+    },
   },
   {
     key: 'koemelk',
     label: 'Koemelk',
     icon: '🥛',
     order: 9,
-    introFromMonths: 4,
     introBeforeMonths: 12,
     suggestion: 'Volle yoghurt of een klein klontje boter',
+    content: {
+      puree: [
+        'Boter of ghee onder vaste voeding, hapje volle yoghurt met een lepeltje aanbieden',
+      ],
+      pieces: [
+        'Lepeltje met volle yoghurt',
+        'Geen grote harde stukken kaas',
+      ],
+    },
   },
 ];
 
@@ -179,7 +257,7 @@ export type AllergenStatus =
   | 'paused'
   | 'in-progress'
   | 'wacht'
-  | 'locked-age';
+  | 'excluded';
 
 /* ----------------------------------------
    Symptoom-constanten (v2.6.0)
@@ -376,7 +454,7 @@ export interface EhSymptom {
   symptom_type: SymptomType;
   severity: SymptomSeverity;
   notes: string | null;
-  linked_allergen: string | null;
+  linked_allergen_key: string | null;
   linked_dose_id: string | null;
   /** Server-side berekende red-flag (mirror van isRedFlag). */
   red_flag: boolean;
@@ -395,7 +473,7 @@ export interface EhSymptomInput {
   severity: SymptomSeverity;
   occurred_at?: string; // default = now()
   notes?: string | null;
-  linked_allergen?: string | null;
+  linked_allergen_key?: string | null;
   linked_dose_id?: string | null;
   time_after_eating?: TimeAfterEating | null;
   duration?: SymptomDuration | null;
@@ -616,7 +694,7 @@ export async function updateEhSymptom(
       | 'severity'
       | 'occurred_at'
       | 'notes'
-      | 'linked_allergen'
+      | 'linked_allergen_key'
       | 'linked_dose_id'
       | 'time_after_eating'
       | 'duration'
@@ -652,12 +730,16 @@ export async function deleteEhSymptom(id: string): Promise<void> {
 
 export interface AllergenContext {
   ageMonths: number;
-  /** Allergenen met 3 of meer geslaagde (reaction === 'geen') doses. */
+  /** Allergenen met 3 of meer geslaagde doses + pre_introduced merged in. */
   completed: string[];
   /** Allergenen met 1-2 geslaagde doses → { key: count }. */
   inProgress: Record<string, number>;
   /** Allergenen waarvoor een gekende allergie geregistreerd is. */
   knownAllergies: string[];
+  /** Allergenen die als "reeds-veilig vóór tracking" gemarkeerd zijn. */
+  preIntroduced: string[];
+  /** Allergenen die expliciet uitgesloten zijn van de flow. */
+  excludedKeys: string[];
   /** Is de globale allergeen-flow gepauzeerd? */
   paused: boolean;
   /** Aantal dagen sinds laatste dose; 999 als nog geen dose. */
@@ -690,6 +772,14 @@ export function buildAllergenContext(
     else inProgress[key] = count;
   }
 
+  /* `pre_introduced`: vóór-tracking-veilig gemarkeerd → telt als completed,
+     spiegel van `buildAllergenContext()` in `js/components/allergenen.js`. */
+  const preIntroduced = state?.allergen_state?.pre_introduced ?? [];
+  for (const key of preIntroduced) {
+    if (!completed.includes(key)) completed.push(key);
+    delete inProgress[key];
+  }
+
   let daysSinceLastDose = 999;
   if (lastDate) {
     const last = new Date(`${lastDate}T00:00:00Z`);
@@ -705,6 +795,8 @@ export function buildAllergenContext(
     completed,
     inProgress,
     knownAllergies: state?.allergen_state?.known_allergies ?? [],
+    preIntroduced,
+    excludedKeys: state?.allergen_state?.excluded_keys ?? [],
     paused: !!state?.allergen_state?.paused,
     daysSinceLastDose,
   };
@@ -721,7 +813,6 @@ export function getAllergenStatus(
   if (ctx.paused) return 'paused';
   const flow = ALLERGEN_FLOW.find(a => a.key === key);
   if (!flow) return 'wacht';
-  if (ctx.ageMonths < flow.introFromMonths) return 'locked-age';
   if ((ctx.inProgress[key] || 0) > 0) return 'in-progress';
   return 'wacht';
 }

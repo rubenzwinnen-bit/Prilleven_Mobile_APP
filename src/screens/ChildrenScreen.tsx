@@ -230,7 +230,7 @@ export function ChildrenScreen({ navigation }: Props) {
 
         {/* "Kind toevoegen"-knop — onderaan zodat hij na de lijst staat */}
         <Pressable
-          onPress={() => navigation.navigate('ChildForm', {})}
+          onPress={() => navigation.navigate('ChildForm')}
           style={({ pressed }) => [
             styles.addBtn,
             pressed && styles.btnPressed,

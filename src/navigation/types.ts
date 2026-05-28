@@ -20,11 +20,11 @@ export type RootStackParamList = {
   HapjesHeld: NavigatorScreenParams<HapjesHeldStackParamList> | undefined;
   Profile: undefined;
   Children: undefined;
-  ChildForm: { childId?: string };
+  ChildForm: { childId?: string } | undefined;
   Memories: undefined;
   AllergenenChildren: undefined;
   EersteHapjes: { childId: string };
-  DoseForm: { childId: string; allergenKey: string };
+  DoseForm: { childId: string; allergenKey: string; doseId?: string };
   SymptomLog: { childId: string };
   SymptomForm: { childId: string; symptomId?: string };
 };

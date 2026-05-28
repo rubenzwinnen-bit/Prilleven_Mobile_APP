@@ -17,6 +17,7 @@ import {
   SafeAreaView,
   ScrollView,
   ImageBackground,
+  ImageResizeMode,
   Pressable,
   Animated,
   ImageSourcePropType,
@@ -45,6 +46,10 @@ interface AnimatedTileProps {
   description: string;
   badge?: string;
   onPress: () => void;
+  /** Optional resize mode override (default = 'cover'). */
+  imageResizeMode?: ImageResizeMode;
+  /** Background tint behind the image (zichtbaar bij 'contain'). */
+  bgColor?: string;
 }
 
 function AnimatedTile({
@@ -54,6 +59,8 @@ function AnimatedTile({
   description,
   badge,
   onPress,
+  imageResizeMode = 'cover',
+  bgColor,
 }: AnimatedTileProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -75,12 +82,18 @@ function AnimatedTile({
 
   return (
     <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>
-      <Animated.View style={[styles.tile, { transform: [{ scale }] }]}>
+      <Animated.View
+        style={[
+          styles.tile,
+          bgColor ? { backgroundColor: bgColor } : null,
+          { transform: [{ scale }] },
+        ]}
+      >
         <ImageBackground
           source={image}
           style={styles.tileBg}
           imageStyle={styles.tileImage}
-          resizeMode="cover"
+          resizeMode={imageResizeMode}
         >
           <View style={[styles.overlay, { backgroundColor: overlayColor }]} />
           <View style={styles.tileContent}>
@@ -227,7 +240,7 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   tileBg: {
-    minHeight: 200,
+    minHeight: 140,
     justifyContent: 'flex-end',
   },
   tileImage: {
@@ -237,7 +250,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   tileContent: {
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   tileTitle: {
     fontSize: 24,

@@ -33,6 +33,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import {
@@ -44,6 +47,151 @@ import {
 } from '../services';
 import type { Child } from '../services';
 import type { RootStackParamList } from '../navigation/types';
+
+/** Format an ISO date (yyyy-mm-dd) as Belgian display string (dd/mm/yyyy).
+ *  Returns '' wanneer de input leeg of ongeldig is. */
+function isoToDisplay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return '';
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+/** Build today's ISO date (yyyy-mm-dd). */
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Build the ISO date 10 years ago (yyyy-mm-dd). */
+function tenYearsAgoIso(): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear() - 10, now.getMonth(), now.getDate());
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Format a Date object as ISO yyyy-mm-dd in the local timezone. */
+function dateToIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/* ----------------------------------------
+   BirthdateField — cross-platform date picker
+   - Web: native HTML <input type="date"> (toont calendar-dropdown in nl-BE
+     locale = dd/mm/yyyy formaat).
+   - iOS/Android: Pressable opent native DateTimePicker.
+   - Interne state blijft altijd ISO (yyyy-mm-dd) → matches API.
+---------------------------------------- */
+function BirthdateField({
+  iso,
+  onChange,
+  disabled,
+}: {
+  iso: string;
+  onChange: (iso: string) => void;
+  disabled?: boolean;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  const maxIso = todayIso();
+  const minIso = tenYearsAgoIso();
+
+  if (Platform.OS === 'web') {
+    // React Native Web laat HTML-elementen door — gebruik native date input
+    // zodat de browser z'n eigen kalender-dropdown opent.
+    return React.createElement('input', {
+      type: 'date',
+      value: iso,
+      disabled,
+      max: maxIso,
+      min: minIso,
+      onChange: (e: { target: { value: string } }) =>
+        onChange(e.target.value || ''),
+      style: {
+        width: '100%',
+        backgroundColor: colors.white,
+        border: `1px solid ${colors.light}`,
+        borderRadius: radius.sm,
+        padding: '10px 16px',
+        fontSize: 15,
+        color: iso ? colors.dark : colors.grayLight,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+        fontFamily: 'inherit',
+        outline: 'none',
+        boxSizing: 'border-box',
+      },
+    });
+  }
+
+  // Native (iOS/Android)
+  const display = isoToDisplay(iso);
+  const initialDate = iso ? new Date(`${iso}T00:00:00`) : new Date();
+  const maxDate = new Date();
+  const minDate = new Date(
+    maxDate.getFullYear() - 10,
+    maxDate.getMonth(),
+    maxDate.getDate()
+  );
+
+  const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+    }
+    if (event.type === 'dismissed') return;
+    if (selectedDate) onChange(dateToIso(selectedDate));
+  };
+
+  return (
+    <>
+      <Pressable
+        onPress={() => !disabled && setShowPicker(true)}
+        style={({ pressed }) => [
+          styles.textInput,
+          styles.dateFieldRow,
+          pressed && styles.btnPressed,
+          disabled && styles.btnDisabled,
+        ]}
+        accessibilityLabel="Geboortedatum kiezen"
+      >
+        <Text
+          style={[
+            styles.dateFieldText,
+            !display && styles.dateFieldPlaceholder,
+          ]}
+        >
+          {display || 'dd/mm/jjjj'}
+        </Text>
+        <Feather name="calendar" size={16} color={colors.primary} />
+      </Pressable>
+      {showPicker && (
+        <DateTimePicker
+          value={initialDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          maximumDate={maxDate}
+          minimumDate={minDate}
+          locale="nl-BE"
+          onChange={handleChange}
+        />
+      )}
+      {Platform.OS === 'ios' && showPicker && (
+        <Pressable
+          onPress={() => setShowPicker(false)}
+          style={styles.pickerDone}
+        >
+          <Text style={styles.pickerDoneText}>Klaar</Text>
+        </Pressable>
+      )}
+    </>
+  );
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChildForm'>;
 
@@ -71,18 +219,20 @@ function ChevronBack({ onPress }: { onPress: () => void }) {
 }
 
 /** Birthdate-validatie: regex + bereik (max vandaag, min 10 jaar terug).
- *  Geeft null bij valid; anders een gebruikersvriendelijke melding. */
+ *  Input = ISO yyyy-mm-dd (interne format). Geeft null bij valid; anders een
+ *  gebruikersvriendelijke melding. */
 function validateBirthdate(input: string): string | null {
+  if (!input) return 'Geboortedatum is verplicht.';
   if (!BIRTHDATE_REGEX.test(input)) {
-    return 'Gebruik formaat jjjj-mm-dd (bv. 2024-03-15).';
+    return 'Geen geldige datum.';
   }
   const [y, m, d] = input.split('-').map(Number);
   const date = new Date(`${input}T00:00:00`);
   if (
     Number.isNaN(date.getTime()) ||
-    date.getUTCFullYear() !== y ||
-    date.getUTCMonth() + 1 !== m ||
-    date.getUTCDate() !== d
+    date.getFullYear() !== y ||
+    date.getMonth() + 1 !== m ||
+    date.getDate() !== d
   ) {
     return 'Geen geldige datum.';
   }
@@ -159,15 +309,6 @@ export function ChildFormScreen({ navigation, route }: Props) {
     () => validateBirthdate(trimmedBirthdate),
     [trimmedBirthdate]
   );
-  const canSave =
-    !!trimmedName &&
-    trimmedName.length <= 50 &&
-    !birthdateError &&
-    previousReactions.length <= 1000 &&
-    notes.length <= 500 &&
-    !saving &&
-    !loading;
-
   const toggleAllergen = useCallback((key: string) => {
     setKnownAllergies(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
@@ -175,7 +316,29 @@ export function ChildFormScreen({ navigation, route }: Props) {
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!canSave) return;
+    if (saving || loading) return;
+    // Validatie-feedback i.p.v. stilzwijgend de knop disabled houden:
+    // toon de specifieke melding zodat de gebruiker weet wat er mist.
+    if (!trimmedName) {
+      show('Vul een naam in.', 'error');
+      return;
+    }
+    if (trimmedName.length > 50) {
+      show('Naam mag max 50 tekens zijn.', 'error');
+      return;
+    }
+    if (birthdateError) {
+      show(birthdateError, 'error');
+      return;
+    }
+    if (previousReactions.length > 1000) {
+      show('Eerdere reacties mag max 1000 tekens zijn.', 'error');
+      return;
+    }
+    if (notes.length > 500) {
+      show('Opmerkingen mag max 500 tekens zijn.', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -202,9 +365,11 @@ export function ChildFormScreen({ navigation, route }: Props) {
       setSaving(false);
     }
   }, [
-    canSave,
+    saving,
+    loading,
     trimmedName,
     trimmedBirthdate,
+    birthdateError,
     knownAllergies,
     previousReactions,
     notes,
@@ -258,20 +423,13 @@ export function ChildFormScreen({ navigation, route }: Props) {
             <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
               Geboortedatum *
             </Text>
-            <TextInput
-              style={styles.textInput}
-              value={birthdate}
-              onChangeText={setBirthdate}
-              placeholder="2024-03-15"
-              placeholderTextColor={colors.grayLight}
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-              autoCorrect={false}
-              autoCapitalize="none"
-              editable={!saving}
+            <BirthdateField
+              iso={birthdate}
+              onChange={setBirthdate}
+              disabled={saving}
             />
             <Text style={styles.fieldHint}>
-              Formaat jjjj-mm-dd · binnen de laatste 10 jaar
+              Formaat dd/mm/jjjj · binnen de laatste 10 jaar
               {birthdate.length > 0 && birthdateError
                 ? ` · ${birthdateError}`
                 : ''}
@@ -330,14 +488,14 @@ export function ChildFormScreen({ navigation, route }: Props) {
             />
             <Text style={styles.fieldHint}>{notes.length}/500 tekens</Text>
 
-            {/* Save */}
+            {/* Save — altijd klikbaar; validatie geeft duidelijke toast-feedback */}
             <Pressable
               onPress={handleSave}
-              disabled={!canSave}
+              disabled={saving || loading}
               style={({ pressed }) => [
                 styles.saveBtn,
                 pressed && styles.btnPressed,
-                !canSave && styles.btnDisabled,
+                (saving || loading) && styles.btnDisabled,
               ]}
             >
               {saving ? (
@@ -440,6 +598,28 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
     paddingTop: spacing.sm,
+  },
+  dateFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateFieldText: {
+    fontSize: 15,
+    color: colors.dark,
+  },
+  dateFieldPlaceholder: {
+    color: colors.grayLight,
+  },
+  pickerDone: {
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  pickerDoneText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   chipRow: {
     flexDirection: 'row',
