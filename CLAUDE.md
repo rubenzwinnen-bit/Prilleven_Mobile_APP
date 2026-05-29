@@ -1,6 +1,6 @@
 # CLAUDE.md — Pril Leven Mobile App
 
-Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v2.18.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
+Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v2.18.1`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
 
 > Zusterproject: de **web-app** in `~/Desktop/Project_weekschema_Productie/` heeft een eigen, uitgebreide `CLAUDE.md` per laag (root, `/js`, `/api`, `/supabase-migrations`). De mobiele app deelt **dezelfde Supabase-database en dezelfde Vercel-API** als de web-app — niet duplicaten.
 
@@ -28,12 +28,14 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Image | `expo-image-picker` + `expo-image-manipulator` |
 | File/share (GDPR-export) | `expo-file-system` (~19) `File`/`Paths` API + `expo-sharing` |
 | Learnings-viewer | `react-native-webview` (blog-HTML + eigen PDF.js-viewer) + `expo-video` (video) |
-| Tegels herordenen | `react-native-draggable-flatlist` `^4.0.3` + `react-native-reanimated` `~4.1.1` (wiebel-animatie) + `react-native-gesture-handler` `~2.28.0` |
+| Tegels herordenen | `react-native-draggable-flatlist` `^4.0.3` + `react-native-reanimated` `~4.1.1` (wiebel-animatie) + `react-native-gesture-handler` `~2.28.0` + `react-native-worklets` (peer van reanimated 4) |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `56` (v2.18.0) |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `60` (v2.18.0) |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `57` (v2.18.1) |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `61` (v2.18.1) |
 
 Node ≥ 20 lokaal voor Expo CLI.
+
+> **`babel.config.js` is verplicht (v2.18.1).** Reanimated 4 splitst worklets af in `react-native-worklets` en de babel-plugin wordt **niet** meer automatisch door `babel-preset-expo` toegevoegd (zoals bij reanimated 3). Het project heeft daarom een `babel.config.js` met `plugins: ['react-native-worklets/plugin']` (moet als laatste plugin staan). Zonder dit bestand crasht de app bij opstarten met `Exception in HostFunction: NativeWorklets`. Na wijzigingen aan babel: Metro starten met cache-clear (`npx expo start -c`).
 
 ---
 
