@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   logoImage: {
-    width: 46,
-    height: 46,
+    width: 56,
+    height: 56,
   },
 });
