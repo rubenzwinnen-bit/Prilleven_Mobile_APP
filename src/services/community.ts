@@ -255,6 +255,73 @@ export async function createReply(
 }
 
 /* ----------------------------------------
+   editPost
+   PATCH /api/community/posts/:id { body } → { post }
+   Server doet eigenaar-check (403 als niet van jou). Geen edit-window.
+---------------------------------------- */
+export async function editPost(
+  postId: string,
+  body: string
+): Promise<CommunityPost> {
+  const response = await authedFetch(
+    `/api/community/posts/${encodeURIComponent(postId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    }
+  );
+  const data = await jsonOrThrow<PostEnvelope>(response);
+  if (!data?.post) throw new Error('Bericht kon niet worden bijgewerkt.');
+  return data.post;
+}
+
+/* ----------------------------------------
+   deletePost
+   DELETE /api/community/posts/:id → { ok: true }
+---------------------------------------- */
+export async function deletePost(postId: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/community/posts/${encodeURIComponent(postId)}`,
+    { method: 'DELETE' }
+  );
+  await jsonOrThrow<{ ok: boolean }>(response);
+}
+
+/* ----------------------------------------
+   editReply
+   PATCH /api/community/replies/:id { body } → { reply }
+---------------------------------------- */
+export async function editReply(
+  replyId: string,
+  body: string
+): Promise<CommunityReply> {
+  const response = await authedFetch(
+    `/api/community/replies/${encodeURIComponent(replyId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    }
+  );
+  const data = await jsonOrThrow<ReplyEnvelope>(response);
+  if (!data?.reply) throw new Error('Reactie kon niet worden bijgewerkt.');
+  return data.reply;
+}
+
+/* ----------------------------------------
+   deleteReply
+   DELETE /api/community/replies/:id → { ok: true }
+---------------------------------------- */
+export async function deleteReply(replyId: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/community/replies/${encodeURIComponent(replyId)}`,
+    { method: 'DELETE' }
+  );
+  await jsonOrThrow<{ ok: boolean }>(response);
+}
+
+/* ----------------------------------------
    getIsAdmin
    GET /api/subscription-status?email= → { is_admin }
    Bepaalt of de admin-only composer getoond wordt. Stille false bij fout.

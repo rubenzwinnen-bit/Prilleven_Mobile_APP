@@ -27,6 +27,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -40,12 +41,18 @@ import {
   togglePostLike,
   listReplies,
   createReply,
+  editPost,
+  deletePost,
+  editReply,
   getIsAdmin,
+  getCurrentUserId,
   categoryInfo,
   POST_BODY_MAX,
   REPLY_BODY_MAX,
   relTime,
 } from '../services';
+/* community.deleteReply botst met chatRooms.deleteReply in de barrel. */
+import { deleteReply } from '../services/community';
 import type { CommunityPost, CommunityReply } from '../services';
 
 const PAGE_SIZE = 20;
@@ -93,7 +100,66 @@ function PostAvatar({
 /* ----------------------------------------
    ReplyRow
 ---------------------------------------- */
-function ReplyRow({ reply }: { reply: CommunityReply }) {
+function ReplyRow({
+  reply,
+  currentUserId,
+  onUpdated,
+  onDeleted,
+}: {
+  reply: CommunityReply;
+  currentUserId: string | null;
+  onUpdated: (reply: CommunityReply) => void;
+  onDeleted: (replyId: string) => void;
+}) {
+  const { show } = useToast();
+  const isOwner = !!currentUserId && reply.user_id === currentUserId;
+
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(reply.body);
+  const [saving, setSaving] = useState(false);
+
+  const onStartEdit = useCallback(() => {
+    setEditText(reply.body);
+    setEditing(true);
+  }, [reply.body]);
+
+  const onSaveEdit = useCallback(async () => {
+    const text = editText.trim();
+    if (!text || saving) return;
+    setSaving(true);
+    try {
+      const updated = await editReply(reply.id, text);
+      onUpdated(updated);
+      setEditing(false);
+    } catch (err: any) {
+      show(err.message || 'Bewerken mislukt.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [editText, saving, reply.id, onUpdated, show]);
+
+  const onDelete = useCallback(() => {
+    Alert.alert(
+      'Reactie verwijderen',
+      'Weet je zeker dat je deze reactie wilt verwijderen?',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Verwijderen',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteReply(reply.id);
+              onDeleted(reply.id);
+            } catch (err: any) {
+              show(err.message || 'Verwijderen mislukt.', 'error');
+            }
+          },
+        },
+      ]
+    );
+  }, [reply.id, onDeleted, show]);
+
   return (
     <View style={styles.replyRow}>
       <PostAvatar
@@ -115,8 +181,56 @@ function ReplyRow({ reply }: { reply: CommunityReply }) {
             {relTime(reply.created_at)}
             {reply.edited_at ? ' · bewerkt' : ''}
           </Text>
+          {isOwner && !editing ? (
+            <View style={styles.ownerActions}>
+              <Pressable onPress={onStartEdit} hitSlop={8}>
+                <Feather name="edit-2" size={13} color={colors.gray} />
+              </Pressable>
+              <Pressable onPress={onDelete} hitSlop={8}>
+                <Feather name="trash-2" size={13} color={colors.gray} />
+              </Pressable>
+            </View>
+          ) : null}
         </View>
-        <Text style={styles.replyBody}>{reply.body}</Text>
+
+        {editing ? (
+          <View style={styles.editWrap}>
+            <TextInput
+              style={styles.editInput}
+              value={editText}
+              onChangeText={setEditText}
+              maxLength={REPLY_BODY_MAX}
+              multiline
+              autoFocus
+            />
+            <View style={styles.editBtnRow}>
+              <Pressable
+                onPress={() => setEditing(false)}
+                style={styles.editCancelBtn}
+                hitSlop={6}
+              >
+                <Text style={styles.editCancelText}>Annuleren</Text>
+              </Pressable>
+              <Pressable
+                onPress={onSaveEdit}
+                disabled={!editText.trim() || saving}
+                style={[
+                  styles.editSaveBtn,
+                  !editText.trim() || saving ? styles.editSaveBtnDisabled : null,
+                ]}
+                hitSlop={6}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.editSaveText}>Bewaren</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.replyBody}>{reply.body}</Text>
+        )}
       </View>
     </View>
   );
@@ -125,7 +239,17 @@ function ReplyRow({ reply }: { reply: CommunityReply }) {
 /* ----------------------------------------
    PostCard — eigen like- + replies-state
 ---------------------------------------- */
-function PostCard({ post }: { post: CommunityPost }) {
+function PostCard({
+  post,
+  currentUserId,
+  onPostUpdated,
+  onPostDeleted,
+}: {
+  post: CommunityPost;
+  currentUserId: string | null;
+  onPostUpdated: (post: CommunityPost) => void;
+  onPostDeleted: (postId: string) => void;
+}) {
   const { show } = useToast();
 
   const [liked, setLiked] = useState(post.liked_by_me);
@@ -143,7 +267,65 @@ function PostCard({ post }: { post: CommunityPost }) {
 
   const [imageFailed, setImageFailed] = useState(false);
 
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(post.body);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const isOwner = !!currentUserId && post.user_id === currentUserId;
   const cat = categoryInfo(post.category);
+
+  const onStartEdit = useCallback(() => {
+    setEditText(post.body);
+    setEditing(true);
+  }, [post.body]);
+
+  const onSaveEdit = useCallback(async () => {
+    const text = editText.trim();
+    if (!text || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const updated = await editPost(post.id, text);
+      onPostUpdated(updated);
+      setEditing(false);
+    } catch (err: any) {
+      show(err.message || 'Bewerken mislukt.', 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [editText, savingEdit, post.id, onPostUpdated, show]);
+
+  const onDelete = useCallback(() => {
+    Alert.alert(
+      'Bericht verwijderen',
+      'Weet je zeker dat je dit bericht wilt verwijderen? Dit kan niet ongedaan worden gemaakt.',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Verwijderen',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletePost(post.id);
+              onPostDeleted(post.id);
+            } catch (err: any) {
+              show(err.message || 'Verwijderen mislukt.', 'error');
+            }
+          },
+        },
+      ]
+    );
+  }, [post.id, onPostDeleted, show]);
+
+  const onReplyUpdated = useCallback((updated: CommunityReply) => {
+    setReplies((prev) =>
+      prev.map((r) => (r.id === updated.id ? updated : r))
+    );
+  }, []);
+
+  const onReplyDeleted = useCallback((replyId: string) => {
+    setReplies((prev) => prev.filter((r) => r.id !== replyId));
+    setReplyCount((c) => Math.max(0, c - 1));
+  }, []);
 
   const onToggleLike = useCallback(async () => {
     if (liking) return;
@@ -239,10 +421,59 @@ function PostCard({ post }: { post: CommunityPost }) {
             </Text>
           </View>
         ) : null}
+        {isOwner && !editing ? (
+          <View style={styles.ownerActions}>
+            <Pressable onPress={onStartEdit} hitSlop={8}>
+              <Feather name="edit-2" size={16} color={colors.gray} />
+            </Pressable>
+            <Pressable onPress={onDelete} hitSlop={8}>
+              <Feather name="trash-2" size={16} color={colors.gray} />
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
-      {/* Body */}
-      {post.body ? <Text style={styles.body}>{post.body}</Text> : null}
+      {/* Body / edit-modus */}
+      {editing ? (
+        <View style={styles.editWrap}>
+          <TextInput
+            style={styles.editInput}
+            value={editText}
+            onChangeText={setEditText}
+            maxLength={POST_BODY_MAX}
+            multiline
+            autoFocus
+          />
+          <View style={styles.editBtnRow}>
+            <Pressable
+              onPress={() => setEditing(false)}
+              style={styles.editCancelBtn}
+              hitSlop={6}
+            >
+              <Text style={styles.editCancelText}>Annuleren</Text>
+            </Pressable>
+            <Pressable
+              onPress={onSaveEdit}
+              disabled={!editText.trim() || savingEdit}
+              style={[
+                styles.editSaveBtn,
+                !editText.trim() || savingEdit
+                  ? styles.editSaveBtnDisabled
+                  : null,
+              ]}
+              hitSlop={6}
+            >
+              {savingEdit ? (
+                <ActivityIndicator color={colors.white} size="small" />
+              ) : (
+                <Text style={styles.editSaveText}>Bewaren</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      ) : post.body ? (
+        <Text style={styles.body}>{post.body}</Text>
+      ) : null}
 
       {/* Foto */}
       {showImage ? (
@@ -301,7 +532,15 @@ function PostCard({ post }: { post: CommunityPost }) {
               Nog geen reacties — wees de eerste!
             </Text>
           ) : (
-            replies.map((r) => <ReplyRow key={r.id} reply={r} />)
+            replies.map((r) => (
+              <ReplyRow
+                key={r.id}
+                reply={r}
+                currentUserId={currentUserId}
+                onUpdated={onReplyUpdated}
+                onDeleted={onReplyDeleted}
+              />
+            ))
           )}
 
           {/* Reply-composer */}
@@ -405,6 +644,7 @@ export function TimelineScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   /* Cursor = created_at van de laatste niet-gepinde community-post. */
   const cursorRef = useRef<string | null>(null);
@@ -464,10 +704,11 @@ export function TimelineScreen() {
     }
   }, [loadingMore, hasMore, loading, refreshing, computeCursor, show]);
 
-  /* Eerste load + admin-check. */
+  /* Eerste load + admin-check + eigen user-id (voor edit/delete-rechten). */
   useEffect(() => {
     load('initial');
     getIsAdmin(user).then(setIsAdmin);
+    getCurrentUserId().then(setCurrentUserId);
   }, [load, user]);
 
   /* Verse feed bij elke focus (bv. terugkeer uit andere tab). */
@@ -479,6 +720,16 @@ export function TimelineScreen() {
 
   const onPosted = useCallback((post: CommunityPost) => {
     setPosts((prev) => [post, ...prev]);
+  }, []);
+
+  const onPostUpdated = useCallback((updated: CommunityPost) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === updated.id ? updated : p))
+    );
+  }, []);
+
+  const onPostDeleted = useCallback((postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
   }, []);
 
   return (
@@ -496,7 +747,14 @@ export function TimelineScreen() {
           <FlatList
             data={posts}
             keyExtractor={(p) => p.id}
-            renderItem={({ item }) => <PostCard post={item} />}
+            renderItem={({ item }) => (
+              <PostCard
+                post={item}
+                currentUserId={currentUserId}
+                onPostUpdated={onPostUpdated}
+                onPostDeleted={onPostDeleted}
+              />
+            )}
             contentContainerStyle={styles.listContent}
             ListHeaderComponent={
               isAdmin ? <Composer onPosted={onPosted} /> : null
@@ -670,6 +928,62 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.gray,
     fontWeight: '600',
+  },
+
+  /* Eigenaar-acties (bewerken / verwijderen) */
+  ownerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginLeft: spacing.sm,
+  },
+
+  /* Inline edit-modus (post + reply) */
+  editWrap: {
+    marginTop: spacing.sm,
+  },
+  editInput: {
+    fontSize: 15,
+    color: colors.dark,
+    backgroundColor: colors.bg,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  editBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  editCancelBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  editCancelText: {
+    fontSize: 14,
+    color: colors.gray,
+    fontWeight: '600',
+  },
+  editSaveBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+  },
+  editSaveBtnDisabled: {
+    opacity: 0.5,
+  },
+  editSaveText: {
+    fontSize: 14,
+    color: colors.white,
+    fontWeight: '700',
   },
 
   /* Replies */

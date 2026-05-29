@@ -70,12 +70,17 @@ export {
   togglePostLike,
   listReplies,
   createReply,
+  editPost,
+  deletePost,
+  editReply,
   getIsAdmin,
   categoryInfo,
   POST_CATEGORIES,
   POST_BODY_MAX,
   REPLY_BODY_MAX,
 } from './community';
+/* NB: community.deleteReply botst met chatRooms.deleteReply — TimelineScreen
+   importeert de community-variant rechtstreeks uit './community'. */
 export type {
   CommunityPost,
   CommunityReply,
