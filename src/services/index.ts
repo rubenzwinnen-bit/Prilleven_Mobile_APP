@@ -65,6 +65,23 @@ export {
 } from './communityProfile';
 export type { CommunityProfile } from './communityProfile';
 export {
+  listPosts,
+  createPost,
+  togglePostLike,
+  listReplies,
+  createReply,
+  getIsAdmin,
+  categoryInfo,
+  POST_CATEGORIES,
+  POST_BODY_MAX,
+  REPLY_BODY_MAX,
+} from './community';
+export type {
+  CommunityPost,
+  CommunityReply,
+  CategoryInfo,
+} from './community';
+export {
   getChildren,
   createChild,
   updateChild,

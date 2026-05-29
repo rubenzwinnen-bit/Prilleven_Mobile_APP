@@ -18,7 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing } from '../constants/theme';
-import { LandingScreen } from '../screens/LandingScreen';
+import { LandingTabs } from './LandingTabs';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { ChildrenScreen } from '../screens/ChildrenScreen';
 import { ChildFormScreen } from '../screens/ChildFormScreen';
@@ -150,7 +150,7 @@ export function RootStackNavigator() {
     >
       <Stack.Screen
         name="Landing"
-        component={LandingScreen}
+        component={LandingTabs}
         options={{ headerShown: false }}
       />
       <Stack.Screen

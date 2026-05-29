@@ -23,14 +23,25 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useUser } from '../context/UserContext';
 import { AvatarButton } from '../components/AvatarButton';
 import { getCommunityProfile } from '../services';
-import type { RootStackParamList } from '../navigation/types';
+import type {
+  RootStackParamList,
+  LandingTabParamList,
+} from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Landing'>;
+/* Functies-tab binnen LandingTabs, genest in de RootStack. Composite
+   zodat navigation.navigate('Main' | 'HapjesHeld' | 'Profile' | ...)
+   naar de RootStack bubbelt. */
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<LandingTabParamList, 'Functies'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 const IMG_RECEPTEN = require('../../assets/landing-recepten.jpeg');
 const IMG_HAPJESHELD = require('../../assets/landing-hapjesheld.png');

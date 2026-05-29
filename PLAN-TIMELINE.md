@@ -37,9 +37,9 @@
 
 ### Versie-stand
 
-- `expo.version`: **2.9.1**
-- `expo.ios.buildNumber`: **36**
-- `expo.android.versionCode`: **40**
+- `expo.version`: **2.10.0**
+- `expo.ios.buildNumber`: **37**
+- `expo.android.versionCode`: **41**
 
 ### Pariteit met web-app
 
@@ -52,14 +52,17 @@
 | Linked-allergen-unie in symptoom-form | v3.0.0 | ✅ v2.8.7 |
 | Pause-flow (hide Hoeveelheden + Symptoom-knop) | v3.0.0 | ✅ v2.8.9 |
 | Arts-toezicht / exclude-toggle | v3.0.0 | ✅ v2.9.1 |
-| Volledige readiness-checklist (multi-step wizard) | v3.0.0 | ⬜ open |
-| Tijdlijn / community feed | v3.0.0 | ⬜ open |
-| Chatruimtes | v3.0.0 | ⬜ open |
+| Pause-wizard (3-staps modal + auto-trigger + allergisch ja/nee) | v3.0.0 | ✅ v2.9.1 |
+| Tijdlijn / community feed | v3.0.0 | 🟡 MVP v2.10.0 (tekst: lezen/liken/reageren + admin-composer; foto's/polls/notificaties open) |
+| Chatruimtes | v3.0.0 | 🟡 placeholder v2.10.0 (rooms→topics→replies open) |
+
+> **Correctie (2026-05-29)**: de "readiness-checklist" bestaat **niet** op de webversie — dat was een foutieve aanname. De pause-wizard (3-staps modal: Gelezen → arts gecontacteerd → allergisch ja/nee) is **wél** volledig geïmplementeerd: auto-trigger in `SymptomFormScreen.tsx` (matig/heftig + gelinkt allergeen → `paused/paused_step/paused_type/paused_allergen` via `patchEhState`) + wizard-UI + `advancePauseStep`/`handleAllergyConfirmed`/`handleAllergyDenied` in `EersteHapjesScreen.tsx`. **Allergenen-introductie = feature-compleet t.o.v. web.**
 
 ### Volgende stap
 
-1. **Readiness-checklist + multi-step pause-flow modal** uitwerken in `EersteHapjesScreen` (volledige parity met website `js/components/allergenen.js` pause-wizard) — momenteel nog `⬜ open`.
-2. Daarna: keuze tussen tijdlijn-MVP (`services/community.ts` + `TimelineScreen`) of chatruimtes (`services/chatRooms.ts` + `ChatRoomsScreen`).
+Tijdlijn-MVP is gebouwd (v2.10.0): footer-navigatie (`LandingTabs`) met 3 tabs + `services/community.ts` + `TimelineScreen` (tekst-feed lezen/liken/reageren, admin-only composer). Chatruimtes is nu een placeholder-scherm.
+
+Volgende roadmap-feature: **Chatruimtes uitwerken** — `services/chatRooms.ts` (kopieer `community.ts`-patroon) + echte rooms→topics→replies-UI in `ChatRoomsScreen`. Daarna tijdlijn-uitbreidingen (foto's, polls, notificaties).
 
 ### Open vragen / blockers
 

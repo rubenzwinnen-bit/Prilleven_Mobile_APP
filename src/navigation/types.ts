@@ -15,7 +15,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 /* ---- Root Stack (Landing → Main of HapjesHeld of Profile) ---- */
 export type RootStackParamList = {
-  Landing: undefined;
+  Landing: NavigatorScreenParams<LandingTabParamList> | undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   HapjesHeld: NavigatorScreenParams<HapjesHeldStackParamList> | undefined;
   Profile: undefined;
@@ -27,6 +27,13 @@ export type RootStackParamList = {
   DoseForm: { childId: string; allergenKey: string; doseId?: string };
   SymptomLog: { childId: string };
   SymptomForm: { childId: string; symptomId?: string };
+};
+
+/* ---- Landing footer-tabs (Functies / Tijdlijn / Chatruimtes) ---- */
+export type LandingTabParamList = {
+  Functies: undefined;
+  Tijdlijn: undefined;
+  Chatruimtes: undefined;
 };
 
 /* ---- Bottom Tabs ---- */
