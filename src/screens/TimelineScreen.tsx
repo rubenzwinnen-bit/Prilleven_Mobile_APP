@@ -7,8 +7,8 @@
  *   - reacties inline uitklappen (lazy-load) + plaatsen
  *   - tekst-post plaatsen (alleen admins, net als de webversie)
  *
- * Buiten scope (latere iteratie): foto's, polls, reply-likes,
- * edit/delete, rapporteren, notificaties, chatroom-topics in de feed.
+ * Buiten scope (latere iteratie): foto's, polls, rapporteren,
+ * notificaties, chatroom-topics in de feed.
  *
  * Signed avatar_url/image_url hebben 1u TTL → bij stale beeld de feed
  * opnieuw laden (pull-to-refresh).
@@ -39,6 +39,7 @@ import {
   listPosts,
   createPost,
   togglePostLike,
+  toggleReplyLike,
   listReplies,
   createReply,
   editPost,
@@ -117,6 +118,30 @@ function ReplyRow({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(reply.body);
   const [saving, setSaving] = useState(false);
+
+  const [liked, setLiked] = useState(reply.liked_by_me);
+  const [likeCount, setLikeCount] = useState(reply.likes_count);
+  const [liking, setLiking] = useState(false);
+
+  const onToggleLike = useCallback(async () => {
+    if (liking) return;
+    setLiking(true);
+    const prevLiked = liked;
+    const prevCount = likeCount;
+    setLiked(!prevLiked);
+    setLikeCount(prevCount + (prevLiked ? -1 : 1));
+    try {
+      const res = await toggleReplyLike(reply.id);
+      setLiked(res.liked);
+      setLikeCount(res.count);
+    } catch (err: any) {
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
+      show(err.message || 'Liken mislukt.', 'error');
+    } finally {
+      setLiking(false);
+    }
+  }, [liking, liked, likeCount, reply.id, show]);
 
   const onStartEdit = useCallback(() => {
     setEditText(reply.body);
@@ -229,7 +254,30 @@ function ReplyRow({
             </View>
           </View>
         ) : (
-          <Text style={styles.replyBody}>{reply.body}</Text>
+          <>
+            <Text style={styles.replyBody}>{reply.body}</Text>
+            <Pressable
+              onPress={onToggleLike}
+              style={styles.replyLikeBtn}
+              hitSlop={8}
+            >
+              <Feather
+                name="heart"
+                size={14}
+                color={liked ? colors.danger : colors.gray}
+              />
+              {likeCount > 0 ? (
+                <Text
+                  style={[
+                    styles.replyLikeText,
+                    liked ? { color: colors.danger } : null,
+                  ]}
+                >
+                  {likeCount}
+                </Text>
+              ) : null}
+            </Pressable>
+          </>
         )}
       </View>
     </View>
@@ -1030,6 +1078,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.dark,
     lineHeight: 20,
+  },
+  replyLikeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  replyLikeText: {
+    fontSize: 12,
+    color: colors.gray,
+    fontWeight: '600',
   },
   replyComposer: {
     flexDirection: 'row',

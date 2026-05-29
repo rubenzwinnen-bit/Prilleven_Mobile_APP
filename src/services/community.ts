@@ -219,6 +219,21 @@ export async function togglePostLike(
 }
 
 /* ----------------------------------------
+   toggleReplyLike
+   POST /api/community/replies/:id/like → { liked, count }
+---------------------------------------- */
+export async function toggleReplyLike(
+  replyId: string
+): Promise<{ liked: boolean; count: number }> {
+  const response = await authedFetch(
+    `/api/community/replies/${encodeURIComponent(replyId)}/like`,
+    { method: 'POST' }
+  );
+  const data = await jsonOrThrow<LikeEnvelope>(response);
+  return { liked: !!data?.liked, count: data?.count ?? 0 };
+}
+
+/* ----------------------------------------
    listReplies
    GET /api/community/posts/:id/replies → chronologisch (oudste boven)
 ---------------------------------------- */

@@ -68,6 +68,7 @@ export {
   listPosts,
   createPost,
   togglePostLike,
+  toggleReplyLike,
   listReplies,
   createReply,
   editPost,
