@@ -37,6 +37,8 @@ export function LandingTabs() {
 
   return (
     <Tabs.Navigator
+      initialRouteName="Functies"
+      backBehavior="initialRoute"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,

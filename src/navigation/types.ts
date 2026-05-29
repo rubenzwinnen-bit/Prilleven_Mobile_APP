@@ -27,6 +27,8 @@ export type RootStackParamList = {
   DoseForm: { childId: string; allergenKey: string; doseId?: string };
   SymptomLog: { childId: string };
   SymptomForm: { childId: string; symptomId?: string };
+  Learnings: undefined;
+  LearningDetail: { id: string; title?: string };
 };
 
 /* ---- Landing footer-tabs (Functies / Tijdlijn / Chatruimtes) ---- */

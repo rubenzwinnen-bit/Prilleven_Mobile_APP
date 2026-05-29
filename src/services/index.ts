@@ -201,3 +201,16 @@ export type {
   EhSymptom,
   EhSymptomInput,
 } from './eersteHapjes';
+export {
+  getLearnings,
+  getLearning,
+  toggleLearningFavorite,
+  learningKindIcon,
+  learningKindLabel,
+  formatDuration,
+} from './learnings';
+export type {
+  Learning,
+  LearningDetail,
+  LearningKind,
+} from './learnings';
