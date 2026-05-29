@@ -10,6 +10,15 @@
  *   GET  /api/learnings              → { learnings: Learning[] }   (?kind=, ?favorites=1)
  *   GET  /api/learnings/:id          → { learning: LearningDetail } (incl. signed_url voor pdf/video)
  *   POST /api/learnings/:id/favorite → { is_favorite: boolean }     (toggle)
+ *   GET  /api/learnings/:id/bookmark → { bookmark: { position, updated_at } | null }
+ *   PUT  /api/learnings/:id/bookmark → { ok: true }   (body { position })
+ *
+ * Bladwijzer (cross-device sync, identiek aan website):
+ *   pdf   → position.page_nr   (1-based paginanummer)
+ *   blog  → position.scroll_px (scroll-offset in px)
+ *   video → position.seconds   (afspeelpositie in seconden)
+ * Zet je op de website een bladwijzer, dan landt de mobiele app op dezelfde
+ * pagina/positie (en omgekeerd). De website debounced opslaan met 1500 ms.
  *
  * Drie soorten content (`kind`):
  *   blog  → HTML-artikel in `body_html`
@@ -63,6 +72,23 @@ interface LearningEnvelope {
 
 interface FavoriteEnvelope {
   is_favorite: boolean;
+}
+
+/** Bladwijzer-positie; veld hangt af van het type (zie kop). */
+export interface LearningBookmarkPosition {
+  /** PDF: 1-based paginanummer. */
+  page_nr?: number;
+  /** Blog: scroll-offset in pixels. */
+  scroll_px?: number;
+  /** Video: afspeelpositie in seconden. */
+  seconds?: number;
+}
+
+interface BookmarkEnvelope {
+  bookmark: {
+    position: LearningBookmarkPosition;
+    updated_at: string;
+  } | null;
 }
 
 /* ----------------------------------------
@@ -149,6 +175,39 @@ export async function toggleLearningFavorite(
   );
   const data = await jsonOrThrow<FavoriteEnvelope>(response);
   return !!data?.is_favorite;
+}
+
+/* ----------------------------------------
+   getLearningBookmark
+   GET /api/learnings/:id/bookmark — laatst bewaarde positie (of null).
+---------------------------------------- */
+export async function getLearningBookmark(
+  id: string
+): Promise<LearningBookmarkPosition | null> {
+  const response = await authedFetch(
+    `/api/learnings/${encodeURIComponent(id)}/bookmark`
+  );
+  const data = await jsonOrThrow<BookmarkEnvelope>(response);
+  return data?.bookmark?.position ?? null;
+}
+
+/* ----------------------------------------
+   putLearningBookmark
+   PUT /api/learnings/:id/bookmark — bewaart de positie (cross-device sync).
+---------------------------------------- */
+export async function putLearningBookmark(
+  id: string,
+  position: LearningBookmarkPosition
+): Promise<void> {
+  const response = await authedFetch(
+    `/api/learnings/${encodeURIComponent(id)}/bookmark`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position }),
+    }
+  );
+  await jsonOrThrow<unknown>(response);
 }
 
 /* ----------------------------------------

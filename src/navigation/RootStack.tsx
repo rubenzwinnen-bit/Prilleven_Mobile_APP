@@ -30,6 +30,7 @@ import { SymptomLogScreen } from '../screens/SymptomLogScreen';
 import { SymptomFormScreen } from '../screens/SymptomFormScreen';
 import { LearningsScreen } from '../screens/LearningsScreen';
 import { LearningDetailScreen } from '../screens/LearningDetailScreen';
+import { LearningPdfScreen } from '../screens/LearningPdfScreen';
 import { MainTabs } from './index';
 import { HapjesHeldStackNavigator } from './HapjesHeldStack';
 import type { RootStackParamList } from './types';
@@ -220,6 +221,11 @@ export function RootStackNavigator() {
       <Stack.Screen
         name="LearningDetail"
         component={LearningDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="LearningPdf"
+        component={LearningPdfScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

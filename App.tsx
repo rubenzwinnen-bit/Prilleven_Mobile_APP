@@ -22,6 +22,7 @@ import 'react-native-url-polyfill/auto';
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 
@@ -72,22 +73,27 @@ function AppGate() {
 ---------------------------------------- */
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ToastProvider>
-        <UserProvider>
-          <NotificationProvider>
-            <ShoppingListProvider>
-              <StatusBar style="dark" />
-              <AppGate />
-            </ShoppingListProvider>
-          </NotificationProvider>
-        </UserProvider>
-      </ToastProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.flex}>
+      <SafeAreaProvider>
+        <ToastProvider>
+          <UserProvider>
+            <NotificationProvider>
+              <ShoppingListProvider>
+                <StatusBar style="dark" />
+                <AppGate />
+              </ShoppingListProvider>
+            </NotificationProvider>
+          </UserProvider>
+        </ToastProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   center: {
     flex: 1,
     backgroundColor: colors.bg,

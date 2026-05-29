@@ -29,6 +29,7 @@ export type RootStackParamList = {
   SymptomForm: { childId: string; symptomId?: string };
   Learnings: undefined;
   LearningDetail: { id: string; title?: string };
+  LearningPdf: { id: string; title?: string };
 };
 
 /* ---- Landing footer-tabs (Functies / Tijdlijn / Chatruimtes) ---- */

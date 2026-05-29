@@ -205,6 +205,8 @@ export {
   getLearnings,
   getLearning,
   toggleLearningFavorite,
+  getLearningBookmark,
+  putLearningBookmark,
   learningKindIcon,
   learningKindLabel,
   formatDuration,
@@ -213,4 +215,5 @@ export type {
   Learning,
   LearningDetail,
   LearningKind,
+  LearningBookmarkPosition,
 } from './learnings';

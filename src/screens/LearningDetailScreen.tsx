@@ -12,7 +12,7 @@
  * de website laten we (voorlopig) buiten de mobiele app.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,8 @@ import { useToast } from '../components/Toast';
 import {
   getLearning,
   toggleLearningFavorite,
+  getLearningBookmark,
+  putLearningBookmark,
   learningKindIcon,
   learningKindLabel,
 } from '../services';
@@ -99,6 +101,16 @@ export function LearningDetailScreen({ navigation, route }: Props) {
   const [favBusy, setFavBusy] = useState(false);
   const [opening, setOpening] = useState(false);
 
+  /* Video-positie sync (cross-device, gedeeld met de website):
+       resumeRef    — seconden waarnaar we moeten springen zodra de speler klaar is
+       didResumeRef — voorkomt herhaald springen
+       saveTimer    — debounce voor het bewaren (1500 ms, zoals de website)
+       lastSavedRef — laatst bewaarde seconde (vermijdt overbodige PUTs) */
+  const resumeRef = useRef<number | null>(null);
+  const didResumeRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef<number>(0);
+
   /* Video-bron: pas bekend na het laden. useVideoPlayer accepteert null en
      herbouwt de speler zodra de signed URL beschikbaar is. */
   const videoUri =
@@ -127,6 +139,75 @@ export function LearningDetailScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [id, navigation, show]);
+
+  /* Video: laatst bewaarde positie ophalen zodra we weten dat dit een video
+     is. We springen er pas naartoe wanneer de speler 'readyToPlay' is. */
+  useEffect(() => {
+    if (learning?.kind !== 'video') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const bm = await getLearningBookmark(learning.id);
+        if (!cancelled && bm?.seconds && bm.seconds > 0) {
+          resumeRef.current = bm.seconds;
+          lastSavedRef.current = bm.seconds;
+        }
+      } catch {
+        /* Stille fout: positie ophalen is niet kritisch. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [learning?.kind, learning?.id]);
+
+  /* Video: spring naar de bewaarde positie zodra de speler klaar is en
+     bewaar de afspeelpositie (debounced) tijdens + bij het verlaten. */
+  useEffect(() => {
+    if (!player || learning?.kind !== 'video') return;
+    const learningId = learning.id;
+    player.timeUpdateEventInterval = 2;
+
+    const saveAt = (secs: number) => {
+      if (!Number.isFinite(secs) || secs <= 0) return;
+      if (Math.abs(secs - lastSavedRef.current) < 1) return;
+      lastSavedRef.current = secs;
+      putLearningBookmark(learningId, { seconds: Math.floor(secs) }).catch(() => {
+        /* Stille fout: bewaren is niet kritisch. */
+      });
+    };
+
+    const statusSub = player.addListener('statusChange', ({ status }) => {
+      if (
+        status === 'readyToPlay' &&
+        !didResumeRef.current &&
+        resumeRef.current != null
+      ) {
+        didResumeRef.current = true;
+        try {
+          player.currentTime = resumeRef.current;
+        } catch {
+          /* speler nog niet seekbaar */
+        }
+      }
+    });
+
+    const timeSub = player.addListener('timeUpdate', ({ currentTime }) => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => saveAt(currentTime), 1500);
+    });
+
+    return () => {
+      statusSub.remove();
+      timeSub.remove();
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      try {
+        saveAt(player.currentTime);
+      } catch {
+        /* speler reeds vrijgegeven */
+      }
+    };
+  }, [player, learning?.kind, learning?.id]);
 
   const onToggleFavorite = useCallback(async () => {
     if (!learning || favBusy) return;
