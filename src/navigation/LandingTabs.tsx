@@ -92,9 +92,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
+    overflow: 'hidden',
   },
   logoImage: {
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
   },
 });
