@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { Image, View, StyleSheet } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../constants/theme';
@@ -59,13 +59,11 @@ export function LandingTabs() {
         options={{
           tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.logoCircle, { opacity: focused ? 1 : 0.7 }]}>
-              <Image
-                source={require('../../assets/prilleven-logo.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
+            <Image
+              source={require('../../assets/prilleven-logo-round.png')}
+              style={[styles.logoImage, { opacity: focused ? 1 : 0.7 }]}
+              resizeMode="contain"
+            />
           ),
         }}
       />
@@ -84,18 +82,9 @@ export function LandingTabs() {
 }
 
 const styles = StyleSheet.create({
-  logoCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-    overflow: 'hidden',
-  },
   logoImage: {
     width: 60,
     height: 60,
+    marginTop: 2,
   },
 });
