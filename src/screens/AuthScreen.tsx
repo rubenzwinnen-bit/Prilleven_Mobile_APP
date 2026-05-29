@@ -24,12 +24,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { signIn, signUp, resetPassword } from '../services';
 
 type AuthTab = 'login' | 'register' | 'reset';
+
+/* Publieke juridische pagina's (gedeeld met de website). */
+const PRIVACY_URL = 'https://community-web.prilleven.be/privacy.html';
+const TERMS_URL = 'https://community-web.prilleven.be/voorwaarden.html';
 
 interface AuthScreenProps {
   onAuthenticated: (email: string) => void;
@@ -291,6 +296,44 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 </Text>
               </View>
             )}
+
+            {/* Toestemming bij registratie */}
+            {tab === 'register' && (
+              <Text style={styles.consentText}>
+                Door een account aan te maken ga je akkoord met onze{' '}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => Linking.openURL(TERMS_URL)}
+                >
+                  gebruiksvoorwaarden
+                </Text>{' '}
+                en{' '}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => Linking.openURL(PRIVACY_URL)}
+                >
+                  privacybeleid
+                </Text>
+                .
+              </Text>
+            )}
+          </View>
+
+          {/* Juridische links — altijd zichtbaar */}
+          <View style={styles.legalFooter}>
+            <Text
+              style={styles.legalLink}
+              onPress={() => Linking.openURL(PRIVACY_URL)}
+            >
+              Privacybeleid
+            </Text>
+            <Text style={styles.legalSep}>·</Text>
+            <Text
+              style={styles.legalLink}
+              onPress={() => Linking.openURL(TERMS_URL)}
+            >
+              Gebruiksvoorwaarden
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -435,5 +478,32 @@ const styles = StyleSheet.create({
     color: colors.darkLight,
     fontSize: 12,
     lineHeight: 17,
+  },
+  consentText: {
+    fontSize: 12,
+    color: colors.gray,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  consentLink: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  legalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  legalLink: {
+    color: colors.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  legalSep: {
+    color: colors.grayLight,
+    fontSize: 12,
   },
 });

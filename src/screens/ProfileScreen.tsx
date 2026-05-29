@@ -27,6 +27,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
@@ -60,6 +61,10 @@ import type { RootStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
 const CONFIRM_WORD = 'VERWIJDER';
+
+/* Publieke juridische pagina's (gedeeld met de website). */
+const PRIVACY_URL = 'https://community-web.prilleven.be/privacy.html';
+const TERMS_URL = 'https://community-web.prilleven.be/voorwaarden.html';
 
 /* Lokale chevron-back — geïnlined om een require-cycle met RootStack te vermijden
    (RootStack importeert ProfileScreen; ProfileScreen mag dus niets uit
@@ -775,6 +780,33 @@ export function ProfileScreen({ navigation }: Props) {
           >
             <Feather name="trash-2" size={16} color={colors.white} />
             <Text style={styles.btnDangerText}>Verwijder mijn account</Text>
+          </Pressable>
+        </Section>
+
+        {/* ----- 7. JURIDISCH ----- */}
+        <Section title="Juridisch">
+          <Pressable
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+            style={({ pressed }) => [
+              styles.btnSecondary,
+              pressed && styles.btnPressed,
+            ]}
+          >
+            <Feather name="shield" size={16} color={colors.primary} />
+            <Text style={styles.btnSecondaryTextPrimary}>Privacybeleid</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => Linking.openURL(TERMS_URL)}
+            style={({ pressed }) => [
+              styles.btnSecondary,
+              pressed && styles.btnPressed,
+            ]}
+          >
+            <Feather name="file-text" size={16} color={colors.primary} />
+            <Text style={styles.btnSecondaryTextPrimary}>
+              Gebruiksvoorwaarden
+            </Text>
           </Pressable>
         </Section>
 
