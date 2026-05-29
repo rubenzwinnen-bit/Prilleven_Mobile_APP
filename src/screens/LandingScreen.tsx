@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     ...shadows.lg,
   },
   tileBg: {
-    minHeight: 140,
+    minHeight: 104,
     justifyContent: 'flex-start',
   },
   tileImage: {
