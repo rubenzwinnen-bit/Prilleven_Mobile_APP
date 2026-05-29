@@ -1,6 +1,6 @@
 # CLAUDE.md — Pril Leven Mobile App
 
-Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v2.18.1`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
+Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v2.19.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
 
 > Zusterproject: de **web-app** in `~/Desktop/Project_weekschema_Productie/` heeft een eigen, uitgebreide `CLAUDE.md` per laag (root, `/js`, `/api`, `/supabase-migrations`). De mobiele app deelt **dezelfde Supabase-database en dezelfde Vercel-API** als de web-app — niet duplicaten.
 
@@ -17,7 +17,7 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Onderdeel | Versie / keuze |
 |---|---|
 | React Native | `0.81.5` |
-| Expo | `~54.0.34` (managed workflow, `newArchEnabled: false`) |
+| Expo | `~54.0.34` (managed workflow, **`newArchEnabled: true`** sinds v2.19.0) |
 | TypeScript | `~5.9.2`, `"strict": true` (zie `tsconfig.json`, extends `expo/tsconfig.base`) |
 | Navigatie | `@react-navigation/native` v7 + `native-stack` + `bottom-tabs` |
 | State | React Context (geen Redux/Zustand) |
@@ -28,14 +28,18 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Image | `expo-image-picker` + `expo-image-manipulator` |
 | File/share (GDPR-export) | `expo-file-system` (~19) `File`/`Paths` API + `expo-sharing` |
 | Learnings-viewer | `react-native-webview` (blog-HTML + eigen PDF.js-viewer) + `expo-video` (video) |
-| Tegels herordenen | `react-native-draggable-flatlist` `^4.0.3` + `react-native-reanimated` `~4.1.1` (wiebel-animatie) + `react-native-gesture-handler` `~2.28.0` + `react-native-worklets` (peer van reanimated 4) |
+| Tegels herordenen | `react-native-draggable-flatlist` `^4.0.3` + `react-native-reanimated` **`4.1.1`** (exact) + `react-native-worklets` **`0.5.1`** (exact) + `react-native-gesture-handler` `~2.28.0` |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `57` (v2.18.1) |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `61` (v2.18.1) |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `58` (v2.19.0) |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `62` (v2.19.0) |
 
 Node ≥ 20 lokaal voor Expo CLI.
 
-> **`babel.config.js` is verplicht (v2.18.1).** Reanimated 4 splitst worklets af in `react-native-worklets` en de babel-plugin wordt **niet** meer automatisch door `babel-preset-expo` toegevoegd (zoals bij reanimated 3). Het project heeft daarom een `babel.config.js` met `plugins: ['react-native-worklets/plugin']` (moet als laatste plugin staan). Zonder dit bestand crasht de app bij opstarten met `Exception in HostFunction: NativeWorklets`. Na wijzigingen aan babel: Metro starten met cache-clear (`npx expo start -c`).
+> **New Architecture (v2.19.0).** De app draait op de **New Architecture** (`newArchEnabled: true` in `app.json`). Vereist omdat **reanimated 4 enkel op New Arch werkt** (Old-Arch-support is geschrapt). Expo Go SDK 54 draait sowieso al op New Arch. Bij twijfel altijd via een **EAS dev/preview-build** valideren, niet enkel Expo Go.
+>
+> **Reanimated/worklets-versies zijn exact gepind (v2.19.0).** Expo Go SDK 54 bevat de **native** modules `react-native-reanimated ~4.1.1` + `react-native-worklets 0.5.1`. De JS-kant MOET hiermee overeenkomen, anders crasht de app bij opstarten met `Exception in HostFunction: NativeWorklets`. Daarom staan ze met exacte versie in `package.json` (`4.1.1` / `0.5.1`). **Niet** upgraden zonder de Expo `bundledNativeModules.json` te checken (`expo install --check` ziet de transitieve worklets-mismatch NIET).
+>
+> **`babel.config.js` is verplicht.** Reanimated 4 splitst worklets af in `react-native-worklets`; de babel-plugin wordt **niet** automatisch door `babel-preset-expo` toegevoegd. Het project heeft daarom een `babel.config.js` met `plugins: ['react-native-worklets/plugin']` (als laatste plugin). Na babel- of versiewijzigingen: Metro starten met cache-clear (`npx expo start -c`).
 
 ---
 
@@ -45,7 +49,7 @@ Node ≥ 20 lokaal voor Expo CLI.
 /
 ├── App.tsx                          provider-boom + AppGate (zie §4)
 ├── index.ts                         expo entry
-├── app.json                         expo config (version 2.18.0, permissions in NL)
+├── app.json                         expo config (version 2.19.0, newArchEnabled true, permissions in NL)
 ├── eas.json                         EAS profielen (development/preview/production)
 ├── tsconfig.json                    strict, extends expo/tsconfig.base
 ├── package.json                     dependencies

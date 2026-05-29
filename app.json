@@ -2,11 +2,11 @@
   "expo": {
     "name": "Prilleven",
     "slug": "prilleven-mobile-app",
-    "version": "2.18.1",
+    "version": "2.19.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "owner": "prilleven",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "be.prilleven.mobileapp",
-      "buildNumber": "57",
+      "buildNumber": "58",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Laat je HapjesHeld een foto nemen van ingrediënten of een etiket om een antwoord te krijgen.",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "be.prilleven.mobileapp",
-      "versionCode": 61,
+      "versionCode": 62,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
