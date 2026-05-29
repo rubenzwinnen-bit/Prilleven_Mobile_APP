@@ -65,16 +65,11 @@ function Avatar({
 function AdminIntroCard({ intro }: { intro: AdminIntro }) {
   return (
     <View style={styles.introCard}>
-      <View style={styles.introHead}>
-        <Feather name="info" size={15} color={colors.secondaryDark} />
-        <Text style={styles.introLabel}>Welkom</Text>
-      </View>
-      <Text style={styles.introBody}>{intro.message}</Text>
       <View style={styles.introAuthor}>
         <Avatar
           nickname={intro.nickname}
           avatarUrl={intro.avatar_url}
-          size={28}
+          size={36}
         />
         <View style={styles.introAuthorMeta}>
           <View style={styles.introNickRow}>
@@ -87,9 +82,12 @@ function AdminIntroCard({ intro }: { intro: AdminIntro }) {
               </View>
             ) : null}
           </View>
-          <Text style={styles.introMeta}>{relTime(intro.updated_at)}</Text>
+          <Text style={styles.introMeta}>
+            Welkom · {relTime(intro.updated_at)}
+          </Text>
         </View>
       </View>
+      <Text style={styles.introBody}>{intro.message}</Text>
     </View>
   );
 }
@@ -249,27 +247,15 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  introHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.xs,
-  },
-  introLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.secondaryDark,
-    letterSpacing: 0.3,
-  },
   introBody: {
     fontSize: 14,
     color: colors.dark,
     lineHeight: 21,
+    marginTop: spacing.md,
   },
   introAuthor: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
   },
   introAuthorMeta: {
     flex: 1,

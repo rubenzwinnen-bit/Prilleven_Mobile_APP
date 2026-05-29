@@ -12,6 +12,7 @@
  */
 
 import React from 'react';
+import { Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../constants/theme';
@@ -56,9 +57,13 @@ export function LandingTabs() {
         name="Tijdlijn"
         component={TimelineScreen}
         options={{
-          tabBarLabel: 'Tijdlijn',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="message-square" size={size} color={color} />
+          tabBarLabel: () => null,
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={require('../../assets/prilleven-logo.png')}
+              style={{ width: 40, height: 40, opacity: focused ? 1 : 0.6 }}
+              resizeMode="contain"
+            />
           ),
         }}
       />

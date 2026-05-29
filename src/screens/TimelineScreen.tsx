@@ -487,10 +487,6 @@ export function TimelineScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Tijdlijn</Text>
-        </View>
-
         {loading ? (
           <ActivityIndicator
             color={colors.primary}
@@ -545,15 +541,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.dark,
   },
   listContent: {
     padding: spacing.lg,
