@@ -28,8 +28,8 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Image | `expo-image-picker` + `expo-image-manipulator` |
 | File/share (GDPR-export) | `expo-file-system` (~19) `File`/`Paths` API + `expo-sharing` |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `48` (v2.12.1) |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `52` (v2.12.1) |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `49` (v2.13.0) |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `53` (v2.13.0) |
 
 Node ≥ 20 lokaal voor Expo CLI.
 
@@ -41,7 +41,7 @@ Node ≥ 20 lokaal voor Expo CLI.
 /
 ├── App.tsx                          provider-boom + AppGate (zie §4)
 ├── index.ts                         expo entry
-├── app.json                         expo config (version 2.12.1, permissions in NL)
+├── app.json                         expo config (version 2.13.0, permissions in NL)
 ├── eas.json                         EAS profielen (development/preview/production)
 ├── tsconfig.json                    strict, extends expo/tsconfig.base
 ├── package.json                     dependencies
@@ -62,7 +62,7 @@ Node ≥ 20 lokaal voor Expo CLI.
     │                                HapjesHeldStack, types.ts
     ├── services/                    data-laag (Supabase + Vercel) — alle exports
     │                                via services/index.ts barrel
-    ├── context/                     UserContext, ShoppingListContext
+    ├── context/                     UserContext, NotificationContext, ShoppingListContext
     ├── lib/                         supabase.ts (singleton client)
     ├── constants/                   theme, data, ingredientIcons
     └── types/                       index.ts (Recipe, Schedule, Comment, ...)
@@ -78,12 +78,13 @@ Node ≥ 20 lokaal voor Expo CLI.
 SafeAreaProvider
   └── ToastProvider          (useToast() overal beschikbaar)
         └── UserProvider     (Supabase sessie + AsyncStorage email)
-              └── ShoppingListProvider
-                    └── AppGate
-                          ├── ActivityIndicator        (loading sessie)
-                          ├── AuthScreen               (geen sessie)
-                          └── NavigationContainer
-                                └── RootStackNavigator (ingelogd)
+              └── NotificationProvider   (admin-post badges, poll 60s)
+                    └── ShoppingListProvider
+                          └── AppGate
+                                ├── ActivityIndicator        (loading sessie)
+                                ├── AuthScreen               (geen sessie)
+                                └── NavigationContainer
+                                      └── RootStackNavigator (ingelogd)
 ```
 
 `AppGate` leest `useUser().loading` en wisselt automatisch zodra `onAuthStateChange` triggert.
@@ -194,6 +195,7 @@ Barrel: `src/services/index.ts`. Iedere service exporteert pure functies (geen k
 | `memory.ts` | Eigen `authedFetch` + `jsonOrThrow` + `okOrThrow` (voor 204-DELETE). Type `Memory` (`id`, `content`, `importance` 1-5, `created_at`, `last_used_at`). Endpoints: `getMemories()` (GET `/api/memory` → `Memory[]`), `deleteMemory(id)` (DELETE `/api/memory?id=<uuid>`), `deleteAllMemories()` (DELETE `/api/memory`). Server-tabel `chat_user_memory` (RLS owner-only). Helper `relTime(iso)` voor "5 min" / "3 u" / "12 d" / NL-datum, identiek aan website `js/chat.js::relTime`. Werkt onafhankelijk van `memory_enabled`-flag. |
 | `eersteHapjes.ts` | Eigen `authedFetch` + `jsonOrThrow` + `okOrThrow`. **Allergen-constants**: `ALLERGEN_FLOW` (9 hoofdallergenen met `key`/`label`/`icon`/`order`/`introFromMonths` (4) / `introBeforeMonths` (12) / `suggestion`), `ALLERGEN_COOLDOWN_DAYS = 2`, `ALLERGEN_TARGET_DOSES = 3`, `REACTION_LEVELS` (geen/mild/ernstig met `counts`/`pauses`/`escalate` flags). **Symptom-constants** (v2.6.0): `SYMPTOM_TYPES` (16 items met `key`/`label`/`icon`/`redFlagSeverity[]` — mirror van server `RED_FLAG_SEVERITIES`; `ademhaling` & `lethargie` triggeren al bij `mild`, `braken`/`koorts`/`zwelling`/`hoesten`/`gewicht` vanaf `matig`, de rest enkel bij `heftig`), `SYMPTOM_SEVERITIES` (mild/matig/heftig met description). Types: `EhState`, `EhDose`, `EhDoseInput`, `AllergenStatus` ('veilig' \| 'allergisch' \| 'paused' \| 'in-progress' \| 'wacht' \| 'locked-age' \| 'excluded' — v2.9.0), `AllergenContext`, `AllergenStateData`, `EhSymptom`, `EhSymptomInput`, `SymptomType`, `SymptomSeverity`, `TimeAfterEating`, `SymptomDuration`, `SymptomWorsened`, `SymptomBehavior`. State-endpoints: `getEhState(childId)`, `patchEhState(childId, patch)` (PATCH met deep-merge op `allergen_state`). Dose-endpoints: `getEhDoses`, `createEhDose` (409 op duplicate `(child, allergen, dose_number)`), `updateEhDose`, `deleteEhDose`. **Symptom-endpoints** (v2.6.0): `getEhSymptoms(childId, { since?, limit? })` (GET `/api/eerste-hapjes/symptoms`), `createEhSymptom(input)` (POST, server vult `red_flag` o.b.v. `RED_FLAG_SEVERITIES`), `updateEhSymptom(id, patch)` (PATCH), `deleteEhSymptom(id)` (DELETE → 204). Helpers: `buildAllergenContext`, `getAllergenStatus`, `successfulDoseCount`, `nextDoseNumber`, `todayIsoDate`, `isRedFlag(type, severity)` (lokale mirror voor live-banner in form), `symptomTypeInfo(type)` (label/icon lookup). Spiegelt `js/content/eersteHapjes-allergen-flow.js` + `js/eersteHapjesStateApi.js` + `api/_lib/eersteHapjes-logs.mjs` op de website. **v2.6.0** dekt state + doses + symptomen; **v2.8.x** voegt setup-flow + welcome-card + pause-hide toe; **v2.9.x** voegt arts-toezicht/exclude-toggle toe (`excluded_keys` patch via `patchEhState`) + volledige 3-staps pause-wizard. Feature-compleet t.o.v. web. |
 | `community.ts` (v2.10.0) | Eigen `authedFetch` + `jsonOrThrow` (kopie van `communityProfile.ts`-helpers). Spiegelt `api/community.mjs`. Types `CommunityPost` (`id`, `user_id`, `body`, `category`, `image_path`, `is_pinned`, `edited_at`, `created_at`, `nickname`, `likes_count`, `replies_count`, `has_poll`, `source_type` `'community'\|'chatroom'`, `liked_by_me`, `image_url`/`avatar_url` signed 1u TTL, `poll`, `author_is_admin`), `CommunityReply`, `CategoryInfo`. Constants: `POST_CATEGORIES` (algemeen💬, vraag❓, tip💡, mijlpaal⭐, voeding🥕, slapen😴), `POST_BODY_MAX = 4000`, `REPLY_BODY_MAX = 2000`, helper `categoryInfo(key)`. Endpoints: `listPosts({ before?, limit?, category? })` (GET `/api/community/posts`, **cursor-paginatie** via `before` = created_at), `createPost({ body, category })` (POST, 412 zonder nickname), `togglePostLike(postId)` (POST `/like` → `{ liked, count }`), `toggleReplyLike(replyId)` (POST `/replies/:id/like` → `{ liked, count }`, v2.12.1), `listReplies(postId)`, `createReply(postId, body)` (412 zonder nickname), `editPost(postId, body)` (PATCH, owner-check 403, geen edit-window), `deletePost(postId)` (DELETE → `{ ok }`), `editReply(replyId, body)` (PATCH), `deleteReply(replyId)` (DELETE) — v2.12.0, `getIsAdmin(email)` (GET `/api/subscription-status?email=` → `{ is_admin }`, stille false bij fout). **NB**: `deleteReply` wordt NIET via de barrel geëxporteerd (botst met `chatRooms.deleteReply`); `TimelineScreen` importeert die rechtstreeks uit `services/community`. |
+| `notifications.ts` (v2.13.0) | Telfuncties voor de admin-post badges op de footer-tabs (geen push). `countNewAdminTimelinePosts(since)` (listPosts limit 50 → filter `author_is_admin && source_type==='community' && created_at > since`) en `countNewAdminChatroomPosts(since)` (per room `getRoom(slug)` → admin-topics `created_at > since`, opgeteld over alle `ROOMS`). Beide defensief: bij fout → 0 (poll-loop crasht nooit). "Nieuw" = strikt na `since`; geen `since` → 0 (eerste run telt niets). Wordt gepolld door `NotificationContext`. |
 | `chatRooms.ts` (v2.11.0) | Eigen `authedFetch` + `jsonOrThrow` + `okOrThrow` (kopie van `community.ts`-helpers). Spiegelt `api/chat-rooms.mjs`. **Constants**: `ROOMS` (4 vaste rooms: melk-voeding🍼, eerste-hapjes🥄, allergieen-overgevoeligheden🌾, feedback💬), `TOPIC_TITLE_MAX = 120`, `TOPIC_BODY_MAX = 4000`, `REPLY_BODY_MAX = 2000`, `EDIT_WINDOW_MS = 15 min`. Types: `ChatRoom`, `ChatRoomDetail` (+ `admin_intro`), `ChatTopic` (`title`, `body`, `is_pinned`, `replies_count`, `last_reply_at`, `author_is_admin`, nickname/avatar_url signed), `ChatReply`, `AdminIntro`. Endpoints: `listRooms()` (GET `/api/chat-rooms`), `getRoom(slug)` (GET `/api/chat-rooms/:slug` → `{ room, topics }`), `getTopic(id)` (GET `/api/chat-rooms/topics/:id` → `{ topic, replies }`), `createTopic(slug, { title, body })` (POST, 412 zonder nickname / 422 moderatie), `updateTopic(id, patch)` (PATCH, 403 buiten eigenaar/venster), `deleteTopic(id)` (DELETE → `{ ok: true }`), `createReply(topicId, body)` / `updateReply(id, body)` / `deleteReply(id)`. Helpers: `getCurrentUserId()` (uit `supabase.auth.getSession()` — UserContext heeft enkel de e-mail, niet de UUID, nodig voor eigenaarschap-checks), `isWithinEditWindow(createdAt)`, `roomEmoji(slug)`. **NB**: `createReply` + `REPLY_BODY_MAX` worden NIET via de barrel geëxporteerd (botsen met `community.ts`); `ChatTopicScreen` importeert ze rechtstreeks uit `services/chatRooms`. |
 
 **Patroon voor nieuwe services:**
@@ -275,6 +277,8 @@ Interfaces: `Ingredient`, `Recipe`, `Comment`, `RatingSummary`, `Schedule` (save
 | `receptenboek_schedule_subtab_<email>` | `WeekScheduleScreen` | `'active'` of `'generate'` |
 | `receptenboek_active_preset_<email>` | `WeekScheduleScreen` | `'today'` / `'today-tomorrow'` / `'week'` |
 | `hh_health_disclaimer_seen_v1` | `HealthDisclaimerModal` | `'1'` na accept |
+| `notif_seen_timeline_<email>` | `NotificationContext` | ISO-tijdstip "tijdlijn laatst gezien" |
+| `notif_seen_chatrooms_<email>` | `NotificationContext` | ISO-tijdstip "chatruimtes laatst gezien" |
 
 Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen doet), zodat het wisselen van account geen lekkage geeft.
 
@@ -300,8 +304,8 @@ Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen 
 - Branch `main` = productie. Grotere features → feature branch + merge.
 
 ### Versionering
-- `app.json.expo.version` = user-facing string (huidig `2.12.1`).
-- `app.json.ios.buildNumber` (`48`) + `app.json.android.versionCode` (`52`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
+- `app.json.expo.version` = user-facing string (huidig `2.13.0`).
+- `app.json.ios.buildNumber` (`49`) + `app.json.android.versionCode` (`53`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
 - `package.json.version` wordt **niet** actief gebruikt — niet syncen.
 
 ---
@@ -462,12 +466,15 @@ Bron: `Project_weekschema_Productie/PLAN-TIMELINE.md` (web v3.0.0).
    - ✅ v2.10.0: footer-navigatie op de landing (3 tabs: Functies / Tijdlijn / Chatruimtes via `LandingTabs`). Tijdlijn-MVP: tekst-feed lezen (cursor-paginatie), liken (optimistic), replies lazy-load + plaatsen, admin-only tekst-composer (`getIsAdmin`-check). `services/community.ts` + `TimelineScreen`.
    - ✅ v2.12.0: eigen post + reply bewerken/verwijderen (owner-check server-side, geen edit-window; inline edit-TextInput + `Alert`-confirm delete). `editPost`/`deletePost`/`editReply`/`deleteReply` in `services/community.ts`.
    - ✅ v2.12.1: reply-likes (hartje + teller per reactie, optimistic toggle via `toggleReplyLike`).
-   - ⬜ Open: foto-upload bij post, polls, rapporteren, in-app notificaties. (Categorie-filterbalk is op de website verwijderd → niet meer bouwen.)
+   - ✅ v2.13.0: in-app notificatie-badges (rode cijfer-rondjes) op de footer-tabs — zie roadmap-punt 6.
+   - ⬜ Open: foto-upload bij post, polls, rapporteren. (Categorie-filterbalk is op de website verwijderd → niet meer bouwen.)
 5. 🟡 **Chatruimtes** — categorische rooms (Melk & voeding, Eerste hapjes, Allergieën & overgevoeligheden, Feedback) + topics.
    - ✅ v2.10.0: placeholder-scherm "binnenkort" als 3de footer-tab.
    - ✅ v2.11.0: volledige CRUD-MVP. `services/chatRooms.ts` + `ChatRoomsStack` (RoomList → ChatRoom → ChatTopic → ChatTopicForm). Rooms lezen, topics lezen/plaatsen, replies lezen/plaatsen, eigen topic/reply bewerken (15min-venster) + wissen, admin-welkomsbericht read-only bovenaan een room. Géén follow/unread-badges (bewust overgeslagen).
    - ⬜ Open: follow-rooms + unread-badges, topic pinnen vanuit app (admin), notificaties.
-6. ⬜ **Push-notificaties** — Expo Push, vervangt polling.
+6. 🟡 **Notificaties** — admin-post badges op de footer-tabs.
+   - ✅ v2.13.0: in-app badges (rood rondje + cijfer "nieuw sinds laatst") op twee footer-tabs, gevoed door `NotificationContext` (poll 60s + AppState 'active'): **Tijdlijn** (prilleven-logo) toont nieuwe admin-posts in de community-feed; **Chatruimtes** toont de som van nieuwe admin-topics over alle rooms. Markeerpunt per gebruiker in AsyncStorage (`notif_seen_timeline_<email>` / `notif_seen_chatrooms_<email>`), wist bij focus op de tab (`markTimelineSeen` / `markChatroomsSeen`). Eerste run initialiseert markeerpunt op "nu". Telfuncties in `services/notifications.ts`.
+   - ⬜ Open: Expo Push (server-side trigger), vervangt polling.
 
 **Werkvolgorde per feature:**
 1. CLAUDE.md uitbreiden (nieuwe service/screen toevoegen aan §3/§5/§6/§11).

@@ -9,6 +9,13 @@
  * Deze navigator vervangt het losse Landing-scherm in de RootStack.
  * Diepere schermen (Main, HapjesHeld, ...) worden bovenop gepusht en
  * bedekken de footer — die zien we dus alleen op de landing zelf.
+ *
+ * Notificatie-badges (rode cijfer-rondjes) op twee tabs, gevoed door de
+ * NotificationContext:
+ *   Tijdlijn (logo) → nieuwe admin-posts in de tijdlijn
+ *   Chatruimtes     → som van nieuwe admin-topics over alle chatruimtes
+ * De badge wist bij focus op de betreffende tab (markTimelineSeen /
+ * markChatroomsSeen).
  */
 
 import React from 'react';
@@ -20,10 +27,14 @@ import type { LandingTabParamList } from './types';
 import { LandingScreen } from '../screens/LandingScreen';
 import { TimelineScreen } from '../screens/TimelineScreen';
 import { ChatRoomsStackNavigator } from './ChatRoomsStack';
+import { useNotifications } from '../context/NotificationContext';
 
 const Tabs = createBottomTabNavigator<LandingTabParamList>();
 
 export function LandingTabs() {
+  const { timelineCount, chatroomsCount, markTimelineSeen, markChatroomsSeen } =
+    useNotifications();
+
   return (
     <Tabs.Navigator
       screenOptions={{
@@ -40,6 +51,12 @@ export function LandingTabs() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
+        },
+        tabBarBadgeStyle: {
+          backgroundColor: colors.danger,
+          color: colors.white,
+          fontSize: 11,
+          fontWeight: '700',
         },
       }}
     >
@@ -58,6 +75,7 @@ export function LandingTabs() {
         component={TimelineScreen}
         options={{
           tabBarLabel: () => null,
+          tabBarBadge: timelineCount > 0 ? timelineCount : undefined,
           tabBarIcon: ({ focused }) => (
             <Image
               source={require('../../assets/prilleven-logo-round.png')}
@@ -66,16 +84,19 @@ export function LandingTabs() {
             />
           ),
         }}
+        listeners={{ focus: () => markTimelineSeen() }}
       />
       <Tabs.Screen
         name="Chatruimtes"
         component={ChatRoomsStackNavigator}
         options={{
           tabBarLabel: 'Chatruimtes',
+          tabBarBadge: chatroomsCount > 0 ? chatroomsCount : undefined,
           tabBarIcon: ({ color, size }) => (
             <Feather name="users" size={size} color={color} />
           ),
         }}
+        listeners={{ focus: () => markChatroomsSeen() }}
       />
     </Tabs.Navigator>
   );

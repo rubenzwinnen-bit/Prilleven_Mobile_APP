@@ -140,6 +140,10 @@ export {
 } from './memory';
 export type { Memory } from './memory';
 export {
+  countNewAdminTimelinePosts,
+  countNewAdminChatroomPosts,
+} from './notifications';
+export {
   ALLERGEN_FLOW,
   ALLERGEN_COOLDOWN_DAYS,
   ALLERGEN_TARGET_DOSES,

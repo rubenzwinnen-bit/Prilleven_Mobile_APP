@@ -8,8 +8,9 @@
  *   SafeAreaProvider
  *     └── ToastProvider
  *           └── UserProvider
- *                 └── ShoppingListProvider
- *                       └── AppGate
+ *                 └── NotificationProvider
+ *                       └── ShoppingListProvider
+ *                             └── AppGate
  *                             ├── AuthScreen          (niet ingelogd)
  *                             └── RootStackNavigator  (ingelogd)
  *                                   ├── Landing       (tegels)
@@ -26,6 +27,7 @@ import { NavigationContainer } from '@react-navigation/native';
 
 import { colors } from './src/constants/theme';
 import { UserProvider, useUser } from './src/context/UserContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import { ShoppingListProvider } from './src/context/ShoppingListContext';
 import { ToastProvider } from './src/components/Toast';
 import { RootStackNavigator } from './src/navigation/RootStack';
@@ -73,10 +75,12 @@ export default function App() {
     <SafeAreaProvider>
       <ToastProvider>
         <UserProvider>
-          <ShoppingListProvider>
-            <StatusBar style="dark" />
-            <AppGate />
-          </ShoppingListProvider>
+          <NotificationProvider>
+            <ShoppingListProvider>
+              <StatusBar style="dark" />
+              <AppGate />
+            </ShoppingListProvider>
+          </NotificationProvider>
         </UserProvider>
       </ToastProvider>
     </SafeAreaProvider>
