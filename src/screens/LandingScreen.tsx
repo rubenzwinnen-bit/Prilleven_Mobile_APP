@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   },
   tileBg: {
     minHeight: 140,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   tileImage: {
     borderRadius: radius.lg,
