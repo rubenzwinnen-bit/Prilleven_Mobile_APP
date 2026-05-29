@@ -22,7 +22,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
-import { listRooms, roomEmoji, ROOMS } from '../services';
+import { listRooms, getUnread, roomEmoji, ROOMS } from '../services';
 import type { ChatRoom } from '../services';
 import type { ChatRoomsStackParamList } from '../navigation/types';
 
@@ -40,6 +40,7 @@ const FALLBACK_ROOMS: ChatRoom[] = ROOMS.map((r, i) => ({
 export function ChatRoomsListScreen({ navigation }: Props) {
   const { show } = useToast();
   const [rooms, setRooms] = useState<ChatRoom[]>(FALLBACK_ROOMS);
+  const [unread, setUnread] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,8 +49,9 @@ export function ChatRoomsListScreen({ navigation }: Props) {
       if (mode === 'refresh') setRefreshing(true);
       else setLoading(true);
       try {
-        const list = await listRooms();
+        const [list, counts] = await Promise.all([listRooms(), getUnread()]);
         if (list.length) setRooms(list);
+        setUnread(counts.rooms);
       } catch (err: any) {
         show(err.message || 'Chatruimtes laden mislukt.', 'error');
       } finally {
@@ -85,35 +87,51 @@ export function ChatRoomsListScreen({ navigation }: Props) {
           data={rooms}
           keyExtractor={(r) => r.id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [
-                styles.card,
-                pressed ? styles.cardPressed : null,
-              ]}
-              onPress={() =>
-                navigation.navigate('ChatRoom', {
-                  slug: item.slug,
-                  title: item.title,
-                })
-              }
-            >
-              <View style={styles.emojiCircle}>
-                <Text style={styles.emoji}>{roomEmoji(item.slug)}</Text>
-              </View>
-              <View style={styles.cardMeta}>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                {item.description ? (
-                  <Text style={styles.cardDesc} numberOfLines={2}>
-                    {item.description}
+          renderItem={({ item }) => {
+            const count = unread[item.id] ?? 0;
+            return (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.card,
+                  pressed ? styles.cardPressed : null,
+                ]}
+                onPress={() =>
+                  navigation.navigate('ChatRoom', {
+                    slug: item.slug,
+                    title: item.title,
+                  })
+                }
+              >
+                <View style={styles.emojiCircle}>
+                  <Text style={styles.emoji}>{roomEmoji(item.slug)}</Text>
+                </View>
+                <View style={styles.cardMeta}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {item.title}
                   </Text>
+                  {item.description ? (
+                    <Text style={styles.cardDesc} numberOfLines={2}>
+                      {item.description}
+                    </Text>
+                  ) : null}
+                </View>
+                {count > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {count > 99 ? '99+' : count}
+                    </Text>
+                  </View>
+                ) : item.is_followed ? (
+                  <View style={styles.followedDot} />
                 ) : null}
-              </View>
-              <Feather name="chevron-right" size={22} color={colors.grayLight} />
-            </Pressable>
-          )}
+                <Feather
+                  name="chevron-right"
+                  size={22}
+                  color={colors.grayLight}
+                />
+              </Pressable>
+            );
+          }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -188,5 +206,27 @@ const styles = StyleSheet.create({
     color: colors.gray,
     marginTop: 2,
     lineHeight: 18,
+  },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    marginRight: spacing.xs,
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  followedDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: colors.secondary,
+    marginRight: spacing.sm,
   },
 });

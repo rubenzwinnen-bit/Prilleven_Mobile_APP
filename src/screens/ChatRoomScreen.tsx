@@ -22,7 +22,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
-import { getRoom, relTime } from '../services';
+import {
+  getRoom,
+  relTime,
+  followRoom,
+  unfollowRoom,
+  markRoomRead,
+} from '../services';
 import type { AdminIntro, ChatTopic } from '../services';
 import type { ChatRoomsStackParamList } from '../navigation/types';
 
@@ -100,6 +106,8 @@ export function ChatRoomScreen({ navigation, route }: Props) {
   const [topics, setTopics] = useState<ChatTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [following, setFollowing] = useState(false);
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
@@ -109,6 +117,10 @@ export function ChatRoomScreen({ navigation, route }: Props) {
         const { room, topics: list } = await getRoom(slug);
         setIntro(room.admin_intro ?? null);
         setTopics(list);
+        setIsFollowed(room.is_followed ?? false);
+        /* Gevolgde room geopend → last_read_at bijwerken zodat de
+           ongelezen-badge op de roomlijst reset (mirror website). */
+        if (room.is_followed) markRoomRead(slug);
       } catch (err: any) {
         show(err.message || 'Topics laden mislukt.', 'error');
       } finally {
@@ -124,6 +136,60 @@ export function ChatRoomScreen({ navigation, route }: Props) {
       load('refresh');
     }, [load])
   );
+
+  /* Volgen/ontvolgen — optimistisch, met rollback bij fout. */
+  const toggleFollow = useCallback(async () => {
+    if (following) return;
+    const next = !isFollowed;
+    setIsFollowed(next);
+    setFollowing(true);
+    try {
+      if (next) {
+        await followRoom(slug);
+        await markRoomRead(slug);
+        show('Je volgt deze chatruimte nu.', 'success');
+      } else {
+        await unfollowRoom(slug);
+        show('Je volgt deze chatruimte niet meer.', 'info');
+      }
+    } catch (err: any) {
+      setIsFollowed(!next);
+      show(err.message || 'Volgen mislukt.', 'error');
+    } finally {
+      setFollowing(false);
+    }
+  }, [following, isFollowed, slug, show]);
+
+  /* Volg-knop rechts in de header. */
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={toggleFollow}
+          disabled={following}
+          style={({ pressed }) => [
+            styles.followBtn,
+            isFollowed ? styles.followBtnActive : null,
+            pressed ? styles.followBtnPressed : null,
+          ]}
+        >
+          <Feather
+            name={isFollowed ? 'check' : 'plus'}
+            size={14}
+            color={isFollowed ? colors.white : colors.primary}
+          />
+          <Text
+            style={[
+              styles.followBtnText,
+              isFollowed ? styles.followBtnTextActive : null,
+            ]}
+          >
+            {isFollowed ? 'Gevolgd' : 'Volg'}
+          </Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, isFollowed, following, toggleFollow]);
 
   return (
     <View style={styles.safe}>
@@ -381,6 +447,34 @@ const styles = StyleSheet.create({
     color: colors.gray,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
+  },
+
+  /* Volg-knop (header rechts) */
+  followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  followBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  followBtnPressed: {
+    opacity: 0.7,
+  },
+  followBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  followBtnTextActive: {
+    color: colors.white,
   },
 
   /* FAB */

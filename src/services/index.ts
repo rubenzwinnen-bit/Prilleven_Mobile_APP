@@ -100,6 +100,10 @@ export {
   deleteTopic,
   updateReply,
   deleteReply,
+  getUnread,
+  followRoom,
+  unfollowRoom,
+  markRoomRead,
   getCurrentUserId,
   isWithinEditWindow,
   roomEmoji,
@@ -114,6 +118,7 @@ export type {
   ChatTopic,
   ChatReply,
   AdminIntro,
+  UnreadCounts,
 } from './chatRooms';
 export {
   getChildren,

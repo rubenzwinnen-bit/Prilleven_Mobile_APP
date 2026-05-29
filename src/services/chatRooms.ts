@@ -10,8 +10,12 @@
  * Admins kunnen alles verwijderen.
  *
  * Endpoints:
- *   GET    /api/chat-rooms                         → { rooms }
- *   GET    /api/chat-rooms/:slug                   → { room, topics }
+ *   GET    /api/chat-rooms                         → { rooms } (+ is_followed)
+ *   GET    /api/chat-rooms/unread                  → { rooms, topics } (ongelezen-tellingen)
+ *   GET    /api/chat-rooms/:slug                   → { room, topics } (+ is_followed)
+ *   POST   /api/chat-rooms/:slug/follow            → { ok: true } (room volgen)
+ *   DELETE /api/chat-rooms/:slug/follow            → { ok: true } (room ontvolgen)
+ *   POST   /api/chat-rooms/:slug/read              → { ok: true } (badges resetten)
  *   GET    /api/chat-rooms/topics/:id              → { topic, replies }
  *   POST   /api/chat-rooms/:slug/topics            → { topic } (201)
  *   PATCH  /api/chat-rooms/topics/:id              → { topic }
@@ -141,6 +145,17 @@ interface TopicEnvelope {
 }
 interface ReplyEnvelope {
   reply: ChatReply;
+}
+
+/**
+ * Ongelezen-tellingen voor gevolgde rooms/topics.
+ *   rooms  → { [room_id]: aantal nieuwe topics sinds last_read_at/followed_at }
+ *   topics → { [topic_id]: aantal nieuwe replies sinds last_read_at/followed_at }
+ * Enkel rooms/topics mét unread > 0 staan in de map.
+ */
+export interface UnreadCounts {
+  rooms: Record<string, number>;
+  topics: Record<string, number>;
 }
 
 /* ----------------------------------------
@@ -359,6 +374,64 @@ export async function deleteReply(replyId: string): Promise<void> {
     { method: 'DELETE' }
   );
   await okOrThrow(response);
+}
+
+/* ----------------------------------------
+   getUnread
+   GET /api/chat-rooms/unread → { rooms, topics }
+   Ongelezen-tellingen per gevolgde room/topic. Defensief: bij fout
+   lege maps zodat de roomlijst nooit crasht.
+---------------------------------------- */
+export async function getUnread(): Promise<UnreadCounts> {
+  try {
+    const response = await authedFetch('/api/chat-rooms/unread');
+    const data = await jsonOrThrow<UnreadCounts>(response);
+    return { rooms: data?.rooms ?? {}, topics: data?.topics ?? {} };
+  } catch {
+    return { rooms: {}, topics: {} };
+  }
+}
+
+/* ----------------------------------------
+   followRoom
+   POST /api/chat-rooms/:slug/follow → { ok: true }
+---------------------------------------- */
+export async function followRoom(slug: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/chat-rooms/${encodeURIComponent(slug)}/follow`,
+    { method: 'POST' }
+  );
+  await okOrThrow(response);
+}
+
+/* ----------------------------------------
+   unfollowRoom
+   DELETE /api/chat-rooms/:slug/follow → { ok: true }
+---------------------------------------- */
+export async function unfollowRoom(slug: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/chat-rooms/${encodeURIComponent(slug)}/follow`,
+    { method: 'DELETE' }
+  );
+  await okOrThrow(response);
+}
+
+/* ----------------------------------------
+   markRoomRead
+   POST /api/chat-rooms/:slug/read → { ok: true }
+   Werkt last_read_at bij zodat de ongelezen-badge reset. Stil falen:
+   een mislukte read-markering mag het openen van de room niet blokkeren.
+---------------------------------------- */
+export async function markRoomRead(slug: string): Promise<void> {
+  try {
+    const response = await authedFetch(
+      `/api/chat-rooms/${encodeURIComponent(slug)}/read`,
+      { method: 'POST' }
+    );
+    await okOrThrow(response);
+  } catch {
+    /* niet-kritisch */
+  }
 }
 
 /* ----------------------------------------
