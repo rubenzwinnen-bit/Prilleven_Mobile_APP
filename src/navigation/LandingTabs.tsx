@@ -85,20 +85,13 @@ export function LandingTabs() {
 
 const styles = StyleSheet.create({
   logoCircle: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -22,
-    borderWidth: 1,
-    borderColor: colors.light,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 4,
+    marginTop: 2,
   },
   logoImage: {
     width: 46,
