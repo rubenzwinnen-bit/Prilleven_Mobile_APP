@@ -28,8 +28,8 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Image | `expo-image-picker` + `expo-image-manipulator` |
 | File/share (GDPR-export) | `expo-file-system` (~19) `File`/`Paths` API + `expo-sharing` |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `41` (v2.11.3) |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `45` (v2.11.3) |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `42` (v2.11.4) |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `46` (v2.11.4) |
 
 Node ≥ 20 lokaal voor Expo CLI.
 
@@ -41,7 +41,7 @@ Node ≥ 20 lokaal voor Expo CLI.
 /
 ├── App.tsx                          provider-boom + AppGate (zie §4)
 ├── index.ts                         expo entry
-├── app.json                         expo config (version 2.11.3, permissions in NL)
+├── app.json                         expo config (version 2.11.4, permissions in NL)
 ├── eas.json                         EAS profielen (development/preview/production)
 ├── tsconfig.json                    strict, extends expo/tsconfig.base
 ├── package.json                     dependencies
@@ -300,8 +300,8 @@ Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen 
 - Branch `main` = productie. Grotere features → feature branch + merge.
 
 ### Versionering
-- `app.json.expo.version` = user-facing string (huidig `2.11.3`).
-- `app.json.ios.buildNumber` (`41`) + `app.json.android.versionCode` (`45`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
+- `app.json.expo.version` = user-facing string (huidig `2.11.4`).
+- `app.json.ios.buildNumber` (`42`) + `app.json.android.versionCode` (`46`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
 - `package.json.version` wordt **niet** actief gebruikt — niet syncen.
 
 ---
