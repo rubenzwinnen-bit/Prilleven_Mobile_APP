@@ -14,6 +14,8 @@ import {
   FlatList,
   Pressable,
   Image,
+  TextInput,
+  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -22,15 +24,28 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
+import { useUser } from '../context/UserContext';
 import {
   getRoom,
   relTime,
   followRoom,
   unfollowRoom,
   markRoomRead,
+  getIsAdmin,
+  pinTopic,
+  updateRoom,
+  ADMIN_INTRO_MAX,
 } from '../services';
 import type { AdminIntro, ChatTopic } from '../services';
 import type { ChatRoomsStackParamList } from '../navigation/types';
+
+/* Topics sorteren zoals de server: gepind eerst, dan nieuwste activiteit. */
+function sortTopics(a: ChatTopic, b: ChatTopic): number {
+  if (!!a.is_pinned !== !!b.is_pinned) return a.is_pinned ? -1 : 1;
+  const ta = new Date(a.last_reply_at || a.created_at).getTime();
+  const tb = new Date(b.last_reply_at || b.created_at).getTime();
+  return tb - ta;
+}
 
 type Props = NativeStackScreenProps<ChatRoomsStackParamList, 'ChatRoom'>;
 
@@ -98,9 +113,137 @@ function AdminIntroCard({ intro }: { intro: AdminIntro }) {
   );
 }
 
+/* Welkomsbericht-sectie: read-only kaart voor iedereen, met admin-controls
+   (bewerken/verwijderen/aanmaken) en een inline editor wanneer admin. */
+function IntroSection({
+  intro,
+  isAdmin,
+  editing,
+  draft,
+  saving,
+  onDraftChange,
+  onStartEdit,
+  onCancelEdit,
+  onSave,
+  onDelete,
+}: {
+  intro: AdminIntro | null;
+  isAdmin: boolean;
+  editing: boolean;
+  draft: string;
+  saving: boolean;
+  onDraftChange: (v: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSave: () => void;
+  onDelete: () => void;
+}) {
+  /* Admin in editor-modus: TextInput + opslaan/annuleren. */
+  if (isAdmin && editing) {
+    return (
+      <View style={styles.introEditor}>
+        <Text style={styles.introEditorLabel}>Welkomsbericht</Text>
+        <TextInput
+          style={styles.introInput}
+          value={draft}
+          onChangeText={onDraftChange}
+          placeholder="Schrijf een welkomsbericht voor deze chatruimte…"
+          placeholderTextColor={colors.gray}
+          multiline
+          maxLength={ADMIN_INTRO_MAX}
+          editable={!saving}
+        />
+        <Text style={styles.introCounter}>
+          {draft.length}/{ADMIN_INTRO_MAX}
+        </Text>
+        <View style={styles.introEditorActions}>
+          <Pressable
+            onPress={onCancelEdit}
+            disabled={saving}
+            style={({ pressed }) => [
+              styles.introBtn,
+              styles.introBtnGhost,
+              pressed ? styles.cardPressed : null,
+            ]}
+          >
+            <Text style={styles.introBtnGhostText}>Annuleren</Text>
+          </Pressable>
+          <Pressable
+            onPress={onSave}
+            disabled={saving}
+            style={({ pressed }) => [
+              styles.introBtn,
+              styles.introBtnPrimary,
+              pressed ? styles.cardPressed : null,
+            ]}
+          >
+            <Text style={styles.introBtnPrimaryText}>
+              {saving ? 'Opslaan…' : 'Opslaan'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  /* Bestaand bericht: kaart + (admin) bewerk/verwijder-knoppen. */
+  if (intro) {
+    return (
+      <View>
+        <AdminIntroCard intro={intro} />
+        {isAdmin ? (
+          <View style={styles.introAdminBar}>
+            <Pressable
+              onPress={onStartEdit}
+              style={({ pressed }) => [
+                styles.introLinkBtn,
+                pressed ? styles.cardPressed : null,
+              ]}
+            >
+              <Feather name="edit-2" size={14} color={colors.primary} />
+              <Text style={styles.introLinkText}>Bewerken</Text>
+            </Pressable>
+            <Pressable
+              onPress={onDelete}
+              style={({ pressed }) => [
+                styles.introLinkBtn,
+                pressed ? styles.cardPressed : null,
+              ]}
+            >
+              <Feather name="trash-2" size={14} color={colors.danger} />
+              <Text style={[styles.introLinkText, { color: colors.danger }]}>
+                Verwijderen
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  /* Geen bericht + admin: aanmaken-CTA. */
+  if (isAdmin) {
+    return (
+      <Pressable
+        onPress={onStartEdit}
+        style={({ pressed }) => [
+          styles.introAddBtn,
+          pressed ? styles.cardPressed : null,
+        ]}
+      >
+        <Feather name="plus" size={16} color={colors.primary} />
+        <Text style={styles.introAddText}>Welkomsbericht toevoegen</Text>
+      </Pressable>
+    );
+  }
+
+  return null;
+}
+
 export function ChatRoomScreen({ navigation, route }: Props) {
   const { slug, title } = route.params;
   const { show } = useToast();
+  const { user } = useUser();
 
   const [intro, setIntro] = useState<AdminIntro | null>(null);
   const [topics, setTopics] = useState<ChatTopic[]>([]);
@@ -108,6 +251,12 @@ export function ChatRoomScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowed, setIsFollowed] = useState(false);
   const [following, setFollowing] = useState(false);
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [pinningId, setPinningId] = useState<string | null>(null);
+  const [editingIntro, setEditingIntro] = useState(false);
+  const [introDraft, setIntroDraft] = useState('');
+  const [savingIntro, setSavingIntro] = useState(false);
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
@@ -136,6 +285,88 @@ export function ChatRoomScreen({ navigation, route }: Props) {
       load('refresh');
     }, [load])
   );
+
+  useEffect(() => {
+    getIsAdmin(user).then(setIsAdmin);
+  }, [user]);
+
+  /* Admin: topic vastpinnen/losmaken — optimistisch + her-sorteren. */
+  const onTogglePin = useCallback(
+    async (topicId: string, current: boolean) => {
+      if (pinningId) return;
+      setPinningId(topicId);
+      try {
+        const { is_pinned } = await pinTopic(topicId, !current);
+        setTopics((prev) =>
+          prev
+            .map((t) => (t.id === topicId ? { ...t, is_pinned } : t))
+            .sort(sortTopics)
+        );
+        show(is_pinned ? 'Topic vastgepind.' : 'Topic losgemaakt.', 'success');
+      } catch (err: any) {
+        show(err.message || 'Vastpinnen mislukt.', 'error');
+      } finally {
+        setPinningId(null);
+      }
+    },
+    [pinningId, show]
+  );
+
+  /* Admin: welkomsbericht bewerken/aanmaken. */
+  const startEditIntro = useCallback(() => {
+    setIntroDraft(intro?.message ?? '');
+    setEditingIntro(true);
+  }, [intro]);
+
+  const cancelEditIntro = useCallback(() => {
+    setEditingIntro(false);
+    setIntroDraft('');
+  }, []);
+
+  const saveIntro = useCallback(async () => {
+    const msg = introDraft.trim();
+    if (!msg) {
+      show('Welkomsbericht mag niet leeg zijn.', 'error');
+      return;
+    }
+    setSavingIntro(true);
+    try {
+      const room = await updateRoom(slug, { admin_intro_message: msg });
+      setIntro(room.admin_intro ?? null);
+      setEditingIntro(false);
+      setIntroDraft('');
+      show('Welkomsbericht opgeslagen.', 'success');
+    } catch (err: any) {
+      show(err.message || 'Opslaan mislukt.', 'error');
+    } finally {
+      setSavingIntro(false);
+    }
+  }, [introDraft, slug, show]);
+
+  const deleteIntro = useCallback(() => {
+    Alert.alert(
+      'Welkomsbericht verwijderen',
+      'Weet je zeker dat je het welkomsbericht van deze chatruimte wilt verwijderen?',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Verwijderen',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const room = await updateRoom(slug, { admin_intro_message: null });
+              setIntro(room.admin_intro ?? null);
+              setEditingIntro(false);
+              setIntroDraft('');
+              show('Welkomsbericht verwijderd.', 'info');
+            } catch (err: any) {
+              show(err.message || 'Verwijderen mislukt.', 'error');
+            }
+          },
+        },
+      ]
+    );
+  }, [slug, show]);
 
   /* Volgen/ontvolgen — optimistisch, met rollback bij fout. */
   const toggleFollow = useCallback(async () => {
@@ -204,7 +435,18 @@ export function ChatRoomScreen({ navigation, route }: Props) {
           keyExtractor={(t) => t.id}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
-            intro ? <AdminIntroCard intro={intro} /> : null
+            <IntroSection
+              intro={intro}
+              isAdmin={isAdmin}
+              editing={editingIntro}
+              draft={introDraft}
+              saving={savingIntro}
+              onDraftChange={setIntroDraft}
+              onStartEdit={startEditIntro}
+              onCancelEdit={cancelEditIntro}
+              onSave={saveIntro}
+              onDelete={deleteIntro}
+            />
           }
           renderItem={({ item }) => (
             <Pressable
@@ -262,6 +504,23 @@ export function ChatRoomScreen({ navigation, route }: Props) {
                     {item.replies_count}
                   </Text>
                 </View>
+                {isAdmin ? (
+                  <Pressable
+                    onPress={() => onTogglePin(item.id, !!item.is_pinned)}
+                    disabled={pinningId === item.id}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.pinBtn,
+                      pressed ? styles.cardPressed : null,
+                    ]}
+                  >
+                    <Feather
+                      name="bookmark"
+                      size={16}
+                      color={item.is_pinned ? colors.primaryDark : colors.gray}
+                    />
+                  </Pressable>
+                ) : null}
               </View>
             </Pressable>
           )}
@@ -422,6 +681,105 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.gray,
     fontWeight: '600',
+  },
+  pinBtn: {
+    marginLeft: spacing.sm,
+    padding: 4,
+  },
+
+  /* Welkomsbericht — admin-controls + editor */
+  introAdminBar: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.xs,
+  },
+  introLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  introLinkText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  introAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    backgroundColor: colors.light,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  introAddText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  introEditor: {
+    backgroundColor: colors.light,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  introEditorLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.dark,
+    marginBottom: spacing.sm,
+  },
+  introInput: {
+    backgroundColor: colors.white,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.grayLight,
+    padding: spacing.md,
+    fontSize: 14,
+    color: colors.dark,
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  introCounter: {
+    fontSize: 11,
+    color: colors.gray,
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  introEditorActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  introBtn: {
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  introBtnGhost: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.grayLight,
+  },
+  introBtnGhostText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.gray,
+  },
+  introBtnPrimary: {
+    backgroundColor: colors.primary,
+  },
+  introBtnPrimaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.white,
   },
 
   /* Avatar */

@@ -342,6 +342,29 @@ export async function deleteReply(replyId: string): Promise<void> {
 }
 
 /* ----------------------------------------
+   togglePostPin (admin)
+   POST /api/community/posts/:id/pin { pin? } → { is_pinned }
+   Zonder `pin` togglet de server. Gepinde posts staan altijd bovenaan de
+   feed met een "Mededeling"-badge. 409 bij overschrijden van het maximum
+   aantal gepinde posts. 403 voor niet-admins.
+---------------------------------------- */
+export async function togglePostPin(
+  postId: string,
+  pin?: boolean
+): Promise<{ is_pinned: boolean }> {
+  const response = await authedFetch(
+    `/api/community/posts/${encodeURIComponent(postId)}/pin`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(typeof pin === 'boolean' ? { pin } : {}),
+    }
+  );
+  const data = await jsonOrThrow<{ is_pinned: boolean }>(response);
+  return { is_pinned: !!data.is_pinned };
+}
+
+/* ----------------------------------------
    getIsAdmin
    GET /api/subscription-status?email= → { is_admin }
    Bepaalt of de admin-only composer getoond wordt. Stille false bij fout.

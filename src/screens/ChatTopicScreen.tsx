@@ -25,11 +25,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
+import { useUser } from '../context/UserContext';
 import {
   getTopic,
   updateReply,
   deleteReply,
   deleteTopic,
+  followTopic,
+  unfollowTopic,
+  markTopicRead,
+  pinTopic,
+  getIsAdmin,
   getCurrentUserId,
   isWithinEditWindow,
   relTime,
@@ -225,19 +231,31 @@ function ReplyRow({
 function TopicHeader({
   topic,
   currentUserId,
+  isAdmin,
+  pinning,
   onEdit,
   onDelete,
+  onTogglePin,
 }: {
   topic: ChatTopic;
   currentUserId: string | null;
+  isAdmin: boolean;
+  pinning: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onTogglePin: () => void;
 }) {
   const isOwner = !!currentUserId && topic.user_id === currentUserId;
   const canEdit = isOwner && isWithinEditWindow(topic.created_at);
 
   return (
     <View style={styles.topicCard}>
+      {topic.is_pinned ? (
+        <View style={styles.pinRow}>
+          <Feather name="bookmark" size={12} color={colors.primaryDark} />
+          <Text style={styles.pinText}>Vastgepind</Text>
+        </View>
+      ) : null}
       <Text style={styles.topicTitle}>{topic.title}</Text>
       <View style={styles.topicHead}>
         <Avatar nickname={topic.nickname} avatarUrl={topic.avatar_url} />
@@ -260,7 +278,7 @@ function TopicHeader({
       </View>
       <Text style={styles.topicBody}>{topic.body}</Text>
 
-      {isOwner ? (
+      {isOwner || isAdmin ? (
         <View style={styles.ownActions}>
           {canEdit ? (
             <Pressable onPress={onEdit} style={styles.ownAction} hitSlop={6}>
@@ -268,12 +286,36 @@ function TopicHeader({
               <Text style={styles.ownActionText}>Bewerken</Text>
             </Pressable>
           ) : null}
-          <Pressable onPress={onDelete} style={styles.ownAction} hitSlop={6}>
-            <Feather name="trash-2" size={14} color={colors.danger} />
-            <Text style={[styles.ownActionText, { color: colors.danger }]}>
-              Verwijderen
-            </Text>
-          </Pressable>
+          {isAdmin ? (
+            <Pressable
+              onPress={onTogglePin}
+              disabled={pinning}
+              style={styles.ownAction}
+              hitSlop={6}
+            >
+              <Feather
+                name="bookmark"
+                size={14}
+                color={topic.is_pinned ? colors.primaryDark : colors.gray}
+              />
+              <Text
+                style={[
+                  styles.ownActionText,
+                  topic.is_pinned ? { color: colors.primaryDark } : null,
+                ]}
+              >
+                {topic.is_pinned ? 'Losmaken' : 'Vastpinnen'}
+              </Text>
+            </Pressable>
+          ) : null}
+          {isOwner ? (
+            <Pressable onPress={onDelete} style={styles.ownAction} hitSlop={6}>
+              <Feather name="trash-2" size={14} color={colors.danger} />
+              <Text style={[styles.ownActionText, { color: colors.danger }]}>
+                Verwijderen
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -292,12 +334,18 @@ function TopicHeader({
 ---------------------------------------- */
 export function ChatTopicScreen({ navigation, route }: Props) {
   const { topicId } = route.params;
+  const { user } = useUser();
   const { show } = useToast();
 
   const [topic, setTopic] = useState<ChatTopic | null>(null);
   const [replies, setReplies] = useState<ChatReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [pinning, setPinning] = useState(false);
 
   const [replyBody, setReplyBody] = useState('');
   const [posting, setPosting] = useState(false);
@@ -309,6 +357,10 @@ export function ChatTopicScreen({ navigation, route }: Props) {
       const { topic: t, replies: r } = await getTopic(topicId);
       setTopic(t);
       setReplies(r);
+      setIsFollowed(t.is_followed ?? false);
+      /* Gevolgd topic geopend → last_read_at bijwerken zodat de tijdlijn-
+         badge reset (mirror website). */
+      if (t.is_followed) markTopicRead(topicId);
     } catch (err: any) {
       show(err.message || 'Topic laden mislukt.', 'error');
     } finally {
@@ -318,7 +370,8 @@ export function ChatTopicScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     getCurrentUserId().then(setUserId);
-  }, []);
+    getIsAdmin(user).then(setIsAdmin);
+  }, [user]);
 
   /* Eerste focus toont spinner; latere focus herlaadt stil (na edit). */
   useFocusEffect(
@@ -395,6 +448,79 @@ export function ChatTopicScreen({ navigation, route }: Props) {
     });
   }, [topic, navigation]);
 
+  /* Topic volgen/ontvolgen — optimistisch met rollback. Een gevolgd topic
+     verschijnt op de tijdlijn (mirror website). */
+  const toggleFollow = useCallback(async () => {
+    if (following) return;
+    const next = !isFollowed;
+    setIsFollowed(next);
+    setFollowing(true);
+    try {
+      if (next) {
+        await followTopic(topicId);
+        await markTopicRead(topicId);
+        show('Je volgt dit topic nu — het verschijnt op je tijdlijn.', 'success');
+      } else {
+        await unfollowTopic(topicId);
+        show('Je volgt dit topic niet meer.', 'info');
+      }
+    } catch (err: any) {
+      setIsFollowed(!next);
+      show(err.message || 'Volgen mislukt.', 'error');
+    } finally {
+      setFollowing(false);
+    }
+  }, [following, isFollowed, topicId, show]);
+
+  /* Vastpinnen/losmaken (admin) — optimistisch met rollback. */
+  const onTogglePin = useCallback(async () => {
+    if (!topic || pinning) return;
+    const next = !topic.is_pinned;
+    setTopic((t) => (t ? { ...t, is_pinned: next } : t));
+    setPinning(true);
+    try {
+      const res = await pinTopic(topicId, next);
+      setTopic((t) => (t ? { ...t, is_pinned: res.is_pinned } : t));
+      show(res.is_pinned ? 'Topic vastgepind.' : 'Topic losgemaakt.', 'success');
+    } catch (err: any) {
+      setTopic((t) => (t ? { ...t, is_pinned: !next } : t));
+      show(err.message || 'Vastpinnen mislukt.', 'error');
+    } finally {
+      setPinning(false);
+    }
+  }, [topic, pinning, topicId, show]);
+
+  /* Volg-knop rechts in de header. */
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={toggleFollow}
+          disabled={following}
+          style={({ pressed }) => [
+            styles.followBtn,
+            isFollowed ? styles.followBtnActive : null,
+            pressed ? styles.followBtnPressed : null,
+          ]}
+        >
+          <Feather
+            name={isFollowed ? 'check' : 'plus'}
+            size={14}
+            color={isFollowed ? colors.white : colors.primary}
+          />
+          <Text
+            style={[
+              styles.followBtnText,
+              isFollowed ? styles.followBtnTextActive : null,
+            ]}
+          >
+            {isFollowed ? 'Gevolgd' : 'Volg'}
+          </Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, isFollowed, following, toggleFollow]);
+
   if (loading || !topic) {
     return (
       <View style={styles.safe}>
@@ -420,8 +546,11 @@ export function ChatTopicScreen({ navigation, route }: Props) {
           <TopicHeader
             topic={topic}
             currentUserId={userId}
+            isAdmin={isAdmin}
+            pinning={pinning}
             onEdit={onEditTopic}
             onDelete={onDeleteTopic}
+            onTogglePin={onTogglePin}
           />
         }
         renderItem={({ item }) => (
@@ -479,6 +608,47 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
+  },
+
+  /* Volg-knop (header rechts) */
+  followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  followBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  followBtnPressed: {
+    opacity: 0.7,
+  },
+  followBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  followBtnTextActive: {
+    color: colors.white,
+  },
+
+  /* Vastgepind-badge */
+  pinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: spacing.xs,
+  },
+  pinText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primaryDark,
   },
 
   /* Topic-card */

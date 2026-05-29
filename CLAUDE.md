@@ -1,6 +1,6 @@
 # CLAUDE.md — Pril Leven Mobile App
 
-Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v2.9.1`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
+Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v2.16.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
 
 > Zusterproject: de **web-app** in `~/Desktop/Project_weekschema_Productie/` heeft een eigen, uitgebreide `CLAUDE.md` per laag (root, `/js`, `/api`, `/supabase-migrations`). De mobiele app deelt **dezelfde Supabase-database en dezelfde Vercel-API** als de web-app — niet duplicaten.
 
@@ -28,8 +28,8 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Image | `expo-image-picker` + `expo-image-manipulator` |
 | File/share (GDPR-export) | `expo-file-system` (~19) `File`/`Paths` API + `expo-sharing` |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `52` (v2.15.0) |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `56` (v2.15.0) |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `53` (v2.16.0) |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `57` (v2.16.0) |
 
 Node ≥ 20 lokaal voor Expo CLI.
 
@@ -384,9 +384,14 @@ EXPO_PUBLIC_RAG_API_URL    optioneel, override van community-web.prilleven.be
 | `…/api/chat-rooms/:slug/follow` POST/DELETE | Chatruimte volgen / ontvolgen | `services/chatRooms.ts::followRoom` / `unfollowRoom` |
 | `…/api/chat-rooms/:slug/read` POST | `last_read_at` bijwerken (ongelezen-badge resetten) | `services/chatRooms.ts::markRoomRead` |
 | `…/api/chat-rooms/:slug/topics` POST | Topic aanmaken `{ title, body }` (201) | `services/chatRooms.ts::createTopic` |
-| `…/api/chat-rooms/topics/:id` GET/PATCH/DELETE | Topic + replies lezen / bewerken (15min) / wissen (eigen) | `services/chatRooms.ts::getTopic` / `updateTopic` / `deleteTopic` |
+| `…/api/chat-rooms/topics/:id` GET/PATCH/DELETE | Topic + replies lezen (`+ is_followed`) / bewerken (15min) / wissen (eigen) | `services/chatRooms.ts::getTopic` / `updateTopic` / `deleteTopic` |
+| `…/api/chat-rooms/topics/:id/follow` POST/DELETE | Eén topic volgen / ontvolgen (verschijnt op tijdlijn) | `services/chatRooms.ts::followTopic` / `unfollowTopic` |
+| `…/api/chat-rooms/topics/:id/read` POST | Topic `last_read_at` bijwerken (silent fail) | `services/chatRooms.ts::markTopicRead` |
+| `…/api/chat-rooms/topics/:id/pin` POST `{ pin? }` | **Admin** topic vastpinnen/losmaken → `{ id, is_pinned }` | `services/chatRooms.ts::pinTopic` |
+| `…/api/chat-rooms/:slug` PATCH `{ admin_intro_message?, title?, description? }` | **Admin** welkomsbericht zetten (string)/wissen (null) + room-meta → `{ room }` | `services/chatRooms.ts::updateRoom` |
 | `…/api/chat-rooms/topics/:id/replies` POST | Reply plaatsen `{ body }` (201) | `services/chatRooms.ts::createReply` |
 | `…/api/chat-rooms/replies/:id` PATCH/DELETE | Reply bewerken (15min) / wissen (eigen) | `services/chatRooms.ts::updateReply` / `deleteReply` |
+| `…/api/community/posts/:id/pin` POST `{ pin? }` | **Admin** tijdlijn-post vastpinnen/losmaken (MAX_PINNED → 409) → `{ is_pinned }` | `services/community.ts::togglePostPin` |
 | `…/api/community/profile` GET/PUT | Community-profiel (nickname + avatar) | `services/communityProfile.ts::getCommunityProfile` / `updateCommunityProfile` |
 | `…/api/community/profile/avatar-url` POST | Signed upload-URL voor avatar | `services/communityProfile.ts::getAvatarUploadUrl` |
 | `…/api/children` GET/POST/PATCH/DELETE | Kinderen-CRUD (soft delete) | `services/children.ts::getChildren` / `createChild` / `updateChild` / `archiveChild` |
@@ -470,13 +475,18 @@ Bron: `Project_weekschema_Productie/PLAN-TIMELINE.md` (web v3.0.0).
    - ✅ v2.12.0: eigen post + reply bewerken/verwijderen (owner-check server-side, geen edit-window; inline edit-TextInput + `Alert`-confirm delete). `editPost`/`deletePost`/`editReply`/`deleteReply` in `services/community.ts`.
    - ✅ v2.12.1: reply-likes (hartje + teller per reactie, optimistic toggle via `toggleReplyLike`).
    - ✅ v2.13.0: in-app notificatie-badges (rode cijfer-rondjes) op de footer-tabs — zie roadmap-punt 6.
+   - ✅ v2.16.0: admin kan tijdlijn-posts vastpinnen/losmaken (bookmark-knop in de post-header naast edit/delete, zichtbaar voor admins ook op niet-eigen posts; `togglePostPin`). `onPinChanged` werkt de post lokaal bij + stabiele sort zet gepinde posts bovenaan (mirror server-feed waar gepinde posts eerst komen). MAX_PINNED-overschrijding → 409 met NL-toast.
    - ⬜ Open: foto-upload bij post, polls, rapporteren. (Categorie-filterbalk is op de website verwijderd → niet meer bouwen.)
 5. 🟡 **Chatruimtes** — categorische rooms (Melk & voeding, Eerste hapjes, Allergieën & overgevoeligheden, Feedback) + topics.
    - ✅ v2.10.0: placeholder-scherm "binnenkort" als 3de footer-tab.
    - ✅ v2.11.0: volledige CRUD-MVP. `services/chatRooms.ts` + `ChatRoomsStack` (RoomList → ChatRoom → ChatTopic → ChatTopicForm). Rooms lezen, topics lezen/plaatsen, replies lezen/plaatsen, eigen topic/reply bewerken (15min-venster) + wissen, admin-welkomsbericht read-only bovenaan een room.
    - ✅ v2.14.0: chatruimtes volgen — "Volg"/"Gevolgd"-toggle in de room-header (`followRoom`/`unfollowRoom`, optimistisch + rollback), ongelezen-badge + gevolgd-stip op de roomlijst via `getUnread()`, `markRoomRead` reset de badge bij openen van een gevolgde room (parity met website `api/chat-rooms.mjs`).
    - ✅ v2.15.0: gevolgde topics zichtbaar op de tijdlijn — de server merget gevolgde chatroom-topics al in `GET /api/community/posts` (`source_type==='chatroom'`); `TimelineScreen` filtert ze niet meer weg maar rendert ze als `ChatroomTopicCard` (bron-badge + titel + snippet + "Open discussie"), tik → cross-tab naar `ChatTopic`. Tijdlijn-notificatieteller telt nu admin-posts + alle nieuwe gevolgde chatroom-items op (`countNewAdminTimelinePosts`, parity met website timeline-feed).
-   - ⬜ Open: topic-follow vanuit app, topic pinnen vanuit app (admin), notificaties.
+   - ✅ v2.16.0: drie admin/volg-features parity met website:
+     - **Topic-follow** in `ChatTopicScreen`: "Volg"/"Gevolgd"-knop in de header (`followTopic`/`unfollowTopic`, optimistisch), `getTopic` levert `is_followed`, bij openen van een gevolgd topic `markTopicRead`. Gevolgde topics verschijnen automatisch op de tijdlijn (server merget directe topic-followers al in de feed → geen extra tijdlijn-werk).
+     - **Topic pinnen (admin)** in `ChatTopicScreen` (bookmark-actie in `TopicHeader`, "Vastpinnen"/"Losmaken") + per topic-card in `ChatRoomScreen` (bookmark-knop in de foot-row, optimistisch + her-sorteren via `sortTopics` gepind-eerst). `pinTopic(topicId, pin?)`.
+     - **Admin-welkomsbericht bewerken** in `ChatRoomScreen`: `IntroSection`-component toont read-only `AdminIntroCard` voor iedereen; admins krijgen Bewerken/Verwijderen-knoppen of een "Welkomsbericht toevoegen"-CTA, met inline `TextInput`-editor (max `ADMIN_INTRO_MAX = 4000`). Opslaan → `updateRoom(slug, { admin_intro_message })`, verwijderen → `updateRoom(slug, { admin_intro_message: null })` na `Alert`-confirm.
+   - ⬜ Open: notificaties (Expo Push).
 6. 🟡 **Notificaties** — admin-post badges op de footer-tabs.
    - ✅ v2.13.0: in-app badges (rood rondje + cijfer "nieuw sinds laatst") op twee footer-tabs, gevoed door `NotificationContext` (poll 60s + AppState 'active'): **Tijdlijn** (prilleven-logo) toont nieuwe admin-posts in de community-feed; **Chatruimtes** toont de som van nieuwe admin-topics over alle rooms. Markeerpunt per gebruiker in AsyncStorage (`notif_seen_timeline_<email>` / `notif_seen_chatrooms_<email>`), wist bij focus op de tab (`markTimelineSeen` / `markChatroomsSeen`). Eerste run initialiseert markeerpunt op "nu". Telfuncties in `services/notifications.ts`.
    - ✅ v2.13.1: admin-modus — voor admins (`getIsAdmin`) tellen ALLE nieuwe posts/topics mee i.p.v. enkel admin-posts (`includeAllAuthors`-vlag in de telfuncties; admin-status één keer per gebruiker bepaald in `NotificationContext`).

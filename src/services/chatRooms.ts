@@ -13,13 +13,18 @@
  *   GET    /api/chat-rooms                         → { rooms } (+ is_followed)
  *   GET    /api/chat-rooms/unread                  → { rooms, topics } (ongelezen-tellingen)
  *   GET    /api/chat-rooms/:slug                   → { room, topics } (+ is_followed)
+ *   PATCH  /api/chat-rooms/:slug                   → { room } (admin: titel/omschrijving/welkomsbericht)
  *   POST   /api/chat-rooms/:slug/follow            → { ok: true } (room volgen)
  *   DELETE /api/chat-rooms/:slug/follow            → { ok: true } (room ontvolgen)
  *   POST   /api/chat-rooms/:slug/read              → { ok: true } (badges resetten)
- *   GET    /api/chat-rooms/topics/:id              → { topic, replies }
+ *   GET    /api/chat-rooms/topics/:id              → { topic, replies } (+ is_followed)
  *   POST   /api/chat-rooms/:slug/topics            → { topic } (201)
  *   PATCH  /api/chat-rooms/topics/:id              → { topic }
  *   DELETE /api/chat-rooms/topics/:id              → { ok: true }
+ *   POST   /api/chat-rooms/topics/:id/pin          → { id, is_pinned } (admin)
+ *   POST   /api/chat-rooms/topics/:id/follow       → { ok: true } (topic volgen)
+ *   DELETE /api/chat-rooms/topics/:id/follow       → { ok: true } (topic ontvolgen)
+ *   POST   /api/chat-rooms/topics/:id/read         → { ok: true } (topic-badge resetten)
  *   POST   /api/chat-rooms/topics/:id/replies      → { reply } (201)
  *   PATCH  /api/chat-rooms/replies/:id             → { reply }
  *   DELETE /api/chat-rooms/replies/:id             → { ok: true }
@@ -70,6 +75,9 @@ export function roomEmoji(slug: string | null | undefined): string {
 export const TOPIC_TITLE_MAX = 120;
 export const TOPIC_BODY_MAX = 4000;
 export const REPLY_BODY_MAX = 2000;
+
+/* Admin-welkomsbericht: 1-4000 tekens (mirror server room.edit). */
+export const ADMIN_INTRO_MAX = 4000;
 
 /* Bewerk-venster: server staat owner-edit toe binnen 15 min (RLS). */
 export const EDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -432,6 +440,99 @@ export async function markRoomRead(slug: string): Promise<void> {
   } catch {
     /* niet-kritisch */
   }
+}
+
+/* ----------------------------------------
+   followTopic / unfollowTopic
+   POST/DELETE /api/chat-rooms/topics/:id/follow → { ok: true }
+
+   Een gevolgd topic verschijnt op de tijdlijn (source_type 'chatroom'),
+   ook als de bijbehorende room niet gevolgd wordt — de server mengt
+   gevolgde rooms én losse gevolgde topics in de feed.
+---------------------------------------- */
+export async function followTopic(topicId: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/chat-rooms/topics/${encodeURIComponent(topicId)}/follow`,
+    { method: 'POST' }
+  );
+  await okOrThrow(response);
+}
+
+export async function unfollowTopic(topicId: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/chat-rooms/topics/${encodeURIComponent(topicId)}/follow`,
+    { method: 'DELETE' }
+  );
+  await okOrThrow(response);
+}
+
+/* ----------------------------------------
+   markTopicRead
+   POST /api/chat-rooms/topics/:id/read → { ok: true }
+   Werkt last_read_at van het gevolgde topic bij. Stil falen.
+---------------------------------------- */
+export async function markTopicRead(topicId: string): Promise<void> {
+  try {
+    const response = await authedFetch(
+      `/api/chat-rooms/topics/${encodeURIComponent(topicId)}/read`,
+      { method: 'POST' }
+    );
+    await okOrThrow(response);
+  } catch {
+    /* niet-kritisch */
+  }
+}
+
+/* ----------------------------------------
+   pinTopic (admin)
+   POST /api/chat-rooms/topics/:id/pin { pin? } → { id, is_pinned }
+   Zonder `pin` togglet de server de huidige staat. 403 voor niet-admins.
+---------------------------------------- */
+export async function pinTopic(
+  topicId: string,
+  pin?: boolean
+): Promise<{ id: string; is_pinned: boolean }> {
+  const response = await authedFetch(
+    `/api/chat-rooms/topics/${encodeURIComponent(topicId)}/pin`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(typeof pin === 'boolean' ? { pin } : {}),
+    }
+  );
+  const data = await jsonOrThrow<{ id: string; is_pinned: boolean }>(response);
+  return { id: data.id, is_pinned: !!data.is_pinned };
+}
+
+/* ----------------------------------------
+   updateRoom (admin)
+   PATCH /api/chat-rooms/:slug { admin_intro_message?, title?, description? }
+   → { room }
+
+   admin_intro_message:
+     - string (1-4000)        → welkomsbericht zetten/bijwerken
+     - null OF lege string     → welkomsbericht verwijderen
+   422 "Geen wijzigingen." als de body leeg is. 403 voor niet-admins.
+---------------------------------------- */
+export async function updateRoom(
+  slug: string,
+  patch: {
+    admin_intro_message?: string | null;
+    title?: string;
+    description?: string;
+  }
+): Promise<ChatRoomDetail> {
+  const response = await authedFetch(
+    `/api/chat-rooms/${encodeURIComponent(slug)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }
+  );
+  const data = await jsonOrThrow<{ room: ChatRoomDetail }>(response);
+  if (!data?.room) throw new Error('Chatruimte kon niet worden bijgewerkt.');
+  return data.room;
 }
 
 /* ----------------------------------------

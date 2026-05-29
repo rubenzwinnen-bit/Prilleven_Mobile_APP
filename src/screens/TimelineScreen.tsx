@@ -47,6 +47,7 @@ import {
   createReply,
   editPost,
   deletePost,
+  togglePostPin,
   editReply,
   getIsAdmin,
   getCurrentUserId,
@@ -293,19 +294,24 @@ function ReplyRow({
 function PostCard({
   post,
   currentUserId,
+  isAdmin,
   onPostUpdated,
   onPostDeleted,
+  onPinChanged,
 }: {
   post: CommunityPost;
   currentUserId: string | null;
+  isAdmin: boolean;
   onPostUpdated: (post: CommunityPost) => void;
   onPostDeleted: (postId: string) => void;
+  onPinChanged: (postId: string, isPinned: boolean) => void;
 }) {
   const { show } = useToast();
 
   const [liked, setLiked] = useState(post.liked_by_me);
   const [likeCount, setLikeCount] = useState(post.likes_count);
   const [liking, setLiking] = useState(false);
+  const [pinning, setPinning] = useState(false);
 
   const [repliesOpen, setRepliesOpen] = useState(false);
   const [repliesLoaded, setRepliesLoaded] = useState(false);
@@ -366,6 +372,20 @@ function PostCard({
       ]
     );
   }, [post.id, onPostDeleted, show]);
+
+  const onTogglePin = useCallback(async () => {
+    if (pinning) return;
+    setPinning(true);
+    try {
+      const { is_pinned } = await togglePostPin(post.id, !post.is_pinned);
+      onPinChanged(post.id, is_pinned);
+      show(is_pinned ? 'Bericht vastgepind.' : 'Bericht losgemaakt.', 'success');
+    } catch (err: any) {
+      show(err.message || 'Vastpinnen mislukt.', 'error');
+    } finally {
+      setPinning(false);
+    }
+  }, [pinning, post.id, post.is_pinned, onPinChanged, show]);
 
   const onReplyUpdated = useCallback((updated: CommunityReply) => {
     setReplies((prev) =>
@@ -472,14 +492,31 @@ function PostCard({
             </Text>
           </View>
         ) : null}
-        {isOwner && !editing ? (
+        {(isOwner || isAdmin) && !editing ? (
           <View style={styles.ownerActions}>
-            <Pressable onPress={onStartEdit} hitSlop={8}>
-              <Feather name="edit-2" size={16} color={colors.gray} />
-            </Pressable>
-            <Pressable onPress={onDelete} hitSlop={8}>
-              <Feather name="trash-2" size={16} color={colors.gray} />
-            </Pressable>
+            {isAdmin ? (
+              <Pressable
+                onPress={onTogglePin}
+                disabled={pinning}
+                hitSlop={8}
+              >
+                <Feather
+                  name="bookmark"
+                  size={16}
+                  color={post.is_pinned ? colors.primaryDark : colors.gray}
+                />
+              </Pressable>
+            ) : null}
+            {isOwner ? (
+              <>
+                <Pressable onPress={onStartEdit} hitSlop={8}>
+                  <Feather name="edit-2" size={16} color={colors.gray} />
+                </Pressable>
+                <Pressable onPress={onDelete} hitSlop={8}>
+                  <Feather name="trash-2" size={16} color={colors.gray} />
+                </Pressable>
+              </>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -862,6 +899,17 @@ export function TimelineScreen() {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
   }, []);
 
+  /* Pin-status gewijzigd → lokaal bijwerken + gepinde posts naar boven
+     (stabiele sort behoudt de volgorde binnen elke groep). */
+  const onPinChanged = useCallback((postId: string, isPinned: boolean) => {
+    setPosts((prev) => {
+      const next = prev.map((p) =>
+        p.id === postId ? { ...p, is_pinned: isPinned } : p
+      );
+      return [...next].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+    });
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <KeyboardAvoidingView
@@ -887,8 +935,10 @@ export function TimelineScreen() {
                 <PostCard
                   post={item}
                   currentUserId={currentUserId}
+                  isAdmin={isAdmin}
                   onPostUpdated={onPostUpdated}
                   onPostDeleted={onPostDeleted}
+                  onPinChanged={onPinChanged}
                 />
               )
             }
