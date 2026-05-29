@@ -21,6 +21,10 @@
  *
  * markTimelineSeen() / markChatroomsSeen() worden aangeroepen wanneer de
  * Tijdlijn- resp. Chatruimtes-tab focus krijgt (zie LandingTabs).
+ *
+ * Admin-modus: voor admins tellen ALLE nieuwe posts/topics mee (niet enkel
+ * admin-aankondigingen) zodat zij alle community-activiteit zien. We bepalen
+ * de admin-status één keer per gebruiker via getIsAdmin().
  */
 
 import React, {
@@ -37,6 +41,7 @@ import { useUser } from './UserContext';
 import {
   countNewAdminTimelinePosts,
   countNewAdminChatroomPosts,
+  getIsAdmin,
 } from '../services';
 
 const POLL_INTERVAL_MS = 60_000;
@@ -76,6 +81,9 @@ export function NotificationProvider({
   const seenTimelineRef = useRef<string | null>(null);
   const seenChatroomsRef = useRef<string | null>(null);
 
+  /* Admin-status (true = alle posts tellen, niet enkel admin-posts). */
+  const isAdminRef = useRef<boolean>(false);
+
   const timelineKey = user ? `${SEEN_TIMELINE_PREFIX}${user}` : null;
   const chatroomsKey = user ? `${SEEN_CHATROOMS_PREFIX}${user}` : null;
 
@@ -83,8 +91,8 @@ export function NotificationProvider({
   const refresh = useCallback(async () => {
     if (!user) return;
     const [tl, cr] = await Promise.all([
-      countNewAdminTimelinePosts(seenTimelineRef.current),
-      countNewAdminChatroomPosts(seenChatroomsRef.current),
+      countNewAdminTimelinePosts(seenTimelineRef.current, isAdminRef.current),
+      countNewAdminChatroomPosts(seenChatroomsRef.current, isAdminRef.current),
     ]);
     setTimelineCount(tl);
     setChatroomsCount(cr);
@@ -98,12 +106,21 @@ export function NotificationProvider({
     if (!user || !timelineKey || !chatroomsKey) {
       seenTimelineRef.current = null;
       seenChatroomsRef.current = null;
+      isAdminRef.current = false;
       setTimelineCount(0);
       setChatroomsCount(0);
       return;
     }
 
     (async () => {
+      /* Admin-status bepalen vóór de eerste telling. */
+      try {
+        isAdminRef.current = await getIsAdmin(user);
+      } catch {
+        isAdminRef.current = false;
+      }
+      if (cancelled) return;
+
       const nowIso = new Date().toISOString();
       try {
         let tl = await AsyncStorage.getItem(timelineKey);

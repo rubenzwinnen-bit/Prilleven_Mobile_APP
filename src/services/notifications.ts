@@ -13,6 +13,10 @@
  *
  * "Admin-post" = een post/topic met `author_is_admin === true`.
  * "Nieuw" = `created_at` strikt na het meegegeven `since`-tijdstip.
+ *
+ * `includeAllAuthors` (admin-modus): wanneer true tellen ALLE nieuwe posts/
+ * topics mee, niet enkel die van admins. Gewone gebruikers zien dus enkel
+ * admin-aankondigingen; admins zien alle nieuwe community-activiteit.
  */
 
 import { listPosts } from './community';
@@ -38,13 +42,14 @@ function isNewerThan(createdAt: string, since: string | null): boolean {
    Aantal nieuwe admin-posts in de tijdlijn (community-feed) sinds `since`.
 ---------------------------------------- */
 export async function countNewAdminTimelinePosts(
-  since: string | null
+  since: string | null,
+  includeAllAuthors = false
 ): Promise<number> {
   try {
     const posts = await listPosts({ limit: SCAN_LIMIT });
     return posts.filter(
       (p) =>
-        p.author_is_admin &&
+        (includeAllAuthors || p.author_is_admin) &&
         p.source_type === 'community' &&
         isNewerThan(p.created_at, since)
     ).length;
@@ -58,7 +63,8 @@ export async function countNewAdminTimelinePosts(
    Per chatruimte de nieuwe admin-topics tellen en optellen over alle rooms.
 ---------------------------------------- */
 export async function countNewAdminChatroomPosts(
-  since: string | null
+  since: string | null,
+  includeAllAuthors = false
 ): Promise<number> {
   try {
     const rooms = await listRooms();
@@ -67,7 +73,9 @@ export async function countNewAdminChatroomPosts(
         try {
           const { topics } = await getRoom(room.slug);
           return topics.filter(
-            (t) => t.author_is_admin && isNewerThan(t.created_at, since)
+            (t) =>
+              (includeAllAuthors || t.author_is_admin) &&
+              isNewerThan(t.created_at, since)
           ).length;
         } catch {
           return 0;
