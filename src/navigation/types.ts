@@ -33,7 +33,17 @@ export type RootStackParamList = {
 export type LandingTabParamList = {
   Functies: undefined;
   Tijdlijn: undefined;
-  Chatruimtes: undefined;
+  Chatruimtes: NavigatorScreenParams<ChatRoomsStackParamList> | undefined;
+};
+
+/* ---- Chatruimtes-tab stack (RoomList → ChatRoom → ChatTopic → form) ---- */
+export type ChatRoomsStackParamList = {
+  RoomList: undefined;
+  ChatRoom: { slug: string; title: string };
+  ChatTopic: { topicId: string; roomTitle?: string };
+  ChatTopicForm:
+    | { slug: string; topicId?: string; initialTitle?: string; initialBody?: string }
+    | undefined;
 };
 
 /* ---- Bottom Tabs ---- */

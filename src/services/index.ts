@@ -81,6 +81,34 @@ export type {
   CommunityReply,
   CategoryInfo,
 } from './community';
+/* NB: createReply + REPLY_BODY_MAX bestaan ook in community.ts — die
+   botsing vermijden we door de chatRooms-varianten niet via de barrel
+   te exporteren. ChatTopicScreen importeert ze rechtstreeks uit
+   './chatRooms'. */
+export {
+  listRooms,
+  getRoom,
+  getTopic,
+  createTopic,
+  updateTopic,
+  deleteTopic,
+  updateReply,
+  deleteReply,
+  getCurrentUserId,
+  isWithinEditWindow,
+  roomEmoji,
+  ROOMS,
+  TOPIC_TITLE_MAX,
+  TOPIC_BODY_MAX,
+  EDIT_WINDOW_MS,
+} from './chatRooms';
+export type {
+  ChatRoom,
+  ChatRoomDetail,
+  ChatTopic,
+  ChatReply,
+  AdminIntro,
+} from './chatRooms';
 export {
   getChildren,
   createChild,

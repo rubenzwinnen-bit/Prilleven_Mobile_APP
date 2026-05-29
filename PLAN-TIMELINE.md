@@ -6,6 +6,48 @@
 
 ---
 
+## 2026-05-29 — Chatruimtes CRUD-MVP (v2.11.0)
+
+**Context**: Tijdlijn-MVP stond op v2.10.0 met de footer-navigatie (`LandingTabs`, 3 tabs) en Chatruimtes als placeholder-scherm. Deze sessie heeft Chatruimtes uitgewerkt tot een volledige CRUD-MVP, parity met de website (`api/chat-rooms.mjs`).
+
+### Scope (vooraf bevestigd)
+
+- **Volledig CRUD**: rooms lezen, topics lezen/plaatsen, replies lezen/plaatsen, eigen topic/reply bewerken (15min-venster) + wissen.
+- **Geen follow/unread-badges** (bewust overgeslagen — geen 60s-polling).
+- **Admin-welkomsbericht read-only** bovenaan een room.
+
+### Afgerond deze sessie
+
+- **`services/chatRooms.ts`** (nieuw) — kopie van het `community.ts` auth-patroon. Constants: `ROOMS` (4 vaste rooms), `TOPIC_TITLE_MAX=120`, `TOPIC_BODY_MAX=4000`, `REPLY_BODY_MAX=2000`, `EDIT_WINDOW_MS=15min`. Types: `AdminIntro`, `ChatRoom`, `ChatRoomDetail`, `ChatTopic`, `ChatReply`. Helpers: `getCurrentUserId()` (uit `supabase.auth.getSession()` — UserContext heeft enkel email, niet de auth-UUID), `roomEmoji()`, `isWithinEditWindow()`. CRUD: `listRooms`, `getRoom`, `getTopic`, `createTopic`, `updateTopic`, `deleteTopic`, `createReply`, `updateReply`, `deleteReply`.
+- **`services/index.ts`** — chatRooms-exports toegevoegd. **NB**: `createReply` + `REPLY_BODY_MAX` botsen met `community.ts`; daarom **niet** via de barrel geëxporteerd — `ChatTopicScreen` importeert ze rechtstreeks uit `./chatRooms`.
+- **Navigatie** — `ChatRoomsStackParamList` in `navigation/types.ts`; `Chatruimtes`-tab nu `NavigatorScreenParams<ChatRoomsStackParamList>`. Nieuwe `navigation/ChatRoomsStack.tsx` (RoomList → ChatRoom → ChatTopic → ChatTopicForm). `LandingTabs.tsx` wijst de tab naar `ChatRoomsStackNavigator`.
+- **4 schermen**: `ChatRoomsListScreen` (roomlijst + fallback uit `ROOMS`), `ChatRoomScreen` (admin-intro read-only + topic-lijst gepind-eerst + "Nieuw topic"-FAB), `ChatTopicScreen` (topic-body + replies + composer + eigen edit/delete via `getCurrentUserId` + `isWithinEditWindow`), `ChatTopicFormScreen` (create/edit topic).
+- **`ChatRoomsScreen.tsx`** (placeholder) verwijderd.
+
+### Status
+
+- `npx tsc --noEmit` groen (na fix van de `createReply`/`REPLY_BODY_MAX` barrel-botsing).
+- Geen EAS-build getriggerd; geen version-bump in `app.json` (vereist user-bevestiging).
+
+### Pariteit met web-app
+
+| Flow | Web | Mobile |
+|---|---|---|
+| Chatruimtes (rooms → topics → replies, CRUD) | v3.0.0 | ✅ v2.11.0 |
+| Admin-welkomsbericht in room | v3.0.0 | ✅ v2.11.0 (read-only) |
+| Follow-rooms / unread-badges | v3.0.0 | ⬜ overgeslagen |
+
+### Volgende stap
+
+Version-bump + commit + push (op user-bevestiging): `app.json.version` → 2.11.0, `ios.buildNumber` 37→38, `android.versionCode` 41→42. Daarna tijdlijn-uitbreidingen (foto's, polls, reply-likes, notificaties) of push-notificaties.
+
+### Open vragen / blockers
+
+- Version-bump nog niet uitgevoerd (wacht op user).
+- Niet gecommit deze sessie.
+
+---
+
 ## 2026-05-27 — Allergenen-flow parity met website (v2.7.0 → v2.9.1)
 
 **Context**: Doorgewerkt aan parity met de webversie van de allergenen-introductieflow. De website draait sinds v3.0.0 en heeft een uitgebreide setup + welcome + pause + arts-toezicht-flow; mobile zat op v2.6.0 (MVP doses + symptomen). Deze sessie heeft mobile naar v2.9.1 gebracht.

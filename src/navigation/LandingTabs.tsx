@@ -4,7 +4,7 @@
  * Drie tabs in de footer:
  *   Functies     → LandingScreen (de bestaande module-tegels)
  *   Tijdlijn     → TimelineScreen (community-feed)
- *   Chatruimtes  → ChatRoomsScreen (placeholder, komt later)
+ *   Chatruimtes  → ChatRoomsStack (rooms → topics → replies)
  *
  * Deze navigator vervangt het losse Landing-scherm in de RootStack.
  * Diepere schermen (Main, HapjesHeld, ...) worden bovenop gepusht en
@@ -18,7 +18,7 @@ import { colors } from '../constants/theme';
 import type { LandingTabParamList } from './types';
 import { LandingScreen } from '../screens/LandingScreen';
 import { TimelineScreen } from '../screens/TimelineScreen';
-import { ChatRoomsScreen } from '../screens/ChatRoomsScreen';
+import { ChatRoomsStackNavigator } from './ChatRoomsStack';
 
 const Tabs = createBottomTabNavigator<LandingTabParamList>();
 
@@ -64,7 +64,7 @@ export function LandingTabs() {
       />
       <Tabs.Screen
         name="Chatruimtes"
-        component={ChatRoomsScreen}
+        component={ChatRoomsStackNavigator}
         options={{
           tabBarLabel: 'Chatruimtes',
           tabBarIcon: ({ color, size }) => (
