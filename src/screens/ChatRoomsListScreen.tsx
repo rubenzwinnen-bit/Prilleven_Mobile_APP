@@ -6,7 +6,7 @@
  * Tap op een room → ChatRoom (topics).
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
-import { listRooms, getUnread, roomEmoji, ROOMS } from '../services';
+import { listRooms, getUnread, ROOMS } from '../services';
 import type { ChatRoom } from '../services';
 import type { ChatRoomsStackParamList } from '../navigation/types';
 
@@ -43,11 +43,12 @@ export function ChatRoomsListScreen({ navigation }: Props) {
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const loadedOnce = useRef(false);
 
   const load = useCallback(
-    async (mode: 'initial' | 'refresh') => {
+    async (mode: 'initial' | 'refresh' | 'silent') => {
       if (mode === 'refresh') setRefreshing(true);
-      else setLoading(true);
+      else if (mode === 'initial') setLoading(true);
       try {
         const [list, counts] = await Promise.all([listRooms(), getUnread()]);
         if (list.length) setRooms(list);
@@ -62,9 +63,12 @@ export function ChatRoomsListScreen({ navigation }: Props) {
     [show]
   );
 
+  /* Eerste focus toont de centrale spinner; daarna stil herladen zodat
+     de pull-to-refresh-cirkel niet blijft hangen bij terugkeer. */
   useFocusEffect(
     useCallback(() => {
-      load('refresh');
+      load(loadedOnce.current ? 'silent' : 'initial');
+      loadedOnce.current = true;
     }, [load])
   );
 
@@ -102,9 +106,6 @@ export function ChatRoomsListScreen({ navigation }: Props) {
                   })
                 }
               >
-                <View style={styles.emojiCircle}>
-                  <Text style={styles.emoji}>{roomEmoji(item.slug)}</Text>
-                </View>
                 <View style={styles.cardMeta}>
                   <Text style={styles.cardTitle} numberOfLines={1}>
                     {item.title}
@@ -181,20 +182,9 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.7,
   },
-  emojiCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.light,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emoji: {
-    fontSize: 24,
-  },
   cardMeta: {
     flex: 1,
-    marginHorizontal: spacing.md,
+    marginRight: spacing.md,
   },
   cardTitle: {
     fontSize: 16,

@@ -56,7 +56,6 @@ interface AnimatedTileProps {
   image: ImageSourcePropType;
   overlayColor: string;
   title: string;
-  description: string;
   badge?: string;
   onPress: () => void;
   /** Optional resize mode override (default = 'cover'). */
@@ -69,7 +68,6 @@ function AnimatedTile({
   image,
   overlayColor,
   title,
-  description,
   badge,
   onPress,
   imageResizeMode = 'cover',
@@ -111,7 +109,6 @@ function AnimatedTile({
           <View style={[styles.overlay, { backgroundColor: overlayColor }]} />
           <View style={styles.tileContent}>
             <Text style={styles.tileTitle}>{title}</Text>
-            <Text style={styles.tileDescription}>{description}</Text>
           </View>
           {badge ? (
             <View style={styles.badge}>
@@ -178,7 +175,6 @@ export function LandingScreen({ navigation }: Props) {
           image={IMG_RECEPTEN}
           overlayColor="rgba(0, 0, 0, 0.45)"
           title="Receptenboek & Weekschema"
-          description="Ontdek recepten, plan je week en maak je boodschappenlijst"
           onPress={() => navigation.navigate('Main')}
         />
 
@@ -186,27 +182,24 @@ export function LandingScreen({ navigation }: Props) {
           image={IMG_HAPJESHELD}
           overlayColor="rgba(130, 190, 147, 0.80)"
           title="HapjesHeld 2.0"
-          description="Stel je vragen over kindervoeding aan onze AI-assistent"
           badge="NIEUW"
           onPress={() => navigation.navigate('HapjesHeld')}
-        />
-
-        <AnimatedTile
-          image={IMG_ALLERGENEN}
-          overlayColor="rgba(201, 137, 102, 0.55)"
-          title="Allergenen-introductie"
-          description="Volg per kind de 9 hoofdallergenen en log eventuele symptomen"
-          badge="NIEUW"
-          onPress={() => navigation.navigate('AllergenenChildren')}
         />
 
         <AnimatedTile
           image={IMG_LEARNINGS}
           overlayColor="rgba(190, 118, 78, 0.55)"
           title="Learnings"
-          description="Documenten, blogs en video's om door te lezen of te bekijken"
           badge="NIEUW"
           onPress={() => navigation.navigate('Learnings')}
+        />
+
+        <AnimatedTile
+          image={IMG_ALLERGENEN}
+          overlayColor="rgba(201, 137, 102, 0.55)"
+          title="Allergenen-introductie"
+          badge="NIEUW"
+          onPress={() => navigation.navigate('AllergenenChildren')}
         />
       </ScrollView>
     </SafeAreaView>
@@ -278,20 +271,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     color: colors.white,
-    marginBottom: spacing.xs,
     letterSpacing: 0.3,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
-  },
-  tileDescription: {
-    fontSize: 15,
-    color: colors.white,
-    lineHeight: 22,
-    fontWeight: '500',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   badge: {
     position: 'absolute',

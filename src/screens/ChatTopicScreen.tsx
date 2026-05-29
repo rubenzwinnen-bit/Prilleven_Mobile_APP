@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
@@ -336,6 +337,9 @@ export function ChatTopicScreen({ navigation, route }: Props) {
   const { topicId } = route.params;
   const { user } = useUser();
   const { show } = useToast();
+  /* Werkelijke header-hoogte zodat de composer exact boven het toetsenbord
+     uitlijnt (i.p.v. een hardcoded offset). */
+  const headerHeight = useHeaderHeight();
 
   const [topic, setTopic] = useState<ChatTopic | null>(null);
   const [replies, setReplies] = useState<ChatReply[]>([]);
@@ -536,7 +540,7 @@ export function ChatTopicScreen({ navigation, route }: Props) {
     <KeyboardAvoidingView
       style={styles.safe}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={headerHeight}
     >
       <FlatList
         data={replies}

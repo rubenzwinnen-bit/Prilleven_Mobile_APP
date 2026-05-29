@@ -7,7 +7,8 @@
  *   - Type-filter (Alle / Document / Blog / Video)
  *   - Favorieten-filter (toggle)
  *   - Favoriet togglen per kaart (harticoon)
- *   - Tap op kaart → LearningDetailScreen
+ *   - Tap op een document (pdf) → opent meteen in de in-app browser
+ *   - Tap op blog/video → LearningDetailScreen
  *
  * Eén fetch op focus; filteren gebeurt client-side op de geladen lijst.
  */
@@ -29,10 +30,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import {
   getLearnings,
+  getLearning,
   toggleLearningFavorite,
   learningKindIcon,
   learningKindLabel,
@@ -85,6 +88,7 @@ export function LearningsScreen({ navigation }: Props) {
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [pinningId, setPinningId] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -139,6 +143,32 @@ export function LearningsScreen({ navigation }: Props) {
     [pinningId, show]
   );
 
+  /* Tap op een kaart: documenten (pdf) openen meteen in de in-app browser
+     via een verse signed_url; blog/video gaan naar het detailscherm. */
+  const onOpen = useCallback(
+    async (item: Learning) => {
+      if (item.kind !== 'pdf') {
+        navigation.navigate('LearningDetail', { id: item.id, title: item.title });
+        return;
+      }
+      if (openingId) return;
+      setOpeningId(item.id);
+      try {
+        const detail = await getLearning(item.id);
+        if (!detail.signed_url) {
+          show('Dit document is momenteel niet beschikbaar.', 'error');
+          return;
+        }
+        await WebBrowser.openBrowserAsync(detail.signed_url);
+      } catch (err: any) {
+        show(err.message || 'Document openen mislukt.', 'error');
+      } finally {
+        setOpeningId(null);
+      }
+    },
+    [navigation, openingId, show]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter(l => {
@@ -159,14 +189,11 @@ export function LearningsScreen({ navigation }: Props) {
   const renderItem = useCallback(
     ({ item }: { item: Learning }) => {
       const duration = formatDuration(item.duration_sec);
+      const isOpening = openingId === item.id;
       return (
         <Pressable
-          onPress={() =>
-            navigation.navigate('LearningDetail', {
-              id: item.id,
-              title: item.title,
-            })
-          }
+          onPress={() => onOpen(item)}
+          disabled={isOpening}
           style={({ pressed }) => [styles.card, pressed && styles.pressed]}
           accessibilityLabel={`${item.title} openen`}
         >
@@ -184,6 +211,11 @@ export function LearningsScreen({ navigation }: Props) {
                 </Text>
               </View>
             )}
+            {isOpening ? (
+              <View style={styles.thumbOverlay}>
+                <ActivityIndicator color={colors.white} size="small" />
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.cardBody}>
@@ -226,7 +258,7 @@ export function LearningsScreen({ navigation }: Props) {
         </Pressable>
       );
     },
-    [navigation, onToggleFavorite, pinningId]
+    [onOpen, onToggleFavorite, openingId, pinningId]
   );
 
   return (
@@ -416,6 +448,13 @@ const styles = StyleSheet.create({
   },
   thumbPlaceholder: {
     backgroundColor: colors.light,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
