@@ -33,7 +33,7 @@ export function LandingTabs() {
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.light,
-          height: 64,
+          height: 74,
           paddingTop: 6,
           paddingBottom: 8,
         },
@@ -61,7 +61,7 @@ export function LandingTabs() {
           tabBarIcon: ({ focused }) => (
             <Image
               source={require('../../assets/prilleven-logo.png')}
-              style={{ width: 40, height: 40, opacity: focused ? 1 : 0.6 }}
+              style={{ width: 58, height: 58, opacity: focused ? 1 : 0.6 }}
               resizeMode="contain"
             />
           ),
