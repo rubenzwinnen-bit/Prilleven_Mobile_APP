@@ -6,9 +6,10 @@
  *   - liken (optimistic toggle)
  *   - reacties inline uitklappen (lazy-load) + plaatsen
  *   - tekst-post plaatsen (alleen admins, net als de webversie)
+ *   - gevolgde chatruimte-topics tonen in de feed (source_type 'chatroom'),
+ *     tik → opent het topic in de Chatruimtes-tab
  *
- * Buiten scope (latere iteratie): foto's, polls, rapporteren,
- * notificaties, chatroom-topics in de feed.
+ * Buiten scope (latere iteratie): foto's, polls, rapporteren.
  *
  * Signed avatar_url/image_url hebben 1u TTL → bij stale beeld de feed
  * opnieuw laden (pull-to-refresh).
@@ -31,8 +32,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { colors, radius, spacing, shadows } from '../constants/theme';
+import type { LandingTabParamList } from '../navigation/types';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../components/Toast';
 import {
@@ -627,6 +630,74 @@ function PostCard({
 }
 
 /* ----------------------------------------
+   ChatroomTopicCard — gevolgd chatruimte-topic in de feed
+   (source_type 'chatroom'). Mirror van website renderChatroomTopicCard:
+   bron-badge → room, titel, body-snippet, footer → open discussie.
+---------------------------------------- */
+function ChatroomTopicCard({
+  post,
+  onOpenTopic,
+}: {
+  post: CommunityPost;
+  onOpenTopic: (topicId: string, roomTitle: string) => void;
+}) {
+  const roomTitle = post.source_room_title || 'Chatruimte';
+  const snippet =
+    (post.body || '').length > 200
+      ? `${post.body.slice(0, 200)}…`
+      : post.body || '';
+  const replies = post.replies_count ?? 0;
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        styles.chatroomCard,
+        pressed ? styles.chatroomCardPressed : null,
+      ]}
+      onPress={() => onOpenTopic(post.id, roomTitle)}
+    >
+      <View style={styles.chatroomSource}>
+        <Feather name="message-square" size={13} color={colors.secondaryDark} />
+        <Text style={styles.chatroomSourceText} numberOfLines={1}>
+          Chatruimte: {roomTitle}
+        </Text>
+      </View>
+
+      <View style={styles.cardHead}>
+        <PostAvatar nickname={post.nickname} avatarUrl={post.avatar_url} />
+        <View style={styles.headMeta}>
+          <View style={styles.nickRow}>
+            <Text style={styles.nick} numberOfLines={1}>
+              {post.nickname || 'Onbekend'}
+            </Text>
+            {post.author_is_admin ? (
+              <View style={styles.adminBadge}>
+                <Text style={styles.adminBadgeText}>Admin</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.time}>{relTime(post.created_at)}</Text>
+        </View>
+      </View>
+
+      {post.title ? (
+        <Text style={styles.chatroomTitle}>{post.title}</Text>
+      ) : null}
+      {snippet ? <Text style={styles.body}>{snippet}</Text> : null}
+
+      <View style={styles.chatroomFooter}>
+        <Feather name="message-circle" size={16} color={colors.primary} />
+        <Text style={styles.chatroomFooterText}>
+          {replies} {replies === 1 ? 'reactie' : 'reacties'} · Open discussie
+        </Text>
+        <Feather name="chevron-right" size={16} color={colors.primary} />
+      </View>
+    </Pressable>
+  );
+}
+
+/* ----------------------------------------
    Admin-composer (ListHeaderComponent)
 ---------------------------------------- */
 function Composer({ onPosted }: { onPosted: (post: CommunityPost) => void }) {
@@ -685,6 +756,19 @@ function Composer({ onPosted }: { onPosted: (post: CommunityPost) => void }) {
 export function TimelineScreen() {
   const { user } = useUser();
   const { show } = useToast();
+  const navigation =
+    useNavigation<BottomTabNavigationProp<LandingTabParamList, 'Tijdlijn'>>();
+
+  /* Tik op een chatruimte-topic → open het in de Chatruimtes-tab. */
+  const openChatroomTopic = useCallback(
+    (topicId: string, roomTitle: string) => {
+      navigation.navigate('Chatruimtes', {
+        screen: 'ChatTopic',
+        params: { topicId, roomTitle },
+      });
+    },
+    [navigation]
+  );
 
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -713,8 +797,7 @@ export function TimelineScreen() {
       else setLoading(true);
       try {
         const list = await listPosts({ limit: PAGE_SIZE });
-        const community = list.filter((p) => p.source_type === 'community');
-        setPosts(community);
+        setPosts(list);
         cursorRef.current = computeCursor(list);
         setHasMore(list.length >= PAGE_SIZE);
       } catch (err: any) {
@@ -737,10 +820,9 @@ export function TimelineScreen() {
     setLoadingMore(true);
     try {
       const list = await listPosts({ limit: PAGE_SIZE, before });
-      const community = list.filter((p) => p.source_type === 'community');
       setPosts((prev) => {
         const seen = new Set(prev.map((p) => p.id));
-        return [...prev, ...community.filter((p) => !seen.has(p.id))];
+        return [...prev, ...list.filter((p) => !seen.has(p.id))];
       });
       const nextCursor = computeCursor(list);
       cursorRef.current = nextCursor;
@@ -795,14 +877,21 @@ export function TimelineScreen() {
           <FlatList
             data={posts}
             keyExtractor={(p) => p.id}
-            renderItem={({ item }) => (
-              <PostCard
-                post={item}
-                currentUserId={currentUserId}
-                onPostUpdated={onPostUpdated}
-                onPostDeleted={onPostDeleted}
-              />
-            )}
+            renderItem={({ item }) =>
+              item.source_type === 'chatroom' ? (
+                <ChatroomTopicCard
+                  post={item}
+                  onOpenTopic={openChatroomTopic}
+                />
+              ) : (
+                <PostCard
+                  post={item}
+                  currentUserId={currentUserId}
+                  onPostUpdated={onPostUpdated}
+                  onPostDeleted={onPostDeleted}
+                />
+              )
+            }
             contentContainerStyle={styles.listContent}
             ListHeaderComponent={
               isAdmin ? <Composer onPosted={onPosted} /> : null
@@ -954,6 +1043,44 @@ const styles = StyleSheet.create({
     color: colors.dark,
     lineHeight: 22,
     marginTop: spacing.sm,
+  },
+
+  /* Chatruimte-topic-kaart in de feed */
+  chatroomCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.secondary,
+  },
+  chatroomCardPressed: {
+    opacity: 0.7,
+  },
+  chatroomSource: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: spacing.sm,
+  },
+  chatroomSourceText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.secondaryDark,
+    flexShrink: 1,
+  },
+  chatroomTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.dark,
+    marginTop: spacing.sm,
+  },
+  chatroomFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+  },
+  chatroomFooterText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '600',
   },
   postImage: {
     width: '100%',

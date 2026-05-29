@@ -74,6 +74,11 @@ export interface CommunityPost {
   avatar_url: string | null; // signed, 1u TTL
   poll: unknown | null; // MVP: niet gerenderd
   author_is_admin: boolean;
+  /* Alleen bij source_type 'chatroom' (gevolgde topics in de feed). */
+  title?: string | null;
+  source_room_title?: string | null;
+  source_room_slug?: string | null;
+  last_reply_at?: string | null;
 }
 
 export interface CommunityReply {

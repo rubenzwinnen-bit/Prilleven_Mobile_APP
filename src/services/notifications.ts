@@ -39,7 +39,11 @@ function isNewerThan(createdAt: string, since: string | null): boolean {
 
 /* ----------------------------------------
    countNewAdminTimelinePosts
-   Aantal nieuwe admin-posts in de tijdlijn (community-feed) sinds `since`.
+   Aantal nieuwe items in de tijdlijn sinds `since`, opgeteld:
+     - admin-posts in de community-feed (source_type 'community')
+     - ALLE nieuwe gevolgde chatruimte-topics (source_type 'chatroom') —
+       deze staan al in de feed omdat de gebruiker de room/het topic volgt,
+       dus tellen ze altijd mee, ongeacht auteur.
 ---------------------------------------- */
 export async function countNewAdminTimelinePosts(
   since: string | null,
@@ -47,12 +51,11 @@ export async function countNewAdminTimelinePosts(
 ): Promise<number> {
   try {
     const posts = await listPosts({ limit: SCAN_LIMIT });
-    return posts.filter(
-      (p) =>
-        (includeAllAuthors || p.author_is_admin) &&
-        p.source_type === 'community' &&
-        isNewerThan(p.created_at, since)
-    ).length;
+    return posts.filter((p) => {
+      if (!isNewerThan(p.created_at, since)) return false;
+      if (p.source_type === 'chatroom') return true;
+      return includeAllAuthors || p.author_is_admin;
+    }).length;
   } catch {
     return 0;
   }
