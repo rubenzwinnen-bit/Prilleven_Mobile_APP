@@ -42,7 +42,6 @@ import {
   createReply,
   getIsAdmin,
   categoryInfo,
-  POST_CATEGORIES,
   POST_BODY_MAX,
   REPLY_BODY_MAX,
   relTime,
@@ -346,7 +345,6 @@ function PostCard({ post }: { post: CommunityPost }) {
 function Composer({ onPosted }: { onPosted: (post: CommunityPost) => void }) {
   const { show } = useToast();
   const [body, setBody] = useState('');
-  const [category, setCategory] = useState('algemeen');
   const [posting, setPosting] = useState(false);
 
   const onSubmit = useCallback(async () => {
@@ -354,17 +352,16 @@ function Composer({ onPosted }: { onPosted: (post: CommunityPost) => void }) {
     if (!text || posting) return;
     setPosting(true);
     try {
-      const post = await createPost({ body: text, category });
+      const post = await createPost({ body: text });
       onPosted(post);
       setBody('');
-      setCategory('algemeen');
       show('Post geplaatst.', 'success');
     } catch (err: any) {
       show(err.message || 'Plaatsen mislukt.', 'error');
     } finally {
       setPosting(false);
     }
-  }, [body, category, posting, onPosted, show]);
+  }, [body, posting, onPosted, show]);
 
   return (
     <View style={styles.composer}>
@@ -377,27 +374,6 @@ function Composer({ onPosted }: { onPosted: (post: CommunityPost) => void }) {
         maxLength={POST_BODY_MAX}
         multiline
       />
-      <View style={styles.catRow}>
-        {POST_CATEGORIES.map((c) => {
-          const active = c.key === category;
-          return (
-            <Pressable
-              key={c.key}
-              onPress={() => setCategory(c.key)}
-              style={[styles.catPill, active ? styles.catPillActive : null]}
-            >
-              <Text
-                style={[
-                  styles.catPillText,
-                  active ? styles.catPillTextActive : null,
-                ]}
-              >
-                {c.emoji} {c.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
       <Pressable
         onPress={onSubmit}
         disabled={!body.trim() || posting}
@@ -598,29 +574,6 @@ const styles = StyleSheet.create({
     color: colors.dark,
     minHeight: 60,
     textAlignVertical: 'top',
-  },
-  catRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  catPill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: radius.sm,
-    backgroundColor: colors.light,
-  },
-  catPillActive: {
-    backgroundColor: colors.primary,
-  },
-  catPillText: {
-    fontSize: 12,
-    color: colors.darkLight,
-    fontWeight: '600',
-  },
-  catPillTextActive: {
-    color: colors.white,
   },
   postBtn: {
     marginTop: spacing.md,

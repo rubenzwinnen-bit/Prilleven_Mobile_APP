@@ -70,9 +70,26 @@ function AdminIntroCard({ intro }: { intro: AdminIntro }) {
         <Text style={styles.introLabel}>Welkom</Text>
       </View>
       <Text style={styles.introBody}>{intro.message}</Text>
-      <Text style={styles.introMeta}>
-        {intro.nickname || 'Team Pril Leven'} · {relTime(intro.updated_at)}
-      </Text>
+      <View style={styles.introAuthor}>
+        <Avatar
+          nickname={intro.nickname}
+          avatarUrl={intro.avatar_url}
+          size={28}
+        />
+        <View style={styles.introAuthorMeta}>
+          <View style={styles.introNickRow}>
+            <Text style={styles.introNick} numberOfLines={1}>
+              {intro.nickname || 'Team Pril Leven'}
+            </Text>
+            {intro.author_is_admin ? (
+              <View style={styles.adminBadge}>
+                <Text style={styles.adminBadgeText}>Admin</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.introMeta}>{relTime(intro.updated_at)}</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -249,10 +266,30 @@ const styles = StyleSheet.create({
     color: colors.dark,
     lineHeight: 21,
   },
+  introAuthor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  introAuthorMeta: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  introNickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  introNick: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.dark,
+    flexShrink: 1,
+  },
   introMeta: {
     fontSize: 11,
     color: colors.gray,
-    marginTop: spacing.sm,
+    marginTop: 1,
   },
 
   /* Topic-card */
