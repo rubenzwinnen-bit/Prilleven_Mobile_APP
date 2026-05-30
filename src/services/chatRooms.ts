@@ -536,6 +536,29 @@ export async function updateRoom(
 }
 
 /* ----------------------------------------
+   reportChatTarget (App Store Guideline 1.2)
+   POST /api/chat-rooms/report { target_type, target_id, reason? }
+   target_type: 'topic' | 'reply'. Server slaat op in chat_reports en
+   toont het in de admin-queue. 201 = ontvangen.
+---------------------------------------- */
+export async function reportChatTarget(
+  targetType: 'topic' | 'reply',
+  targetId: string,
+  reason?: string
+): Promise<void> {
+  const response = await authedFetch('/api/chat-rooms/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      target_type: targetType,
+      target_id: targetId,
+      reason: reason ?? null,
+    }),
+  });
+  await okOrThrow(response);
+}
+
+/* ----------------------------------------
    Helpers
 ---------------------------------------- */
 /** Is dit topic/reactie nog bewerkbaar door de eigenaar (binnen 15 min)? */

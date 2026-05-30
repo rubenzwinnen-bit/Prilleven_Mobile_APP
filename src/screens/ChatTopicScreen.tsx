@@ -39,12 +39,15 @@ import {
   getIsAdmin,
   getCurrentUserId,
   isWithinEditWindow,
+  reportChatTarget,
+  blockUser,
   relTime,
 } from '../services';
 import type { ChatTopic, ChatReply } from '../services';
 /* createReply + REPLY_BODY_MAX rechtstreeks uit de module: hun namen
    botsen met community.ts in de barrel (zie services/index.ts). */
 import { createReply, REPLY_BODY_MAX } from '../services/chatRooms';
+import { openModerationMenu } from '../lib/moderation';
 import type { ChatRoomsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ChatRoomsStackParamList, 'ChatTopic'>;
@@ -90,11 +93,13 @@ function ReplyRow({
   currentUserId,
   onUpdated,
   onDeleted,
+  onUserBlocked,
 }: {
   reply: ChatReply;
   currentUserId: string | null;
   onUpdated: (r: ChatReply) => void;
   onDeleted: (id: string) => void;
+  onUserBlocked: (userId: string) => void;
 }) {
   const { show } = useToast();
   const [editing, setEditing] = useState(false);
@@ -103,6 +108,19 @@ function ReplyRow({
 
   const isOwner = !!currentUserId && reply.user_id === currentUserId;
   const canEdit = isOwner && isWithinEditWindow(reply.created_at);
+
+  const onModerate = useCallback(() => {
+    openModerationMenu({
+      targetLabel: 'Reactie',
+      authorName: reply.nickname,
+      onReport: () => reportChatTarget('reply', reply.id),
+      onBlock: async () => {
+        await blockUser(reply.user_id);
+        onUserBlocked(reply.user_id);
+      },
+      show,
+    });
+  }, [reply.id, reply.nickname, reply.user_id, onUserBlocked, show]);
 
   const onSave = useCallback(async () => {
     const body = draft.trim();
@@ -218,7 +236,18 @@ function ReplyRow({
                   </Text>
                 </Pressable>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.ownActions}>
+                <Pressable
+                  onPress={onModerate}
+                  style={styles.ownAction}
+                  hitSlop={6}
+                >
+                  <Feather name="flag" size={13} color={colors.gray} />
+                  <Text style={styles.ownActionText}>Rapporteren / blokkeren</Text>
+                </Pressable>
+              </View>
+            )}
           </>
         )}
       </View>
@@ -237,6 +266,7 @@ function TopicHeader({
   onEdit,
   onDelete,
   onTogglePin,
+  onModerate,
 }: {
   topic: ChatTopic;
   currentUserId: string | null;
@@ -245,6 +275,7 @@ function TopicHeader({
   onEdit: () => void;
   onDelete: () => void;
   onTogglePin: () => void;
+  onModerate: () => void;
 }) {
   const isOwner = !!currentUserId && topic.user_id === currentUserId;
   const canEdit = isOwner && isWithinEditWindow(topic.created_at);
@@ -279,46 +310,49 @@ function TopicHeader({
       </View>
       <Text style={styles.topicBody}>{topic.body}</Text>
 
-      {isOwner || isAdmin ? (
-        <View style={styles.ownActions}>
-          {canEdit ? (
-            <Pressable onPress={onEdit} style={styles.ownAction} hitSlop={6}>
-              <Feather name="edit-2" size={14} color={colors.gray} />
-              <Text style={styles.ownActionText}>Bewerken</Text>
-            </Pressable>
-          ) : null}
-          {isAdmin ? (
-            <Pressable
-              onPress={onTogglePin}
-              disabled={pinning}
-              style={styles.ownAction}
-              hitSlop={6}
+      <View style={styles.ownActions}>
+        {canEdit ? (
+          <Pressable onPress={onEdit} style={styles.ownAction} hitSlop={6}>
+            <Feather name="edit-2" size={14} color={colors.gray} />
+            <Text style={styles.ownActionText}>Bewerken</Text>
+          </Pressable>
+        ) : null}
+        {isAdmin ? (
+          <Pressable
+            onPress={onTogglePin}
+            disabled={pinning}
+            style={styles.ownAction}
+            hitSlop={6}
+          >
+            <Feather
+              name="bookmark"
+              size={14}
+              color={topic.is_pinned ? colors.primaryDark : colors.gray}
+            />
+            <Text
+              style={[
+                styles.ownActionText,
+                topic.is_pinned ? { color: colors.primaryDark } : null,
+              ]}
             >
-              <Feather
-                name="bookmark"
-                size={14}
-                color={topic.is_pinned ? colors.primaryDark : colors.gray}
-              />
-              <Text
-                style={[
-                  styles.ownActionText,
-                  topic.is_pinned ? { color: colors.primaryDark } : null,
-                ]}
-              >
-                {topic.is_pinned ? 'Losmaken' : 'Vastpinnen'}
-              </Text>
-            </Pressable>
-          ) : null}
-          {isOwner ? (
-            <Pressable onPress={onDelete} style={styles.ownAction} hitSlop={6}>
-              <Feather name="trash-2" size={14} color={colors.danger} />
-              <Text style={[styles.ownActionText, { color: colors.danger }]}>
-                Verwijderen
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+              {topic.is_pinned ? 'Losmaken' : 'Vastpinnen'}
+            </Text>
+          </Pressable>
+        ) : null}
+        {isOwner ? (
+          <Pressable onPress={onDelete} style={styles.ownAction} hitSlop={6}>
+            <Feather name="trash-2" size={14} color={colors.danger} />
+            <Text style={[styles.ownActionText, { color: colors.danger }]}>
+              Verwijderen
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={onModerate} style={styles.ownAction} hitSlop={6}>
+            <Feather name="flag" size={14} color={colors.gray} />
+            <Text style={styles.ownActionText}>Rapporteren / blokkeren</Text>
+          </Pressable>
+        )}
+      </View>
 
       <View style={styles.repliesDivider}>
         <Text style={styles.repliesLabel}>
@@ -418,6 +452,27 @@ export function ChatTopicScreen({ navigation, route }: Props) {
       t ? { ...t, replies_count: Math.max(0, t.replies_count - 1) } : t
     );
   }, []);
+
+  /* Auteur van een reactie geblokkeerd → reacties lokaal verbergen. */
+  const onReplyUserBlocked = useCallback((userId: string) => {
+    setReplies((prev) => prev.filter((r) => r.user_id !== userId));
+  }, []);
+
+  /* Moderatie van het topic zelf (niet-eigenaar). Na blokkeren keren we
+     terug naar de roomlijst — het hele topic is van de geblokkeerde auteur. */
+  const onModerateTopic = useCallback(() => {
+    if (!topic) return;
+    openModerationMenu({
+      targetLabel: 'Topic',
+      authorName: topic.nickname,
+      onReport: () => reportChatTarget('topic', topic.id),
+      onBlock: async () => {
+        await blockUser(topic.user_id);
+        navigation.goBack();
+      },
+      show,
+    });
+  }, [topic, navigation, show]);
 
   const onDeleteTopic = useCallback(() => {
     Alert.alert(
@@ -555,6 +610,7 @@ export function ChatTopicScreen({ navigation, route }: Props) {
             onEdit={onEditTopic}
             onDelete={onDeleteTopic}
             onTogglePin={onTogglePin}
+            onModerate={onModerateTopic}
           />
         }
         renderItem={({ item }) => (
@@ -563,6 +619,7 @@ export function ChatTopicScreen({ navigation, route }: Props) {
             currentUserId={userId}
             onUpdated={onReplyUpdated}
             onDeleted={onReplyDeleted}
+            onUserBlocked={onReplyUserBlocked}
           />
         )}
         ListEmptyComponent={

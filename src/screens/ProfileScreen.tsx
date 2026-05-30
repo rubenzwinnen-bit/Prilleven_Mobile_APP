@@ -54,8 +54,10 @@ import {
   setFamilyDiet,
   DIET_OPTIONS,
   MAX_DIET_ITEMS,
+  listBlocks,
+  unblockUser,
 } from '../services';
-import type { CommunityProfile } from '../services';
+import type { CommunityProfile, BlockedUser } from '../services';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
@@ -103,6 +105,11 @@ export function ProfileScreen({ navigation }: Props) {
 
   /* GDPR-export state */
   const [exporting, setExporting] = useState(false);
+
+  /* Geblokkeerde gebruikers (Guideline 1.2) */
+  const [blocks, setBlocks] = useState<BlockedUser[]>([]);
+  const [blocksLoading, setBlocksLoading] = useState(true);
+  const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
   /* GDPR-delete state */
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -388,6 +395,57 @@ export function ProfileScreen({ navigation }: Props) {
       }
     },
     [memoryEnabled, show]
+  );
+
+  /* ----- Geblokkeerde gebruikers: initial load ----- */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await listBlocks();
+        if (!cancelled) setBlocks(list);
+      } catch {
+        /* stil: een lege blokkeerlijst is geen blokkerende fout */
+      } finally {
+        if (!cancelled) setBlocksLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ----- Geblokkeerde gebruiker deblokkeren ----- */
+  const handleUnblock = useCallback(
+    (blockedId: string, nickname: string | null) => {
+      Alert.alert(
+        'Deblokkeren',
+        `Je ziet voortaan opnieuw berichten en reacties van ${
+          nickname || 'deze gebruiker'
+        }.`,
+        [
+          { text: 'Annuleren', style: 'cancel' },
+          {
+            text: 'Deblokkeren',
+            onPress: async () => {
+              setUnblockingId(blockedId);
+              try {
+                await unblockUser(blockedId);
+                setBlocks((prev) =>
+                  prev.filter((b) => b.blocked_id !== blockedId)
+                );
+                show('Gebruiker gedeblokkeerd.', 'success');
+              } catch (err: any) {
+                show(err.message || 'Deblokkeren mislukt.', 'error');
+              } finally {
+                setUnblockingId(null);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [show]
   );
 
   /* ----- GDPR-export ----- */
@@ -740,7 +798,50 @@ export function ProfileScreen({ navigation }: Props) {
           </Pressable>
         </Section>
 
-        {/* ----- 6. MIJN GEGEVENS (GDPR) ----- */}
+        {/* ----- 6. GEBLOKKEERDE GEBRUIKERS ----- */}
+        <Section title="Geblokkeerde gebruikers">
+          <Text style={styles.gdprIntro}>
+            Je ziet geen berichten of reacties meer van geblokkeerde
+            gebruikers. Hier kan je dat ongedaan maken.
+          </Text>
+
+          {blocksLoading ? (
+            <ActivityIndicator
+              color={colors.primary}
+              style={{ marginVertical: spacing.md }}
+            />
+          ) : blocks.length === 0 ? (
+            <Text style={styles.blockEmpty}>
+              Je hebt niemand geblokkeerd.
+            </Text>
+          ) : (
+            blocks.map((b) => (
+              <View key={b.blocked_id} style={styles.blockRow}>
+                <Text style={styles.blockNick} numberOfLines={1}>
+                  {b.nickname || 'Onbekende gebruiker'}
+                </Text>
+                <Pressable
+                  onPress={() => handleUnblock(b.blocked_id, b.nickname)}
+                  disabled={unblockingId === b.blocked_id}
+                  style={({ pressed }) => [
+                    styles.unblockBtn,
+                    pressed && styles.btnPressed,
+                    unblockingId === b.blocked_id && styles.btnDisabled,
+                  ]}
+                  hitSlop={6}
+                >
+                  {unblockingId === b.blocked_id ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text style={styles.unblockBtnText}>Deblokkeren</Text>
+                  )}
+                </Pressable>
+              </View>
+            ))
+          )}
+        </Section>
+
+        {/* ----- 7. MIJN GEGEVENS (GDPR) ----- */}
         <Section title="Mijn gegevens">
           <Text style={styles.gdprIntro}>
             Onder de AVG/GDPR heb je recht op inzage en op verwijdering van je
@@ -783,7 +884,7 @@ export function ProfileScreen({ navigation }: Props) {
           </Pressable>
         </Section>
 
-        {/* ----- 7. JURIDISCH ----- */}
+        {/* ----- 8. JURIDISCH ----- */}
         <Section title="Juridisch">
           <Pressable
             onPress={() => Linking.openURL(PRIVACY_URL)}
@@ -1121,6 +1222,43 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     fontStyle: 'italic',
   },
+  /* Geblokkeerde gebruikers */
+  blockEmpty: {
+    fontSize: 13,
+    color: colors.gray,
+    fontStyle: 'italic',
+  },
+  blockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light,
+  },
+  blockNick: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.dark,
+  },
+  unblockBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.bg,
+    minWidth: 96,
+    alignItems: 'center',
+  },
+  unblockBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+
   /* Buttons */
   btnSecondary: {
     flexDirection: 'row',

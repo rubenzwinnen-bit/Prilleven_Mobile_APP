@@ -76,6 +76,10 @@ export {
   editReply,
   togglePostPin,
   getIsAdmin,
+  reportCommunityTarget,
+  listBlocks,
+  blockUser,
+  unblockUser,
   categoryInfo,
   POST_CATEGORIES,
   POST_BODY_MAX,
@@ -87,6 +91,7 @@ export type {
   CommunityPost,
   CommunityReply,
   CategoryInfo,
+  BlockedUser,
 } from './community';
 /* NB: createReply + REPLY_BODY_MAX bestaan ook in community.ts — die
    botsing vermijden we door de chatRooms-varianten niet via de barrel
@@ -110,6 +115,7 @@ export {
   markTopicRead,
   pinTopic,
   updateRoom,
+  reportChatTarget,
   getCurrentUserId,
   isWithinEditWindow,
   roomEmoji,

@@ -38,6 +38,7 @@ import { colors, radius, spacing, shadows } from '../constants/theme';
 import type { LandingTabParamList } from '../navigation/types';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../components/Toast';
+import { openModerationMenu } from '../lib/moderation';
 import {
   listPosts,
   createPost,
@@ -51,6 +52,8 @@ import {
   editReply,
   getIsAdmin,
   getCurrentUserId,
+  reportCommunityTarget,
+  blockUser,
   categoryInfo,
   POST_BODY_MAX,
   REPLY_BODY_MAX,
@@ -110,14 +113,29 @@ function ReplyRow({
   currentUserId,
   onUpdated,
   onDeleted,
+  onUserBlocked,
 }: {
   reply: CommunityReply;
   currentUserId: string | null;
   onUpdated: (reply: CommunityReply) => void;
   onDeleted: (replyId: string) => void;
+  onUserBlocked: (userId: string) => void;
 }) {
   const { show } = useToast();
   const isOwner = !!currentUserId && reply.user_id === currentUserId;
+
+  const onModerate = useCallback(() => {
+    openModerationMenu({
+      targetLabel: 'Reactie',
+      authorName: reply.nickname,
+      onReport: () => reportCommunityTarget('reply', reply.id),
+      onBlock: async () => {
+        await blockUser(reply.user_id);
+        onUserBlocked(reply.user_id);
+      },
+      show,
+    });
+  }, [reply.id, reply.nickname, reply.user_id, onUserBlocked, show]);
 
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(reply.body);
@@ -210,15 +228,23 @@ function ReplyRow({
             {relTime(reply.created_at)}
             {reply.edited_at ? ' · bewerkt' : ''}
           </Text>
-          {isOwner && !editing ? (
-            <View style={styles.ownerActions}>
-              <Pressable onPress={onStartEdit} hitSlop={8}>
-                <Feather name="edit-2" size={13} color={colors.gray} />
-              </Pressable>
-              <Pressable onPress={onDelete} hitSlop={8}>
-                <Feather name="trash-2" size={13} color={colors.gray} />
-              </Pressable>
-            </View>
+          {!editing ? (
+            isOwner ? (
+              <View style={styles.ownerActions}>
+                <Pressable onPress={onStartEdit} hitSlop={8}>
+                  <Feather name="edit-2" size={13} color={colors.gray} />
+                </Pressable>
+                <Pressable onPress={onDelete} hitSlop={8}>
+                  <Feather name="trash-2" size={13} color={colors.gray} />
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.ownerActions}>
+                <Pressable onPress={onModerate} hitSlop={8}>
+                  <Feather name="more-horizontal" size={15} color={colors.gray} />
+                </Pressable>
+              </View>
+            )
           ) : null}
         </View>
 
@@ -298,6 +324,7 @@ function PostCard({
   onPostUpdated,
   onPostDeleted,
   onPinChanged,
+  onUserBlocked,
 }: {
   post: CommunityPost;
   currentUserId: string | null;
@@ -305,6 +332,7 @@ function PostCard({
   onPostUpdated: (post: CommunityPost) => void;
   onPostDeleted: (postId: string) => void;
   onPinChanged: (postId: string, isPinned: boolean) => void;
+  onUserBlocked: (userId: string) => void;
 }) {
   const { show } = useToast();
 
@@ -397,6 +425,30 @@ function PostCard({
     setReplies((prev) => prev.filter((r) => r.id !== replyId));
     setReplyCount((c) => Math.max(0, c - 1));
   }, []);
+
+  /* Auteur van een reactie geblokkeerd → reacties lokaal verbergen
+     + doorgeven aan de tijdlijn zodat ook posts verdwijnen. */
+  const onReplyUserBlocked = useCallback(
+    (userId: string) => {
+      setReplies((prev) => prev.filter((r) => r.user_id !== userId));
+      onUserBlocked(userId);
+    },
+    [onUserBlocked]
+  );
+
+  /* Moderatie van de post zelf (niet-eigenaar). */
+  const onModerate = useCallback(() => {
+    openModerationMenu({
+      targetLabel: 'Bericht',
+      authorName: post.nickname,
+      onReport: () => reportCommunityTarget('post', post.id),
+      onBlock: async () => {
+        await blockUser(post.user_id);
+        onUserBlocked(post.user_id);
+      },
+      show,
+    });
+  }, [post.id, post.nickname, post.user_id, onUserBlocked, show]);
 
   const onToggleLike = useCallback(async () => {
     if (liking) return;
@@ -492,7 +544,7 @@ function PostCard({
             </Text>
           </View>
         ) : null}
-        {(isOwner || isAdmin) && !editing ? (
+        {!editing ? (
           <View style={styles.ownerActions}>
             {isAdmin ? (
               <Pressable
@@ -516,7 +568,11 @@ function PostCard({
                   <Feather name="trash-2" size={16} color={colors.gray} />
                 </Pressable>
               </>
-            ) : null}
+            ) : (
+              <Pressable onPress={onModerate} hitSlop={8}>
+                <Feather name="more-horizontal" size={18} color={colors.gray} />
+              </Pressable>
+            )}
           </View>
         ) : null}
       </View>
@@ -627,6 +683,7 @@ function PostCard({
                 currentUserId={currentUserId}
                 onUpdated={onReplyUpdated}
                 onDeleted={onReplyDeleted}
+                onUserBlocked={onReplyUserBlocked}
               />
             ))
           )}
@@ -899,6 +956,12 @@ export function TimelineScreen() {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
   }, []);
 
+  /* Gebruiker geblokkeerd → al hun content (posts + gevolgde topics) uit
+     de feed halen. Bij de volgende refresh filtert de server ze ook weg. */
+  const onUserBlocked = useCallback((userId: string) => {
+    setPosts((prev) => prev.filter((p) => p.user_id !== userId));
+  }, []);
+
   /* Pin-status gewijzigd → lokaal bijwerken + gepinde posts naar boven
      (stabiele sort behoudt de volgorde binnen elke groep). */
   const onPinChanged = useCallback((postId: string, isPinned: boolean) => {
@@ -939,6 +1002,7 @@ export function TimelineScreen() {
                   onPostUpdated={onPostUpdated}
                   onPostDeleted={onPostDeleted}
                   onPinChanged={onPinChanged}
+                  onUserBlocked={onUserBlocked}
                 />
               )
             }

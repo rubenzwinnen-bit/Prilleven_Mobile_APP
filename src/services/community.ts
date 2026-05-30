@@ -365,6 +365,67 @@ export async function togglePostPin(
 }
 
 /* ----------------------------------------
+   reportCommunityTarget (App Store Guideline 1.2)
+   POST /api/community/report { target_type, target_id, reason? }
+   target_type: 'post' | 'reply'. Server slaat op in community_reports
+   en toont het in de admin-queue. 201 = ontvangen.
+---------------------------------------- */
+export async function reportCommunityTarget(
+  targetType: 'post' | 'reply',
+  targetId: string,
+  reason?: string
+): Promise<void> {
+  const response = await authedFetch('/api/community/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      target_type: targetType,
+      target_id: targetId,
+      reason: reason ?? null,
+    }),
+  });
+  await jsonOrThrow<{ ok: boolean }>(response);
+}
+
+/* ----------------------------------------
+   BLOCKS — eenrichtings gebruiker blokkeren (Guideline 1.2)
+   De blocker verbergt alle content van de geblokkeerde gebruiker
+   (tijdlijn + chatruimtes). De geblokkeerde merkt niets.
+
+   GET    /api/community/blocks         → eigen blocklijst
+   POST   /api/community/blocks         → blokkeren { blocked_id }
+   DELETE /api/community/blocks/:id     → deblokkeren
+---------------------------------------- */
+export interface BlockedUser {
+  blocked_id: string;
+  nickname: string | null;
+  created_at: string;
+}
+
+export async function listBlocks(): Promise<BlockedUser[]> {
+  const response = await authedFetch('/api/community/blocks');
+  const data = await jsonOrThrow<{ blocks: BlockedUser[] }>(response);
+  return data?.blocks ?? [];
+}
+
+export async function blockUser(blockedId: string): Promise<void> {
+  const response = await authedFetch('/api/community/blocks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blocked_id: blockedId }),
+  });
+  await jsonOrThrow<{ ok: boolean }>(response);
+}
+
+export async function unblockUser(blockedId: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/community/blocks/${encodeURIComponent(blockedId)}`,
+    { method: 'DELETE' }
+  );
+  await jsonOrThrow<{ ok: boolean }>(response);
+}
+
+/* ----------------------------------------
    getIsAdmin
    GET /api/subscription-status?email= → { is_admin }
    Bepaalt of de admin-only composer getoond wordt. Stille false bij fout.
