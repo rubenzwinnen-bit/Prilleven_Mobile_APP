@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-05-30 — Store-compliance + V3.0.0 release-build (v2.20.0 → v3.0.0)
+
+**Context**: Voorbereiding op de eerste publieke release in de App Store + Play Store. Eerst een compliance-review uitgevoerd om store-rejections te vermijden, daarna de gevonden code-gaten gedicht en de grote V3.0.0-release gebouwd (alle features sinds v2.11.0 zaten al in `src/` maar waren nog niet als major release gebundeld/gebouwd).
+
+### Afgerond deze sessie
+
+- **Compliance-review** — gestructureerde checklist opgeleverd: ontbrekende in-app privacy-link, geen voorwaarden-pagina, geen consent-zin bij registratie + store-console TODO's (data safety, demo-account, content rating, screenshots).
+- **v2.20.0 — juridische links (store-compliance)**:
+  - `ProfileScreen.tsx` — nieuwe **Juridisch**-sectie: Privacybeleid (`shield`) + Gebruiksvoorwaarden (`file-text`), elk `Linking.openURL` naar `PRIVACY_URL`/`TERMS_URL`.
+  - `AuthScreen.tsx` — consent-zin op de register-tab (tappable links) + altijd-zichtbare juridische footer onder de card. Constants `PRIVACY_URL`/`TERMS_URL`.
+  - Web-project: **`voorwaarden.html`** aangemaakt (`~/Desktop/Project_weekschema_Productie/`, commit 2ce5a50) — 13 secties, zelfde stijl als `privacy.html`, incl. HapjesHeld geen-medisch-advies disclaimer. Bereikbaar op `community-web.prilleven.be/voorwaarden.html`.
+- **v3.0.0 — grote release** (geen nieuwe feature-code, wel major version-bump + release-notes + builds): bundelt alle features sinds v2.11.0 (community-tijdlijn + eigen-content CRUD + likes + pinnen, chatruimtes + volgen + topic-follow + admin-intro, Learnings-viewer + PDF.js-viewer + bladwijzer/video-positie-sync, allergenen-flow feature-compleet, New Architecture).
+
+### Status
+
+- `npx tsc --noEmit` groen.
+- **Beide EAS production-builds succesvol gequeued** (`--profile production --non-interactive --no-wait`):
+  - Android (AAB): `https://expo.dev/accounts/prilleven/projects/prilleven-mobile-app/builds/bb8549ab-9da9-4bb6-b515-d9748fe078b8`
+  - iOS: `https://expo.dev/accounts/prilleven/projects/prilleven-mobile-app/builds/8813f95f-8201-4c4a-a4f5-880fb94a0202`
+- EAS `autoIncrement` schreef de build-nummers terug naar `app.json` (buildNumber 62→63, versionCode 66→67); die write-back is gecommit.
+- Git clean, alles gepusht naar `main` (commits cd1114a v2.20.0, 616ade4 v3.0.0, 83fdcec build-nummers).
+
+### Versie
+
+`app.json.version` **3.0.0** · `ios.buildNumber` **63** · `android.versionCode` **67**. Nieuwe **builds** (geen EAS Update).
+
+### Volgende stap
+
+Store-console-administratie afronden (handmatig, kan Claude niet doen): data safety / privacy labels invullen (privacy-URL = `community-web.prilleven.be/privacy.html`), demo-account voor reviewers, content rating, screenshots/icon/feature graphic. Daarna `eas submit` naar TestFlight + Play Internal zodra de builds klaar zijn en de listings ingevuld.
+
+### Open vragen / blockers
+
+- Builds draaien nog op EAS (gequeued met `--no-wait`) — uitkomst nog niet geverifieerd.
+- Store-listings + privacy-labels nog niet ingevuld in de consoles (user-taak).
+
+---
+
 ## 2026-05-29 — Chatruimtes CRUD-MVP (v2.11.0)
 
 **Context**: Tijdlijn-MVP stond op v2.10.0 met de footer-navigatie (`LandingTabs`, 3 tabs) en Chatruimtes als placeholder-scherm. Deze sessie heeft Chatruimtes uitgewerkt tot een volledige CRUD-MVP, parity met de website (`api/chat-rooms.mjs`).

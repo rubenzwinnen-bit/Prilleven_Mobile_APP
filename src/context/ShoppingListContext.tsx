@@ -82,7 +82,12 @@ export function ShoppingListProvider({
 
       let changed = false;
       const updatedIngredients = currentList.ingredients.map(ing => {
-        const normalized = normalizeIngredientName(ing.name);
+        // Gebruik de STABIELE genormaliseerde sleutel (key = "normalized|unit"),
+        // niet de (mogelijk al door een vorige refresh vervangen) display-naam.
+        // Anders drift de lookup bij elke refresh weg: "goji bessen" → "goji bess"
+        // → display "Goji Bess" → bij de volgende refresh normalize("Goji Bess")
+        // → "goji bes" → "Goji Bes" → "goji be" → geen match meer (emoji-fallback).
+        const normalized = ing.key.split('|')[0] || normalizeIngredientName(ing.name);
         const newUrl = iconMap.get(normalized) || undefined;
         const adminName = nameMap.get(normalized);
         const newName = adminName || ing.name;

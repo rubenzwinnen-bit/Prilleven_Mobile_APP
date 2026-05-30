@@ -1,6 +1,6 @@
 # CLAUDE.md — Pril Leven Mobile App
 
-Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v2.19.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
+Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op basis van een volledige lezing van de codebase op `v2.6.0` en bijgewerkt t/m `v3.0.0`. Toekomstige Claude-sessies moeten dit bijwerken zodra de waarheid afwijkt.
 
 > Zusterproject: de **web-app** in `~/Desktop/Project_weekschema_Productie/` heeft een eigen, uitgebreide `CLAUDE.md` per laag (root, `/js`, `/api`, `/supabase-migrations`). De mobiele app deelt **dezelfde Supabase-database en dezelfde Vercel-API** als de web-app — niet duplicaten.
 
@@ -30,8 +30,8 @@ Lees dit ALTIJD eerst voordat je code wijzigt. Dit document is geschreven op bas
 | Learnings-viewer | `react-native-webview` (blog-HTML + eigen PDF.js-viewer) + `expo-video` (video) |
 | Tegels herordenen | `react-native-draggable-flatlist` `^4.0.3` + `react-native-reanimated` **`4.1.1`** (exact) + `react-native-worklets` **`0.5.1`** (exact) + `react-native-gesture-handler` `~2.28.0` |
 | Build/release | EAS, project-id `996391c7-00d0-4d2e-8113-fa3f9b79e0a9`, owner `prilleven` |
-| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `58` (v2.19.0) |
-| Android pkg | `be.prilleven.mobileapp`, versionCode `62` (v2.19.0) |
+| iOS bundle | `be.prilleven.mobileapp`, ascAppId `6762270908`, buildNumber `63` (v3.0.0) |
+| Android pkg | `be.prilleven.mobileapp`, versionCode `67` (v3.0.0) |
 
 Node ≥ 20 lokaal voor Expo CLI.
 
@@ -153,9 +153,9 @@ navigation.getParent()?.getParent()?.goBack();
 
 | Bestand | Belangrijkste functies |
 |---|---|
-| `AuthScreen.tsx` | 3 tabs (login/register/reset). Whitelist-check vóór signup. Logo + sage/primary kleuren. |
+| `AuthScreen.tsx` | 3 tabs (login/register/reset). Whitelist-check vóór signup. Logo + sage/primary kleuren. **Store-compliance (v2.20.0)**: consent-zin op de register-tab ("Door een account aan te maken ga je akkoord met onze gebruiksvoorwaarden en privacybeleid", tappable `Text`-links) + altijd-zichtbare juridische footer (Privacybeleid · Gebruiksvoorwaarden) onder de card. Constants `PRIVACY_URL`/`TERMS_URL` → `Linking.openURL`. |
 | `LandingScreen.tsx` | 4 grote tegels (`DraggableTile`), **alleen titel, tekst links-midden** (`tileBg` `justifyContent:'center'`, v2.18.0). Standaard-volgorde: Receptenboek & Weekschema → HapjesHeld 2.0 → Learnings → Allergenen-introductie. **Herordenen (v2.18.0)**: `react-native-draggable-flatlist` + `react-native-reanimated`. Lang drukken op een tegel → `editing`-modus: alle tegels wiebelen (reanimated `withRepeat`/`withSequence` rotatie ±1.3°), elke tegel toont een `move`-handle, en de actieve tegel schaalt 1.04. Sleep → `onDragEnd` → `persistOrder` slaat de key-volgorde op in AsyncStorage `receptenboek_landing_tile_order_<email>`. "Klaar"-knop verlaat edit-modus. In edit-modus navigeert tappen niet. `applyOrder(order)` herschikt `TILES` op opgeslagen keys (onbekende achteraan). + `AvatarButton` rechtsboven → `Profile`. `useFocusEffect` refresht `community avatar_url`. `navigateFor(key)`: Main / HapjesHeld / Learnings / AllergenenChildren. |
-| `ProfileScreen.tsx` | 6 secties: **Account** (e-mail + uitloggen), **Community** (nickname-input met regex-validatie + Opslaan-knop, avatar-blok met `AvatarButton`-preview + "Foto kiezen/wijzigen/Verwijderen", upload-pipeline: `expo-image-picker` → `expo-image-manipulator` resize 512px JPEG q=0.8 → signed Storage URL → `PUT /api/community/profile { avatar_path }`), **Mijn kinderen** (knop → `ChildrenScreen`), **Dieet in het gezin** (9 chips uit `DIET_OPTIONS`, optimistic toggle met 400ms debounce + saveInFlight-ref + pending-queue, status-pill saving/saved/error, flush-on-unmount; vereist bestaand community-profile anders inline hint), **Voorkeuren & privacy** (HapjesHeld memory-toggle via `Switch`, optimistic + rollback, plus knop "Bekijk opgeslagen geheugen →" naar `MemoriesScreen`), **Mijn gegevens** (GDPR-export via `File`/`Paths` + `Sharing.shareAsync`, GDPR-delete via 2-staps modal met `VERWIJDER`-bevestiging). Header: `ChevronBack` + titel. Lokale `ChevronBack` om require-cycle met RootStack te vermijden. |
+| `ProfileScreen.tsx` | 6 secties: **Account** (e-mail + uitloggen), **Community** (nickname-input met regex-validatie + Opslaan-knop, avatar-blok met `AvatarButton`-preview + "Foto kiezen/wijzigen/Verwijderen", upload-pipeline: `expo-image-picker` → `expo-image-manipulator` resize 512px JPEG q=0.8 → signed Storage URL → `PUT /api/community/profile { avatar_path }`), **Mijn kinderen** (knop → `ChildrenScreen`), **Dieet in het gezin** (9 chips uit `DIET_OPTIONS`, optimistic toggle met 400ms debounce + saveInFlight-ref + pending-queue, status-pill saving/saved/error, flush-on-unmount; vereist bestaand community-profile anders inline hint), **Voorkeuren & privacy** (HapjesHeld memory-toggle via `Switch`, optimistic + rollback, plus knop "Bekijk opgeslagen geheugen →" naar `MemoriesScreen`), **Mijn gegevens** (GDPR-export via `File`/`Paths` + `Sharing.shareAsync`, GDPR-delete via 2-staps modal met `VERWIJDER`-bevestiging), **Juridisch** (v2.20.0 — Privacybeleid + Gebruiksvoorwaarden, elk `Linking.openURL` naar `PRIVACY_URL`/`TERMS_URL` op `community-web.prilleven.be`). Header: `ChevronBack` + titel. Lokale `ChevronBack` om require-cycle met RootStack te vermijden. |
 | `ChildrenScreen.tsx` | Lijst van kinderen (cards met naam + leeftijd via `formatAge`, optionele detail-rows voor bekende allergieën, geïntroduceerde allergenen, eerdere reacties, opmerkingen). `useFocusEffect` herlaadt na terugkeer uit `ChildForm`. Edit-knop → `navigate('ChildForm', { childId })`, verwijder-knop → `Alert.alert` confirm → `archiveChild` (soft delete). "Kind toevoegen"-CTA onderaan. Header: `ChevronBack` + titel. **NB v2.6.0**: de allergeen-flow start niet meer hier maar vanaf het landingscherm (Allergenen-tile → `AllergenenChildrenScreen`). |
 | `ChildFormScreen.tsx` | Add/edit-formulier voor een kind. Route-param `childId` bepaalt edit-modus (laadt via `getChildren()` + filter — geen aparte GET-by-id endpoint). Velden + validatie (parity met website-UI sinds verwijdering textuur/eczeem): naam (verplicht, max 50), geboortedatum (regex `^\d{4}-\d{2}-\d{2}$`, max vandaag, min 10 jaar terug — v2.8.4: validatie gebruikt lokale getters i.p.v. UTC zodat geboortedatum vandaag/morgen geen timezone-fout geeft), known_allergies (9 chips uit `KNOWN_ALLERGEN_OPTIONS`), previous_reactions (textarea max 1000), notes (textarea max 500). `KeyboardAvoidingView` op iOS. Op succes: `goBack()` → ChildrenScreen herlaadt automatisch. |
 | `AllergenenChildrenScreen.tsx` | Kind-picker voor de allergeen-flow (v2.6.0). Bereikbaar via de "Allergenen-introductie"-tile op `LandingScreen`. Laadt `getChildren()` met `useFocusEffect`. Toont per kind een kaart (naam + leeftijd via `formatAge` + chevron); tap → `navigate('EersteHapjes', { childId })`. Bij 0 kinderen: empty-state met CTA naar `Children` om er eerst een aan te maken. Header: `ChevronBack` + titel. |
@@ -322,8 +322,8 @@ Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen 
 - Branch `main` = productie. Grotere features → feature branch + merge.
 
 ### Versionering
-- `app.json.expo.version` = user-facing string (huidig `2.14.0`).
-- `app.json.ios.buildNumber` (`51`) + `app.json.android.versionCode` (`55`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
+- `app.json.expo.version` = user-facing string (huidig `3.0.0`).
+- `app.json.ios.buildNumber` (`63`) + `app.json.android.versionCode` (`67`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
 - `package.json.version` wordt **niet** actief gebruikt — niet syncen.
 
 ---
