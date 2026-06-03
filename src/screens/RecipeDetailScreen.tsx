@@ -32,9 +32,12 @@ import {
   rateRecipe,
   addComment,
   getActiveSchedule,
+  getChildren,
 } from '../services';
-import type { Recipe, RatingSummary, Comment, Schedule } from '../types';
+import type { Child } from '../services';
+import type { Recipe, RatingSummary, Comment } from '../types';
 import { getMealMomentLabel, WEEKDAYS, SCHEDULE_SLOTS, getSlotLabel } from '../constants/data';
+import { evaluateFamily, type ChildEvaluation, type FamilyStatus } from '../lib/familyLayer';
 
 export function RecipeDetailScreen({ route, navigation }: any) {
   const { id } = route.params;
@@ -48,6 +51,7 @@ export function RecipeDetailScreen({ route, navigation }: any) {
   const [userRating, setUserRating] = useState(0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
+  const [children, setChildren] = useState<Child[]>([]);
   const [activeInfo, setActiveInfo] = useState<{
     persons: number;
     portions: number;
@@ -59,19 +63,23 @@ export function RecipeDetailScreen({ route, navigation }: any) {
 
   const load = useCallback(async () => {
     try {
-      const [r, isF, avg, uR, cs, activeSch] = await Promise.all([
+      const [r, isF, avg, uR, cs, activeSch, kids] = await Promise.all([
         getRecipe(id),
         isFavorite(id, user),
         getAverageRating(id),
         getUserRating(id, user),
         getComments(id),
         getActiveSchedule(user),
+        /* Kinderen (family-layer) — defensief: een fout hier mag het
+           recept niet blokkeren. */
+        getChildren().catch(() => [] as Child[]),
       ]);
       setRecipe(r);
       setFav(isF);
       setAvgRating(avg);
       setUserRating(uR);
       setComments(cs);
+      setChildren(kids);
 
       // Check of dit recept in het actieve schema zit
       if (activeSch && r) {
@@ -242,6 +250,9 @@ export function RecipeDetailScreen({ route, navigation }: any) {
             )}
           </View>
 
+          {/* Voor jouw gezin (family-layer) */}
+          <FamilyLayer recipe={recipe} children={children} />
+
           {/* Actief weekschema info */}
           {activeInfo && (
             <View style={styles.activeScheduleInfo}>
@@ -337,6 +348,9 @@ export function RecipeDetailScreen({ route, navigation }: any) {
                 <Text style={styles.stepText}>{step}</Text>
               </View>
             ))}
+
+            {/* Algemene babyhapje-uitleg (papje vs. stukjes) */}
+            <BabyPrepTips />
           </View>
 
           {/* Beoordeling */}
@@ -407,6 +421,137 @@ export function RecipeDetailScreen({ route, navigation }: any) {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/* ----------------------------------------
+   FAMILY-LAYER — "Voor jouw gezin"
+   Per kind: avatar + status-badge, met gekleurde waarschuwing eronder
+   voor kinderen met een issue. Puur informatief.
+---------------------------------------- */
+const FAMILY_WARN_COLORS: Record<FamilyStatus, { border: string; bg: string }> = {
+  rood: { border: colors.danger, bg: 'rgba(192, 57, 43, 0.08)' },
+  jong: { border: colors.info, bg: 'rgba(93, 173, 226, 0.10)' },
+  oranje: { border: '#e67e22', bg: 'rgba(230, 126, 34, 0.10)' },
+  ok: { border: colors.secondary, bg: 'rgba(152, 195, 164, 0.10)' },
+};
+
+function FamilyLayer({
+  recipe,
+  children,
+}: {
+  recipe: Recipe;
+  children: Child[];
+}) {
+  if (!children || children.length === 0) return null;
+
+  const evaluated: ChildEvaluation[] = evaluateFamily(recipe, children);
+  const warnings = evaluated.filter(e => e.warnTitle);
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Voor jouw gezin</Text>
+
+      <View style={styles.familyAvatars}>
+        {evaluated.map(e => (
+          <View key={e.child.id} style={styles.familyAvatar}>
+            <View style={[styles.familyAvatarCircle, { backgroundColor: e.color }]}>
+              <Text style={styles.familyAvatarInitials}>{e.initials}</Text>
+              <View style={styles.familyAvatarBadge}>
+                <Text style={styles.familyAvatarBadgeText}>{e.icon}</Text>
+              </View>
+            </View>
+            <Text style={styles.familyAvatarName} numberOfLines={1}>
+              {e.child.name}
+            </Text>
+            <Text style={styles.familyAvatarAge}>{e.ageLabel}</Text>
+          </View>
+        ))}
+      </View>
+
+      {warnings.map(e => {
+        const c = FAMILY_WARN_COLORS[e.status];
+        return (
+          <View
+            key={e.child.id}
+            style={[
+              styles.familyWarn,
+              { borderLeftColor: c.border, backgroundColor: c.bg },
+            ]}
+          >
+            <Text style={styles.familyWarnTitle}>
+              {e.icon} {e.warnTitle}
+            </Text>
+            <Text style={styles.familyWarnText}>{e.warnText}</Text>
+          </View>
+        );
+      })}
+
+      <Text style={styles.familyNote}>Informatief, geen medisch advies.</Text>
+    </View>
+  );
+}
+
+/* ----------------------------------------
+   BABYHAPJE-TIPS — uitklapbaar (papje vs. stukjes)
+   Generiek blok, zelfde inhoud bij elk recept.
+---------------------------------------- */
+const BABY_PREP_PAPJE = [
+  'Groenten 15-20 min stomen of koken (geen bakken/grillen).',
+  'Vlees en vis meestomen; een eitje koken of bakken en meemixen.',
+  'Verdun bij de start met wat (moeder)melk.',
+  'Naar stukjes overschakelen? Plet met een vork i.p.v. mixen.',
+];
+const BABY_PREP_STUKJES = [
+  'Stukken zo groot als 2 volwassen vingers, pletbaar tussen duim en wijsvinger.',
+  'Groenten 5-10 min stomen; harde stukken fruit (appel) kort garen.',
+  'Snijd ronde soorten (druif, kerstomaat, bes) overlangs — verstikkingsrisico.',
+  'Vlees en vis volledig garen; vis uit blik tot reepjes drukken.',
+  'Geen hele noten (gevaarlijk) — gebruik notenpasta; peulvruchten als dip.',
+];
+
+function BabyPrepTips() {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.babyPrep}>
+      <Pressable
+        style={styles.babyPrepSummary}
+        onPress={() => setOpen(o => !o)}
+      >
+        <Text style={styles.babyPrepSummaryText}>
+          Kinderhapje maken — papje of stukjes
+        </Text>
+        <Text style={styles.babyPrepChevron}>{open ? '▾' : '▸'}</Text>
+      </Pressable>
+
+      {open && (
+        <View style={styles.babyPrepBody}>
+          <Text style={styles.babyPrepIntro}>
+            Papje en stukjes zijn perfect combineerbaar — kies wat bij jouw
+            kindje past. Rond 6 mnd eet het met de hele hand, rond 9 mnd
+            ontwikkelt zich de pincetgreep voor kleinere stukjes.
+          </Text>
+
+          <Text style={styles.babyPrepHeading}>Papje</Text>
+          {BABY_PREP_PAPJE.map((li, i) => (
+            <View key={i} style={styles.babyPrepLi}>
+              <Text style={styles.babyPrepBullet}>•</Text>
+              <Text style={styles.babyPrepLiText}>{li}</Text>
+            </View>
+          ))}
+
+          <Text style={styles.babyPrepHeading}>Stukjes</Text>
+          {BABY_PREP_STUKJES.map((li, i) => (
+            <View key={i} style={styles.babyPrepLi}>
+              <Text style={styles.babyPrepBullet}>•</Text>
+              <Text style={styles.babyPrepLiText}>{li}</Text>
+            </View>
+          ))}
+
+          <Text style={styles.babyPrepNote}>Informatief, geen medisch advies.</Text>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -713,5 +858,142 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.darkLight,
     marginBottom: spacing.md,
+  },
+
+  /* Family-layer */
+  familyAvatars: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  familyAvatar: {
+    alignItems: 'center',
+    width: 64,
+  },
+  familyAvatarCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  familyAvatarInitials: {
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  familyAvatarBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.sm,
+  },
+  familyAvatarBadgeText: {
+    fontSize: 11,
+  },
+  familyAvatarName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.dark,
+    maxWidth: 64,
+    textAlign: 'center',
+  },
+  familyAvatarAge: {
+    fontSize: 11,
+    color: colors.gray,
+  },
+  familyWarn: {
+    borderLeftWidth: 4,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  familyWarnTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.dark,
+    marginBottom: 2,
+  },
+  familyWarnText: {
+    fontSize: 13,
+    color: colors.darkLight,
+    lineHeight: 18,
+  },
+  familyNote: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: colors.gray,
+    marginTop: spacing.sm,
+  },
+
+  /* Babyhapje-tips (uitklapbaar) */
+  babyPrep: {
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.light,
+    paddingTop: spacing.sm,
+  },
+  babyPrepSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  babyPrepSummaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primaryDark,
+    flex: 1,
+  },
+  babyPrepChevron: {
+    fontSize: 14,
+    color: colors.primaryDark,
+    marginLeft: spacing.sm,
+  },
+  babyPrepBody: {
+    paddingTop: spacing.xs,
+  },
+  babyPrepIntro: {
+    fontSize: 13,
+    color: colors.darkLight,
+    lineHeight: 19,
+    marginBottom: spacing.sm,
+  },
+  babyPrepHeading: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.dark,
+    marginTop: spacing.sm,
+    marginBottom: 4,
+  },
+  babyPrepLi: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  babyPrepBullet: {
+    fontSize: 13,
+    color: colors.primary,
+    lineHeight: 19,
+  },
+  babyPrepLiText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.darkLight,
+    lineHeight: 19,
+  },
+  babyPrepNote: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: colors.gray,
+    marginTop: spacing.sm,
   },
 });

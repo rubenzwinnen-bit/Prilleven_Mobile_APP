@@ -26,6 +26,7 @@ function dbToRecipe(row: any): Recipe {
     ingredients: (row.ingredients || []) as Ingredient[],
     allergens: row.allergens || [],
     preparation: row.preparation || [],
+    minAgeMonths: row.min_age_months != null ? Number(row.min_age_months) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

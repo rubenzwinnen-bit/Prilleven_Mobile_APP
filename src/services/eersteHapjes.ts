@@ -401,6 +401,9 @@ export interface AllergenStateData {
   started: boolean;
   setup_done: boolean;
   pre_introduced: string[];
+  /** De gebruiker wil de allergenen-introductie voor dit kind niet
+   *  volgen (functie uitgeschakeld). Zie ChildFormScreen-keuze. */
+  opted_out?: boolean;
 }
 
 export interface EhState {

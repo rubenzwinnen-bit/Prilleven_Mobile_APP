@@ -159,8 +159,9 @@ export {
 export type { Memory } from './memory';
 export {
   countNewAdminTimelinePosts,
-  countNewAdminChatroomPosts,
+  countNewAdminChatroomActivity,
 } from './notifications';
+export type { ChatroomActivity } from './notifications';
 export {
   ALLERGEN_FLOW,
   ALLERGEN_COOLDOWN_DAYS,

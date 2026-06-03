@@ -13,6 +13,14 @@
  *   - previous_reactions    (textarea, max 1000)
  *   - notes                 (textarea, max 500)
  *
+ * Allergenen-introductie keuze (parity met web `renderKindForm`, Optie B):
+ *   - "Al geïntroduceerde allergenen" checkbox-grid → pre_introduced
+ *   - twee elkaar uitsluitende keuzes: introductie nog volgen / functie
+ *     uitschakelen (opted_out). Bij bewerken vooraf ingevuld uit ehState.
+ *   - validatie: minstens 1 vakje OF 1 van de 2 keuzes aangevinkt.
+ *   - na opslaan kind: `patchEhState` met pre_introduced + opted_out
+ *     (niet-blokkerend; kind is dan al opgeslagen).
+ *
  * Op succes: `navigation.goBack()` → ChildrenScreen herlaadt via
  * useFocusEffect.
  */
@@ -42,6 +50,8 @@ import {
   getChildren,
   createChild,
   updateChild,
+  getEhState,
+  patchEhState,
   BIRTHDATE_REGEX,
   KNOWN_ALLERGEN_OPTIONS,
 } from '../services';
@@ -267,6 +277,11 @@ export function ChildFormScreen({ navigation, route }: Props) {
   const [previousReactions, setPreviousReactions] = useState('');
   const [notes, setNotes] = useState('');
 
+  /* Allergenen-introductie keuze (Optie B, parity met web). */
+  const [preIntroduced, setPreIntroduced] = useState<string[]>([]);
+  const [prepFollow, setPrepFollow] = useState(false);
+  const [prepDisable, setPrepDisable] = useState(false);
+
   /* Bestaand kind ophalen wanneer edit. `getChildren()` is OK omdat de
      lijst klein is; geen aparte GET /api/children/:id endpoint. */
   useEffect(() => {
@@ -287,6 +302,25 @@ export function ChildFormScreen({ navigation, route }: Props) {
         setKnownAllergies(target.known_allergies);
         setPreviousReactions(target.previous_reactions ?? '');
         setNotes(target.notes ?? '');
+
+        /* Allergenen-keuze ophalen uit ehState zodat de tegels + keuzes
+           vooraf juist staan. Niet-blokkerend (getEhState throwt als er nog
+           geen state is) → form toont dan lege keuze. Web-parity:
+           prepFollow = !optedOut bij bewerken. */
+        try {
+          const ehState = await getEhState(editingId);
+          if (cancelled) return;
+          const a = ehState?.allergen_state;
+          const optedOut = !!a?.opted_out;
+          setPreIntroduced(Array.isArray(a?.pre_introduced) ? a.pre_introduced : []);
+          setPrepDisable(optedOut);
+          setPrepFollow(!optedOut);
+        } catch {
+          if (cancelled) return;
+          setPreIntroduced([]);
+          setPrepDisable(false);
+          setPrepFollow(true);
+        }
       } catch (err: any) {
         if (!cancelled) {
           show(err.message || 'Kon kind niet laden.', 'error');
@@ -315,6 +349,38 @@ export function ChildFormScreen({ navigation, route }: Props) {
     );
   }, []);
 
+  const togglePreIntroduced = useCallback((key: string) => {
+    setPreIntroduced(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  }, []);
+
+  const allPreSelected =
+    preIntroduced.length === KNOWN_ALLERGEN_OPTIONS.length;
+  const toggleAllPre = useCallback(() => {
+    setPreIntroduced(prev =>
+      prev.length === KNOWN_ALLERGEN_OPTIONS.length
+        ? []
+        : KNOWN_ALLERGEN_OPTIONS.map(o => o.key)
+    );
+  }, []);
+
+  /* Twee elkaar uitsluitende keuzes. */
+  const onTogglePrepFollow = useCallback(() => {
+    setPrepFollow(prev => {
+      const next = !prev;
+      if (next) setPrepDisable(false);
+      return next;
+    });
+  }, []);
+  const onTogglePrepDisable = useCallback(() => {
+    setPrepDisable(prev => {
+      const next = !prev;
+      if (next) setPrepFollow(false);
+      return next;
+    });
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (saving || loading) return;
     // Validatie-feedback i.p.v. stilzwijgend de knop disabled houden:
@@ -339,6 +405,14 @@ export function ChildFormScreen({ navigation, route }: Props) {
       show('Opmerkingen mag max 500 tekens zijn.', 'error');
       return;
     }
+    // Allergenen-keuze: minstens 1 vakje OF 1 van de 2 opties (web-parity).
+    if (!prepFollow && !prepDisable && preIntroduced.length === 0) {
+      show(
+        'Maak een keuze onder "Al geïntroduceerde allergenen": vink één van de twee opties aan, of selecteer minstens één allergeen.',
+        'error'
+      );
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -354,6 +428,21 @@ export function ChildFormScreen({ navigation, route }: Props) {
       } else {
         result = await createChild(payload);
       }
+
+      /* Allergenen-keuze opslaan in eerste_hapjes_state (nieuw kind én
+         bewerken). Niet-blokkerend: het kind is al opgeslagen. */
+      const targetChildId = isEdit && editingId ? editingId : result.id;
+      if (targetChildId) {
+        const allergenPatch = prepDisable
+          ? { opted_out: true, setup_done: true }
+          : { pre_introduced: preIntroduced, setup_done: true, opted_out: false };
+        try {
+          await patchEhState(targetChildId, { allergen_state: allergenPatch });
+        } catch {
+          /* niet-blokkerend */
+        }
+      }
+
       show(
         isEdit ? `${result.name} bijgewerkt.` : `${result.name} toegevoegd.`,
         'success'
@@ -373,6 +462,9 @@ export function ChildFormScreen({ navigation, route }: Props) {
     knownAllergies,
     previousReactions,
     notes,
+    prepFollow,
+    prepDisable,
+    preIntroduced,
     isEdit,
     editingId,
     navigation,
@@ -488,6 +580,50 @@ export function ChildFormScreen({ navigation, route }: Props) {
             />
             <Text style={styles.fieldHint}>{notes.length}/500 tekens</Text>
 
+            {/* Allergenen-introductie keuze (Optie B, parity met web) */}
+            <View style={styles.prepHead}>
+              <Text style={[styles.fieldLabel, { marginBottom: 0 }]}>
+                Al geïntroduceerde allergenen
+              </Text>
+              <Pressable onPress={toggleAllPre} hitSlop={8} disabled={saving}>
+                <Text style={styles.prepLink}>
+                  {allPreSelected ? 'Alles deselecteren' : 'Alles selecteren'}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.fieldHint}>
+              Vink aan welke allergenen je kindje al regelmatig en zonder
+              reactie heeft gegeten. Deze slaan we over in de
+              allergenen-tracker.
+            </Text>
+            <View style={styles.prepList}>
+              {KNOWN_ALLERGEN_OPTIONS.map(opt => (
+                <CheckRow
+                  key={opt.key}
+                  label={`${opt.icon} ${opt.label}`}
+                  checked={preIntroduced.includes(opt.key)}
+                  onPress={() => togglePreIntroduced(opt.key)}
+                  disabled={saving}
+                />
+              ))}
+            </View>
+            <View style={styles.prepChoice}>
+              <CheckRow
+                label={'Ik ga de introductie nog volgen, zie functie "Allergenen introduceren".'}
+                checked={prepFollow}
+                onPress={onTogglePrepFollow}
+                disabled={saving}
+                multiline
+              />
+              <CheckRow
+                label={'Ik wil de functie "Allergenen introduceren" niet volgen, schakel de functie uit.'}
+                checked={prepDisable}
+                onPress={onTogglePrepDisable}
+                disabled={saving}
+                multiline
+              />
+            </View>
+
             {/* Save — altijd klikbaar; validatie geeft duidelijke toast-feedback */}
             <Pressable
               onPress={handleSave}
@@ -537,6 +673,39 @@ function Chip({
       <Text style={[styles.chipText, active && styles.chipTextActive]}>
         {label}
       </Text>
+    </Pressable>
+  );
+}
+
+function CheckRow({
+  label,
+  checked,
+  onPress,
+  disabled,
+  multiline,
+}: {
+  label: string;
+  checked: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+  multiline?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.checkRow,
+        multiline && styles.checkRowMultiline,
+        pressed && styles.btnPressed,
+      ]}
+    >
+      <Feather
+        name={checked ? 'check-square' : 'square'}
+        size={20}
+        color={checked ? colors.primary : colors.grayLight}
+      />
+      <Text style={styles.checkRowText}>{label}</Text>
     </Pressable>
   );
 }
@@ -647,6 +816,40 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: colors.white,
     fontWeight: '700',
+  },
+  prepHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
+  },
+  prepLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  prepList: {
+    marginTop: spacing.sm,
+    gap: spacing.xs,
+  },
+  prepChoice: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 6,
+  },
+  checkRowMultiline: {
+    alignItems: 'flex-start',
+  },
+  checkRowText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.dark,
+    lineHeight: 20,
   },
   saveBtn: {
     flexDirection: 'row',

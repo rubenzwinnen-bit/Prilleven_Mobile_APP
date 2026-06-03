@@ -13,9 +13,12 @@
  * Notificatie-badges (rode cijfer-rondjes) op twee tabs, gevoed door de
  * NotificationContext:
  *   Tijdlijn (logo) → nieuwe admin-posts in de tijdlijn
- *   Chatruimtes     → som van nieuwe admin-topics over alle chatruimtes
- * De badge wist bij focus op de betreffende tab (markTimelineSeen /
- * markChatroomsSeen).
+ *   Chatruimtes     → som van nieuwe admin-activiteit over alle chatruimtes
+ *
+ * De Tijdlijn-badge wist bij focus (de feed is dan zichtbaar). De
+ * Chatruimtes-badge wist NIET bij het aantikken van de tab — pas wanneer de
+ * gebruiker een room opent (zie ChatRoomScreen). Bij focus op de Chatruimtes-
+ * tab triggeren we wel een refresh() zodat de teller meteen klopt.
  */
 
 import React from 'react';
@@ -32,7 +35,7 @@ import { useNotifications } from '../context/NotificationContext';
 const Tabs = createBottomTabNavigator<LandingTabParamList>();
 
 export function LandingTabs() {
-  const { timelineCount, chatroomsCount, markTimelineSeen, markChatroomsSeen } =
+  const { timelineCount, chatroomsCount, markTimelineSeen, refresh } =
     useNotifications();
 
   return (
@@ -98,7 +101,7 @@ export function LandingTabs() {
             <Feather name="users" size={size} color={color} />
           ),
         }}
-        listeners={{ focus: () => markChatroomsSeen() }}
+        listeners={{ focus: () => refresh() }}
       />
     </Tabs.Navigator>
   );

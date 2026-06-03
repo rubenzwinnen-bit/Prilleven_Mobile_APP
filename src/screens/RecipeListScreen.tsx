@@ -26,9 +26,11 @@ import {
   getAllRatings,
   getFavoriteRecipeIds,
   toggleFavorite,
+  KNOWN_ALLERGEN_OPTIONS,
 } from '../services';
+import { normalizeAllergen } from '../lib/familyLayer';
 import { useUser } from '../context/UserContext';
-import { ALLERGENS, MEAL_MOMENTS } from '../constants/data';
+import { MEAL_MOMENTS } from '../constants/data';
 import type { Recipe, RatingSummary } from '../types';
 
 export function RecipeListScreen({ navigation }: any) {
@@ -42,11 +44,23 @@ export function RecipeListScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
 
   const [search, setSearch] = useState('');
-  const [momentFilter, setMomentFilter] = useState('');
-  const [allergenFilter, setAllergenFilter] = useState('');
+  const [momentFilter, setMomentFilter] = useState<string[]>([]);
+  const [allergenFilter, setAllergenFilter] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const filtersActive = momentFilter !== '' || allergenFilter !== '';
+  const filtersActive = momentFilter.length > 0 || allergenFilter.length > 0;
+
+  /* Toggle-helpers: voeg toe of verwijder uit de multi-select-lijst. */
+  const toggleMoment = useCallback((id: string) => {
+    setMomentFilter(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }, []);
+  const toggleAllergen = useCallback((key: string) => {
+    setAllergenFilter(prev =>
+      prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]
+    );
+  }, []);
 
   /* Helper om naar Landing te gaan (twee niveaus omhoog vanaf RecipesStack). */
   const goToLanding = useCallback(() => {
@@ -96,8 +110,22 @@ export function RecipeListScreen({ navigation }: any) {
     const q = search.trim().toLowerCase();
     return recipes.filter(r => {
       if (q && !r.name.toLowerCase().includes(q)) return false;
-      if (momentFilter && !(r.mealMoments || []).includes(momentFilter)) return false;
-      if (allergenFilter && (r.allergens || []).includes(allergenFilter)) return false;
+      /* Eetmomenten: recept moet minstens één geselecteerd moment bevatten. */
+      if (
+        momentFilter.length > 0 &&
+        !momentFilter.some(m => (r.mealMoments || []).includes(m))
+      ) {
+        return false;
+      }
+      /* Allergenen wegfilteren: verberg recept als het één van de
+         geselecteerde allergenen bevat. Recept-allergenen worden
+         genormaliseerd (legacy → canoniek) zodat ze matchen met de 9 keys. */
+      if (allergenFilter.length > 0) {
+        const recipeAllergens = new Set(
+          (r.allergens || []).map(normalizeAllergen)
+        );
+        if (allergenFilter.some(a => recipeAllergens.has(a))) return false;
+      }
       return true;
     });
   }, [recipes, search, momentFilter, allergenFilter]);
@@ -153,15 +181,15 @@ export function RecipeListScreen({ navigation }: any) {
           >
             <FilterChip
               label="Alle eetmomenten"
-              active={momentFilter === ''}
-              onPress={() => setMomentFilter('')}
+              active={momentFilter.length === 0}
+              onPress={() => setMomentFilter([])}
             />
             {MEAL_MOMENTS.map(m => (
               <FilterChip
                 key={m.id}
                 label={m.label}
-                active={momentFilter === m.id}
-                onPress={() => setMomentFilter(m.id)}
+                active={momentFilter.includes(m.id)}
+                onPress={() => toggleMoment(m.id)}
               />
             ))}
           </ScrollView>
@@ -173,15 +201,15 @@ export function RecipeListScreen({ navigation }: any) {
           >
             <FilterChip
               label="Geen allergenen filter"
-              active={allergenFilter === ''}
-              onPress={() => setAllergenFilter('')}
+              active={allergenFilter.length === 0}
+              onPress={() => setAllergenFilter([])}
             />
-            {ALLERGENS.map(a => (
+            {KNOWN_ALLERGEN_OPTIONS.map(a => (
               <FilterChip
-                key={a}
-                label={`zonder ${a}`}
-                active={allergenFilter === a}
-                onPress={() => setAllergenFilter(a)}
+                key={a.key}
+                label={`zonder ${a.icon} ${a.label}`}
+                active={allergenFilter.includes(a.key)}
+                onPress={() => toggleAllergen(a.key)}
               />
             ))}
           </ScrollView>

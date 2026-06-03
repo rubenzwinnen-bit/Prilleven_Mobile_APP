@@ -201,13 +201,21 @@ export function ChildrenScreen({ navigation }: Props) {
                     .join(', ')}
                 />
               )}
-              {child.introduced_allergens.length > 0 && (
+              {child.allergens_opted_out ? (
                 <DetailRow
                   label="Geïntroduceerd"
-                  value={child.introduced_allergens
-                    .map(allergenLabel)
-                    .join(', ')}
+                  value="Functie uitgeschakeld"
+                  muted
                 />
+              ) : (
+                child.introduced_allergens.length > 0 && (
+                  <DetailRow
+                    label="Geïntroduceerd"
+                    value={child.introduced_allergens
+                      .map(allergenLabel)
+                      .join(', ')}
+                  />
+                )
               )}
               {child.previous_reactions && (
                 <DetailRow
@@ -248,16 +256,22 @@ function DetailRow({
   label,
   value,
   multiline,
+  muted,
 }: {
   label: string;
   value: string;
   multiline?: boolean;
+  muted?: boolean;
 }) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
       <Text
-        style={[styles.detailValue, multiline && styles.detailValueMultiline]}
+        style={[
+          styles.detailValue,
+          multiline && styles.detailValueMultiline,
+          muted && styles.detailValueMuted,
+        ]}
       >
         {value}
       </Text>
@@ -358,6 +372,10 @@ const styles = StyleSheet.create({
   },
   detailValueMultiline: {
     lineHeight: 20,
+  },
+  detailValueMuted: {
+    color: colors.gray,
+    fontStyle: 'italic',
   },
   addBtn: {
     flexDirection: 'row',

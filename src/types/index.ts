@@ -19,6 +19,8 @@ export interface Recipe {
   ingredients: Ingredient[];
   allergens: string[];
   preparation: string[];
+  /** Minimumleeftijd in maanden (family-layer). null = geen beperking. */
+  minAgeMonths?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }

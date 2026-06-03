@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-05-30 (deel 2) — UGC-moderatie: rapporteren + blokkeren (v3.0.1 → v3.0.2)
+
+**Context**: De App Store-review wees v3.0.x af op **Guideline 1.2** (user-generated content vereist een report-mechanisme én gebruiker-blokkeren). Deze sessie heeft report + block over beide projecten afgewerkt en de release-build voor herindiening gebouwd. Eén-richting-blok-model: de blocker ziet de geblokkeerde niet meer; de geblokkeerde merkt niets.
+
+### Afgerond deze sessie
+
+- **Mobiele app — moderatie (v3.0.1)**:
+  - **`src/lib/moderation.ts`** (nieuw) — gedeeld `openModerationMenu` (native `Alert`): *Rapporteren* + *Gebruiker blokkeren* (met bevestig-alert), toast-feedback.
+  - **`TimelineScreen.tsx`** — `more-horizontal` (···)-knop op posts/replies van anderen → moderatie-menu (`reportCommunityTarget` + `blockUser`, content lokaal uit feed). Niet op eigen content.
+  - **`ChatTopicScreen.tsx`** — vlaggetje-knop "Rapporteren / blokkeren" op topics/replies van anderen (`reportChatTarget` + gedeelde `blockUser`).
+  - **`ProfileScreen.tsx`** — nieuwe sectie **Geblokkeerde gebruikers** (lazy `listBlocks`, Deblokkeren → `unblockUser`).
+  - **`services/community.ts`** — `reportCommunityTarget`, `BlockedUser`, `listBlocks`/`blockUser`/`unblockUser` (uniek genoeg → wél via barrel).
+  - **`services/chatRooms.ts`** — `reportChatTarget` (blok hergebruikt `community.blockUser`, één `user_blocks`-tabel).
+  - **`metro.config.js`** (nieuw) — standaard Expo default-config.
+- **Web-project (ander project, `~/Desktop/Project_weekschema_Productie/`)** — report+block backend al eerder; deze sessie: frontend (tijdlijn/chatruimtes report+block, profiel "Geblokkeerde gebruikers"), admin-dashboard meldingen-queue voor chatruimtes (`admin-chat.html` + `admin-chat.js`). Alles gemerged naar `main` (web commit `640d573`).
+- **v3.0.2 — versie-bump** voor herindiening (v3.0.1 lag al in de stores → nieuwe versie-string vereist).
+- **EAS production-build** voor iOS + Android gedraaid (`--platform all`). autoIncrement schreef build-nummers terug: **iOS 65 / Android 70** (ongecommit in `app.json`).
+
+### Status
+
+- `npx tsc --noEmit` groen.
+- Git: commits `b0cd0c4` (v3.0.1 moderatie) + `0d82446` (v3.0.2 bump) gepusht naar `main`. **Ongecommit**: `app.json` build-nummers 64→65 / 69→70 (EAS write-back; bewust niet gecommit in deze afsluit-sessie).
+- **Android submit faalde** met "service account missing permissions" — Play Console-rechten-issue (geen code-fout). iOS-submission-status nog te bevestigen.
+- App Store Connect: demo-account zit er al in; review-notes-tekst herschreven (incl. exacte report/block-locaties); Age Rating-vragenlijst: **UGC = YES** correct, **Advertising moet NO** (stond op YES).
+
+### Versie
+
+`app.json.version` **3.0.2** · `ios.buildNumber` **65** · `android.versionCode` **70** (build-nummers ongecommit, EAS write-back). Nieuwe **builds** (geen EAS Update).
+
+### Volgende stap
+
+1. **Google Play**: service-account rechten geven in Play Console (Users and permissions → release-rechten op be.prilleven.mobileapp), daarna `eas submit --platform android --latest` opnieuw.
+2. **iOS**: bevestigen dat de build in TestFlight staat; review-notes + Age Rating (Advertising→NO) afronden; indienen voor review.
+3. Zorg dat er bij review minstens één post van een ánder lid zichtbaar is (report/block-knop staat nooit op eigen content).
+
+### Open vragen / blockers
+
+- Play Console service-account-rechten (blokkeert Android-submit).
+- iOS-submission-uitkomst nog onbekend.
+- `app.json` build-nummer-write-back (65/70) staat ongecommit — volgende sessie committen of laten overschrijven door de volgende build.
+
+---
+
 ## 2026-05-30 — Store-compliance + V3.0.0 release-build (v2.20.0 → v3.0.0)
 
 **Context**: Voorbereiding op de eerste publieke release in de App Store + Play Store. Eerst een compliance-review uitgevoerd om store-rejections te vermijden, daarna de gevonden code-gaten gedicht en de grote V3.0.0-release gebouwd (alle features sinds v2.11.0 zaten al in `src/` maar waren nog niet als major release gebundeld/gebouwd).

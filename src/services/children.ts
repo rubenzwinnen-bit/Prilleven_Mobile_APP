@@ -33,6 +33,10 @@ export interface Child {
   created_at: string;
   updated_at: string;
   introduced_allergens: string[]; // server-side computed
+  /** Server-side afgeleid uit eerste_hapjes_state.allergen_state.opted_out:
+   *  de gebruiker heeft de allergenen-introductie voor dit kind
+   *  uitgeschakeld. */
+  allergens_opted_out: boolean;
 }
 
 /** Velden die client mag insturen bij POST/PATCH. */

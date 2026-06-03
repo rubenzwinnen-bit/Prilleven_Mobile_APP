@@ -25,6 +25,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationContext';
 import {
   getRoom,
   relTime,
@@ -244,6 +245,7 @@ export function ChatRoomScreen({ navigation, route }: Props) {
   const { slug, title } = route.params;
   const { show } = useToast();
   const { user } = useUser();
+  const { chatroomTopicCounts, refresh } = useNotifications();
 
   const [intro, setIntro] = useState<AdminIntro | null>(null);
   const [topics, setTopics] = useState<ChatTopic[]>([]);
@@ -283,7 +285,11 @@ export function ChatRoomScreen({ navigation, route }: Props) {
   useFocusEffect(
     useCallback(() => {
       load('refresh');
-    }, [load])
+      /* Tellers hertellen bij focus zodat de per-topic badges meteen kloppen.
+         We wissen hier NIET alles: een topic-badge wist pas wanneer je dat
+         topic effectief opent (markTopicSeen in ChatTopicScreen). */
+      refresh();
+    }, [load, refresh])
   );
 
   useEffect(() => {
@@ -448,7 +454,9 @@ export function ChatRoomScreen({ navigation, route }: Props) {
               onDelete={deleteIntro}
             />
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            const topicCount = chatroomTopicCounts[item.id] ?? 0;
+            return (
             <Pressable
               style={({ pressed }) => [
                 styles.card,
@@ -461,6 +469,13 @@ export function ChatRoomScreen({ navigation, route }: Props) {
                 })
               }
             >
+              {topicCount > 0 ? (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {topicCount > 99 ? '99+' : topicCount}
+                  </Text>
+                </View>
+              ) : null}
               {item.is_pinned ? (
                 <View style={styles.pinRow}>
                   <Feather
@@ -523,7 +538,8 @@ export function ChatRoomScreen({ navigation, route }: Props) {
                 ) : null}
               </View>
             </Pressable>
-          )}
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="message-square" size={36} color={colors.grayLight} />
@@ -613,6 +629,24 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     opacity: 0.7,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  notifBadgeText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
   pinRow: {
     flexDirection: 'row',

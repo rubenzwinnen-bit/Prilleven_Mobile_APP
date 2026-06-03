@@ -27,6 +27,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationContext';
 import {
   getTopic,
   updateReply,
@@ -371,6 +372,7 @@ export function ChatTopicScreen({ navigation, route }: Props) {
   const { topicId } = route.params;
   const { user } = useUser();
   const { show } = useToast();
+  const { markTopicSeen } = useNotifications();
   /* Werkelijke header-hoogte zodat de composer exact boven het toetsenbord
      uitlijnt (i.p.v. een hardcoded offset). */
   const headerHeight = useHeaderHeight();
@@ -419,7 +421,10 @@ export function ChatTopicScreen({ navigation, route }: Props) {
         firstLoad.current = false;
       }
       load();
-    }, [load])
+      /* Dit topic openen telt als "gezien": wist de per-topic notificatie-
+         badge en laat de room-/footer-tellers navenant krimpen. */
+      markTopicSeen(topicId);
+    }, [load, markTopicSeen, topicId])
   );
 
   const onSendReply = useCallback(async () => {
