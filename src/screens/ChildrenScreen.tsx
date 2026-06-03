@@ -59,11 +59,11 @@ function ChevronBack({ onPress }: { onPress: () => void }) {
   );
 }
 
-/** Map allergen-key → display-label (met emoji). Fallback op de key
+/** Map allergen-key → display-label (zonder emoji). Fallback op de key
  *  zelf voor onbekende keys (bv. legacy data). */
 function allergenLabel(key: string): string {
   const opt = KNOWN_ALLERGEN_OPTIONS.find(o => o.key === key);
-  return opt ? `${opt.icon} ${opt.label}` : key;
+  return opt ? opt.label : key;
 }
 
 export function ChildrenScreen({ navigation }: Props) {
@@ -203,14 +203,14 @@ export function ChildrenScreen({ navigation }: Props) {
               )}
               {child.allergens_opted_out ? (
                 <DetailRow
-                  label="Geïntroduceerd"
+                  label="Reeds geïntroduceerde allergenen"
                   value="Functie uitgeschakeld"
                   muted
                 />
               ) : (
                 child.introduced_allergens.length > 0 && (
                   <DetailRow
-                    label="Geïntroduceerd"
+                    label="Reeds geïntroduceerde allergenen"
                     value={child.introduced_allergens
                       .map(allergenLabel)
                       .join(', ')}

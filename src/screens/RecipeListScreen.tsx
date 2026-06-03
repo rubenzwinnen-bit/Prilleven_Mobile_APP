@@ -207,7 +207,7 @@ export function RecipeListScreen({ navigation }: any) {
             {KNOWN_ALLERGEN_OPTIONS.map(a => (
               <FilterChip
                 key={a.key}
-                label={`zonder ${a.icon} ${a.label}`}
+                label={`zonder ${a.label}`}
                 active={allergenFilter.includes(a.key)}
                 onPress={() => toggleAllergen(a.key)}
               />

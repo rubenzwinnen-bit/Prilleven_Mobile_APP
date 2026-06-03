@@ -845,6 +845,48 @@ function PauseFlowCard({
 }
 
 /* ----------------------------------------
+   DisabledCard — spiegel van `renderDisabled()` in
+   `js/components/allergenen.js`. Getoond wanneer `allergen_state.opted_out`:
+   de gebruiker koos in het kindprofiel om de functie niet te volgen. Met
+   "Toch volgen"-knop die de functie weer aanzet (welkomscherm).
+---------------------------------------- */
+interface DisabledCardProps {
+  childName: string;
+  busy: boolean;
+  onReenable: () => void;
+}
+
+function DisabledCard({ childName, busy, onReenable }: DisabledCardProps) {
+  return (
+    <View style={styles.welcomeCard}>
+      <Text style={styles.welcomeIcon}>🔕</Text>
+      <Text style={styles.welcomeTitle}>
+        Allergenen-introductie staat uit voor {childName}
+      </Text>
+      <Text style={styles.welcomeBody}>
+        Je hebt aangegeven deze functie niet te volgen voor {childName}. Je
+        kunt dit altijd weer aanzetten.
+      </Text>
+      <Pressable
+        onPress={onReenable}
+        disabled={busy}
+        style={({ pressed }) => [
+          styles.welcomeBtn,
+          pressed && styles.btnPressed,
+          busy && styles.btnDisabled,
+        ]}
+      >
+        {busy ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <Text style={styles.welcomeBtnText}>Toch volgen</Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+/* ----------------------------------------
    WelcomeCard — spiegel van `renderWelcome()` in
    `js/components/allergenen.js`. Eerste stap bij !started: intro-tekst +
    "Start met introduceren"-knop.
@@ -1044,6 +1086,7 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
   const [pauseBusy, setPauseBusy] = useState(false);
   const [setupBusy, setSetupBusy] = useState(false);
   const [welcomeBusy, setWelcomeBusy] = useState(false);
+  const [reenableBusy, setReenableBusy] = useState(false);
   /* v2.9.0: per-allergeen busy-flag voor de "Overslaan"/"Opnemen"-toggle
      (paritair met `toggleAllergenExcluded()` op de website). */
   const [excludeBusyKey, setExcludeBusyKey] = useState<string | null>(null);
@@ -1302,6 +1345,28 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
   }, [childId, state, show]);
 
   /* ============================================
+     Re-enable — paritair met `renderDisabled()`'s "Toch volgen"-knop op de
+     website. Zet `opted_out: false` + `started: false` zodat de gebruiker
+     terug bij het welkomscherm start.
+  ============================================ */
+  const handleReenableFlow = useCallback(async () => {
+    if (!state) return;
+    setReenableBusy(true);
+    try {
+      const current =
+        state.allergen_state ?? ({} as EhState['allergen_state']);
+      const updated = await patchEhState(childId, {
+        allergen_state: { ...current, opted_out: false, started: false },
+      });
+      setState(updated);
+    } catch (err: any) {
+      show(err.message || 'Activeren mislukt.', 'error');
+    } finally {
+      setReenableBusy(false);
+    }
+  }, [childId, state, show]);
+
+  /* ============================================
      Exclude-toggle — paritair met `toggleAllergenExcluded()` in
      `js/components/allergenen.js`. Voegt het allergeen toe aan
      `excluded_keys` of verwijdert het weer.
@@ -1330,10 +1395,16 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
     [childId, state, show]
   );
 
-  const isPaused = !!ctx?.paused && (allergenState?.paused_step ?? 0) > 0;
-  const needsWelcome = !!state && !allergenState?.started && !isPaused;
+  /* Functie uitgeschakeld (opted_out) — heeft voorrang op alle andere
+     stages, paritair met `renderStage()` in `js/components/allergenen.js`. */
+  const needsDisabled = !!state && !!allergenState?.opted_out;
+  const isPaused =
+    !needsDisabled && !!ctx?.paused && (allergenState?.paused_step ?? 0) > 0;
+  const needsWelcome =
+    !!state && !needsDisabled && !allergenState?.started && !isPaused;
   const needsSetup =
     !!state &&
+    !needsDisabled &&
     !!allergenState?.started &&
     !allergenState?.setup_done &&
     !isPaused;
@@ -1375,7 +1446,7 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
               <Text style={styles.childName}>{child.name}</Text>
               <Text style={styles.childAge}>{formatAge(child.birthdate)}</Text>
             </View>
-            {!isPaused && (
+            {!isPaused && !needsDisabled && (
               <Pressable
                 onPress={() =>
                   navigation.navigate('SymptomForm', { childId: child.id })
@@ -1392,9 +1463,9 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
             )}
           </View>
 
-          {/* Hoeveelheden-box — verborgen tijdens pauze-flow zodat de
-             gebruiker eerst de waarschuwingen doorloopt (v2.8.9). */}
-          {!isPaused && <HoeveelhedenBox />}
+          {/* Hoeveelheden-box — verborgen tijdens pauze-flow + wanneer de
+             functie is uitgeschakeld (v2.8.9). */}
+          {!isPaused && !needsDisabled && <HoeveelhedenBox />}
 
           {/* Arts-warning banner — paritair met `.allergenen-arts-warn` in
              de website. Toont bij recente ernstige reactie/heftig symptoom. */}
@@ -1412,7 +1483,14 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
             </View>
           )}
 
-          {isPaused ? (
+          {needsDisabled ? (
+            /* Functie uitgeschakeld — paritair met `renderDisabled()`. */
+            <DisabledCard
+              childName={child.name}
+              busy={reenableBusy}
+              onReenable={handleReenableFlow}
+            />
+          ) : isPaused ? (
             /* Pauze-flow vervangt de allergenen-grid volledig. */
             <PauseFlowCard
               childName={child.name}

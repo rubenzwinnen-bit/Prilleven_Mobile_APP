@@ -37,7 +37,10 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
+import type { ImageSourcePropType, ImageStyle, StyleProp, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
@@ -57,6 +60,32 @@ import {
 } from '../services';
 import type { Child } from '../services';
 import type { RootStackParamList } from '../navigation/types';
+
+/* ----------------------------------------
+   Foto's per allergeen — Metro vereist statische require()-paden.
+   Keys identiek aan KNOWN_ALLERGEN_OPTIONS + EersteHapjesScreen.
+---------------------------------------- */
+const ALLERGEN_PHOTOS: Record<string, ImageSourcePropType> = {
+  'kippen-ei': require('../../assets/allergens/kippen-ei.jpg'),
+  pinda: require('../../assets/allergens/pinda.jpg'),
+  noten: require('../../assets/allergens/noten.jpg'),
+  sesam: require('../../assets/allergens/sesam.jpg'),
+  vis: require('../../assets/allergens/vis.jpg'),
+  schaaldieren: require('../../assets/allergens/schaaldieren.jpg'),
+  soja: require('../../assets/allergens/soja.jpg'),
+  tarwe: require('../../assets/allergens/tarwe.jpg'),
+  koemelk: require('../../assets/allergens/koemelk.jpg'),
+};
+
+/* Per-allergeen focal-shift: bij tarwe (aren onderaan) en koemelk (glas
+   onderaan) zit het onderwerp in de onderste helft van de foto, terwijl de
+   cover-crop standaard de verticale middenband (lucht/donker) toont. We
+   schalen de foto wat op en schuiven hem omhoog zodat de onderkant in beeld
+   komt — de schaal houdt de tegel volledig bedekt (geen rand). */
+const ALLERGEN_PHOTO_ADJUST: Record<string, StyleProp<ImageStyle>> = {
+  tarwe: { transform: [{ scale: 1.6 }, { translateY: '-20%' }] },
+  koemelk: { transform: [{ scale: 1.6 }, { translateY: '-20%' }] },
+};
 
 /** Format an ISO date (yyyy-mm-dd) as Belgian display string (dd/mm/yyyy).
  *  Returns '' wanneer de input leeg of ongeldig is. */
@@ -535,13 +564,17 @@ export function ChildFormScreen({ navigation, route }: Props) {
               Vink aan wat al bekend is. Pril Leven gebruikt dit om HapjesHeld
               persoonlijker te maken.
             </Text>
-            <View style={styles.chipRow}>
+            <View style={styles.allergenGrid}>
               {KNOWN_ALLERGEN_OPTIONS.map(opt => (
-                <Chip
+                <AllergenPhotoRow
                   key={opt.key}
-                  label={`${opt.icon} ${opt.label}`}
-                  active={knownAllergies.includes(opt.key)}
+                  label={opt.label}
+                  photo={ALLERGEN_PHOTOS[opt.key]}
+                  checked={knownAllergies.includes(opt.key)}
                   onPress={() => toggleAllergen(opt.key)}
+                  disabled={saving}
+                  style={styles.allergenItemHalf}
+                  imageStyle={ALLERGEN_PHOTO_ADJUST[opt.key]}
                 />
               ))}
             </View>
@@ -596,14 +629,17 @@ export function ChildFormScreen({ navigation, route }: Props) {
               reactie heeft gegeten. Deze slaan we over in de
               allergenen-tracker.
             </Text>
-            <View style={styles.prepList}>
+            <View style={styles.allergenList}>
               {KNOWN_ALLERGEN_OPTIONS.map(opt => (
-                <CheckRow
+                <AllergenPhotoRow
                   key={opt.key}
-                  label={`${opt.icon} ${opt.label}`}
+                  label={opt.label}
+                  photo={ALLERGEN_PHOTOS[opt.key]}
                   checked={preIntroduced.includes(opt.key)}
                   onPress={() => togglePreIntroduced(opt.key)}
                   disabled={saving}
+                  style={styles.allergenItemTall}
+                  imageStyle={ALLERGEN_PHOTO_ADJUST[opt.key]}
                 />
               ))}
             </View>
@@ -652,27 +688,55 @@ export function ChildFormScreen({ navigation, route }: Props) {
   );
 }
 
-function Chip({
+/** Allergeen-rij met foto-achtergrond + sage-gradient (parity met de
+ *  setup-card in EersteHapjesScreen). Foto rechts 70%, gradient links→rechts
+ *  uitvloeiend, checkbox + label links. Geen emoji-symbool. */
+function AllergenPhotoRow({
   label,
-  active,
+  photo,
+  checked,
   onPress,
+  disabled,
+  style,
+  imageStyle,
 }: {
   label: string;
-  active: boolean;
+  photo?: ImageSourcePropType;
+  checked: boolean;
   onPress: () => void;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
       style={({ pressed }) => [
-        styles.chip,
-        active && styles.chipActive,
-        pressed && styles.btnPressed,
+        styles.allergenItem,
+        style,
+        checked && styles.allergenItemChecked,
+        pressed && styles.allergenItemPressed,
       ]}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-        {label}
-      </Text>
+      {photo ? (
+        <Image source={photo} style={[styles.allergenItemBg, imageStyle]} resizeMode="cover" />
+      ) : null}
+      <LinearGradient
+        colors={['rgba(238,243,232,0.72)', 'rgba(238,243,232,0.25)', 'rgba(238,243,232,0.1)']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        locations={[0, 0.5, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.allergenItemContent}>
+        <View style={[styles.allergenBox, checked && styles.allergenBoxChecked]}>
+          {checked && <Feather name="check" size={14} color={colors.white} />}
+        </View>
+        <Text style={styles.allergenItemLabel}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -790,32 +854,71 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  chipRow: {
+  allergenList: {
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  allergenGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs,
+    justifyContent: 'space-between',
+    rowGap: spacing.xs,
+    marginTop: spacing.sm,
   },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: spacing.md,
-    borderRadius: 999,
+  allergenItemHalf: {
+    width: '48%',
+  },
+  allergenItemTall: {
+    minHeight: 60,
+  },
+  allergenItem: {
+    position: 'relative',
+    minHeight: 44,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.light,
+    borderColor: '#e6e2d8',
+    backgroundColor: '#fafaf6',
+    overflow: 'hidden',
+  },
+  allergenItemBg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  allergenItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  allergenItemChecked: {
+    borderColor: colors.primary,
+  },
+  allergenItemPressed: {
+    opacity: 0.85,
+  },
+  allergenBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.gray,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.white,
   },
-  chipActive: {
-    borderColor: colors.primary,
+  allergenBoxChecked: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  chipText: {
+  allergenItemLabel: {
+    flex: 1,
     fontSize: 13,
+    fontWeight: '400',
     color: colors.dark,
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: colors.white,
-    fontWeight: '700',
+    textShadowColor: 'rgba(255,255,255,0.9)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4,
   },
   prepHead: {
     flexDirection: 'row',
@@ -827,10 +930,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.primary,
-  },
-  prepList: {
-    marginTop: spacing.sm,
-    gap: spacing.xs,
   },
   prepChoice: {
     marginTop: spacing.md,
