@@ -85,6 +85,18 @@ export function getRecipeMinAge(recipe: Recipe): number | null {
   return ages.length ? Math.min(...ages) : null;
 }
 
+/** Korte badge-tekst met de leeftijdscategorie van een recept,
+ *  bv. "vanaf 6 mnd". Geeft null terug als er geen leeftijd bekend is. */
+export function getRecipeAgeLabel(recipe: Recipe): string | null {
+  const age = getRecipeMinAge(recipe);
+  return age != null ? `vanaf ${age} mnd` : null;
+}
+
+/** Mogelijke leeftijdscategorieën voor de receptenfilter:
+ *  de unieke eetmoment-minima, oplopend (→ [6, 7, 9, 10]). */
+export const AGE_FILTER_OPTIONS: number[] =
+  [...new Set(Object.values(MEAL_MOMENT_MIN_AGE))].sort((a, b) => a - b);
+
 /** Compacte leeftijd voor onder de avatar: "3 mnd" / "2 jaar". */
 export function childAgeLabel(months: number | null): string {
   if (months == null) return 'leeftijd onbekend';

@@ -37,7 +37,14 @@ import {
 import type { Child } from '../services';
 import type { Recipe, RatingSummary, Comment } from '../types';
 import { getMealMomentLabel, WEEKDAYS, SCHEDULE_SLOTS, getSlotLabel } from '../constants/data';
-import { evaluateFamily, type ChildEvaluation, type FamilyStatus } from '../lib/familyLayer';
+import {
+  evaluateFamily,
+  getAllergenLabel,
+  getRecipeAgeLabel,
+  normalizeAllergen,
+  type ChildEvaluation,
+  type FamilyStatus,
+} from '../lib/familyLayer';
 
 export function RecipeDetailScreen({ route, navigation }: any) {
   const { id } = route.params;
@@ -220,7 +227,16 @@ export function RecipeDetailScreen({ route, navigation }: any) {
 
           {/* Info sectie */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Informatie</Text>
+            <View style={styles.sectionTitleRow}>
+              <Text style={[styles.sectionTitle, styles.sectionTitleInRow]}>
+                Informatie
+              </Text>
+              {getRecipeAgeLabel(recipe) ? (
+                <View style={styles.ageBadgeLg}>
+                  <Text style={styles.ageBadgeLgText}>{getRecipeAgeLabel(recipe)}</Text>
+                </View>
+              ) : null}
+            </View>
             <View style={styles.tagRow}>
               {(recipe.mealMoments || []).map(m => (
                 <View key={m} style={styles.tagMoment}>
@@ -241,9 +257,9 @@ export function RecipeDetailScreen({ route, navigation }: any) {
             {(recipe.allergens || []).length > 0 && (
               <View style={[styles.tagRow, { marginTop: spacing.sm }]}>
                 <Text style={styles.allergenLabel}>Allergenen: </Text>
-                {recipe.allergens.map(a => (
-                  <View key={a} style={styles.tagAllergen}>
-                    <Text style={styles.tagAllergenText}>{a}</Text>
+                {[...new Set((recipe.allergens || []).map(normalizeAllergen))].map(key => (
+                  <View key={key} style={styles.tagAllergen}>
+                    <Text style={styles.tagAllergenText}>{getAllergenLabel(key)}</Text>
                   </View>
                 ))}
               </View>
@@ -639,6 +655,36 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     borderBottomWidth: 2,
     borderBottomColor: colors.light,
+  },
+  /* Variant: titel in een rij met een leeftijd-badge ernaast.
+     De onderlijn verhuist naar de rij-container (sectionTitleRow). */
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.light,
+  },
+  sectionTitleInRow: {
+    flexShrink: 1,
+    marginBottom: 0,
+    paddingBottom: 0,
+    borderBottomWidth: 0,
+  },
+  ageBadgeLg: {
+    flexShrink: 0,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(152, 195, 164, 0.25)',
+  },
+  ageBadgeLgText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4a7c59',
   },
   sectionSub: {
     fontSize: 13,

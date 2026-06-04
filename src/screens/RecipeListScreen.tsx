@@ -28,7 +28,7 @@ import {
   toggleFavorite,
   KNOWN_ALLERGEN_OPTIONS,
 } from '../services';
-import { normalizeAllergen } from '../lib/familyLayer';
+import { normalizeAllergen, getRecipeMinAge, AGE_FILTER_OPTIONS } from '../lib/familyLayer';
 import { useUser } from '../context/UserContext';
 import { MEAL_MOMENTS } from '../constants/data';
 import type { Recipe, RatingSummary } from '../types';
@@ -46,9 +46,11 @@ export function RecipeListScreen({ navigation }: any) {
   const [search, setSearch] = useState('');
   const [momentFilter, setMomentFilter] = useState<string[]>([]);
   const [allergenFilter, setAllergenFilter] = useState<string[]>([]);
+  const [ageFilter, setAgeFilter] = useState<number[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const filtersActive = momentFilter.length > 0 || allergenFilter.length > 0;
+  const filtersActive =
+    momentFilter.length > 0 || allergenFilter.length > 0 || ageFilter.length > 0;
 
   /* Toggle-helpers: voeg toe of verwijder uit de multi-select-lijst. */
   const toggleMoment = useCallback((id: string) => {
@@ -59,6 +61,11 @@ export function RecipeListScreen({ navigation }: any) {
   const toggleAllergen = useCallback((key: string) => {
     setAllergenFilter(prev =>
       prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]
+    );
+  }, []);
+  const toggleAge = useCallback((age: number) => {
+    setAgeFilter(prev =>
+      prev.includes(age) ? prev.filter(x => x !== age) : [...prev, age]
     );
   }, []);
 
@@ -126,9 +133,15 @@ export function RecipeListScreen({ navigation }: any) {
         );
         if (allergenFilter.some(a => recipeAllergens.has(a))) return false;
       }
+      /* Leeftijdsfilter: recept zichtbaar als zijn minimumleeftijd
+         overeenkomt met één van de geselecteerde categorieën (OF). */
+      if (ageFilter.length > 0) {
+        const minAge = getRecipeMinAge(r);
+        if (minAge == null || !ageFilter.includes(minAge)) return false;
+      }
       return true;
     });
-  }, [recipes, search, momentFilter, allergenFilter]);
+  }, [recipes, search, momentFilter, allergenFilter, ageFilter]);
 
   if (loading) {
     return (
@@ -210,6 +223,26 @@ export function RecipeListScreen({ navigation }: any) {
                 label={`zonder ${a.label}`}
                 active={allergenFilter.includes(a.key)}
                 onPress={() => toggleAllergen(a.key)}
+              />
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            <FilterChip
+              label="Alle leeftijden"
+              active={ageFilter.length === 0}
+              onPress={() => setAgeFilter([])}
+            />
+            {AGE_FILTER_OPTIONS.map(a => (
+              <FilterChip
+                key={a}
+                label={`vanaf ${a} mnd`}
+                active={ageFilter.includes(a)}
+                onPress={() => toggleAge(a)}
               />
             ))}
           </ScrollView>

@@ -6,6 +6,83 @@
 
 ---
 
+## 2026-06-04 (deel 2) — Leeftijd-badge + multi-select leeftijdsfilter (web-parity 3.1.0→3.1.3)
+
+**Context**: De web-app kreeg tussen 3.1.0 en 3.1.3 een leeftijdscategorie-badge op recepten + een multi-select leeftijdsfilter (web-commits `9623ed0`, `91c5d4c`, `afd9885`, merge `63e81f6`). Deze sessie neemt die feature 1-op-1 over in de mobiele app.
+
+### Afgerond deze sessie
+
+- **`src/lib/familyLayer.ts`** — twee dunne helpers toegevoegd, identiek aan web `js/utils.js`. Hergebruiken de bestaande `getRecipeMinAge` + `MEAL_MOMENT_MIN_AGE` (ochtend 9, fruit moment 7, middag 6, snack 10, avond 6 — géén nieuwe databron):
+  - `getRecipeAgeLabel(recipe): string | null` → `"vanaf X mnd"` (null als leeftijd onbekend).
+  - `AGE_FILTER_OPTIONS: number[]` → unieke eetmoment-minima, oplopend (`[6, 7, 9, 10]`).
+- **`src/components/RecipeCard.tsx`** — leeftijd-badge (klein groen pill-ovaal `rgba(152,195,164,0.25)` / `#4a7c59`, "vanaf X mnd") in een nieuwe `titleRow` (titel `flex:1` + badge `flexShrink:0`, `space-between`). Geen badge bij onbekende leeftijd. Verschijnt overal waar `RecipeCard` gerenderd wordt (recepten-overzicht + favorieten).
+- **`src/screens/RecipeDetailScreen.tsx`** — grotere badge-variant rechts naast de "Informatie"-titel (`sectionTitleRow` draagt nu de onderlijn; `sectionTitleInRow` strip't border/margin van de titel-`Text`). Import `getRecipeAgeLabel`.
+- **`src/screens/RecipeListScreen.tsx`** — multi-select leeftijdsfilter: nieuwe state `ageFilter: number[]` + `toggleAge`, derde chip-rij in het bestaande inklapbare filterpanel ("Alle leeftijden" reset + pill per `AGE_FILTER_OPTIONS`). Filterlogica: recept zichtbaar als `getRecipeMinAge(r)` in de selectie zit (OF-logica, parity met web). `filtersActive` telt de leeftijdsfilter mee (filter-dot op de toolbar-knop).
+
+### Afwijking t.o.v. web (bewust)
+
+- De web-toolbar toont de leeftijdsfilter altijd; mobiel zit hij in het bestaande inklapbare filterpanel naast eetmoment + allergenen (mobiele UI-conventie). Functioneel identiek.
+- Badge-styling via inline groen `#4a7c59` (zelfde kleur als de bestaande momenttags) i.p.v. een nieuw theme-token — consistent met de al aanwezige tags in RecipeCard/RecipeDetail.
+
+### Status
+
+- `npx tsc --noEmit` groen.
+- **Ongecommit** (samen met de eerdere RecipeDetailScreen-allergeenfix uit deel 1): `src/lib/familyLayer.ts`, `src/components/RecipeCard.tsx`, `src/screens/RecipeListScreen.tsx`, `src/screens/RecipeDetailScreen.tsx`, `CLAUDE.md`, `PLAN-TIMELINE.md`.
+
+### Versie
+
+`app.json.version` **3.1.0** · `ios.buildNumber` **66** · `android.versionCode` **72** — **niet** gebumpt deze sessie (alleen JS/UI-wijzigingen). Beslis bij commit/build of dit als nieuwe build 3.1.0 meelift dan wel een aparte patch (3.1.1) wordt, samen met de eerder ongecommitte RecipeDetailScreen-allergeenfix.
+
+### Volgende stap
+
+1. Visueel checken op toestel/Expo (badge op kaart + detail, filter-pills).
+2. Committen samen met de openstaande wijzigingen.
+3. Beslissen over version-bump + nieuwe EAS-build.
+
+---
+
+## 2026-06-04 — v3.1.0 release-build + submit & allergeen-legacy-namen opgeschoond
+
+**Context**: v3.1.0 (per-topic notificatiebadges + 6-weken vervaltermijn + family-layer in receptdetail, code reeds in `src/` via commit `3cf6232`) klaargezet voor de stores. Daarna een datakwaliteits-issue aangepakt: in recepten verschenen nog oude allergeen-namen (gluten/lactose/ei) i.p.v. de canonieke keys (tarwe/koemelk/kippen-ei).
+
+### Afgerond deze sessie
+
+- **v3.1.0 release-builds** (EAS production, `--non-interactive --no-wait`):
+  - iOS **buildNumber 66** (build-ID `88d4ad9c-…`) → **gesubmit naar App Store Connect** (`eas submit --platform ios`); binary geüpload, verwerkt door Apple → TestFlight.
+  - Android **versionCode 71** geannuleerd (te lang in wachtrij) → herbouwd als **versionCode 72** (build-ID `7cb3fdf3-…`).
+  - EAS write-back van build-nummers gecommit: `1bb7176` (iOS 66 / Android 71) + `3cf9c97` (Android 72). Eerder ook `72415c4` (emoji-iconen weg + EersteHapjes uitgeschakeld-stage).
+- **Allergeen-legacy-namen — diagnose**: Supabase `recipes.allergens` is **jsonb** (geen `text[]`). 82 recepten, 64 met allergenen; legacy-waarden aanwezig: gluten(5), lactose(4), ei(2). Family-layer (`src/lib/familyLayer.ts`) normaliseerde al correct, maar `RecipeDetailScreen` toonde de rauwe DB-waarde. Web-import (`importRecipes.js`) normaliseert óók al correct; enkel de CSV-template-voorbeelden toonden legacy-namen.
+- **SQL-correctie** (jsonb): `UPDATE recipes` met `jsonb_array_elements_text` + `jsonb_agg(DISTINCT …)` + `CASE` (gluten→tarwe, lactose/melk/zuivel→koemelk, ei→kippen-ei), `WHERE EXISTS`-filter. Preview (Stap 1) door gebruiker bevestigd correct. **UPDATE (Stap 2) nog door gebruiker uit te voeren.**
+- **Mobiel — `RecipeListScreen.tsx` multi-select filter** (commit `72415c4`): `momentFilter`/`allergenFilter` van één waarde → `string[]`. Meerdere eetmomenten (any-of) en meerdere allergenen (wegfilteren bij minstens één) tegelijk. Allergeen-chips uit de canonieke **9** `KNOWN_ALLERGEN_OPTIONS` (i.p.v. 13 legacy `ALLERGENS`), recept-allergenen genormaliseerd via `normalizeAllergen`. `tsc` groen.
+- **Mobiel — `RecipeDetailScreen.tsx`**: allergenen-tags tonen nu `getAllergenLabel(normalizeAllergen(a))` met `Set`-dedupe i.p.v. rauwe waarde. (Ongecommit.)
+- **Web-project (ander project)** — `js/components/importRecipes.js`: drie legacy CSV-template-voorbeelden gecorrigeerd (regel 120 `gluten, lactose`→`tarwe, koemelk`; regel 154 `gluten, ei, lactose`→`tarwe, kippen-ei, koemelk`; regel 156 `gluten`→`tarwe`). (Ongecommit, aparte repo.)
+
+### Status
+
+- `npx tsc --noEmit` groen (exit 0).
+- Git (mobile): commits t/m `3cf9c97` gepusht. **Ongecommit**: `src/screens/RecipeDetailScreen.tsx` + `CLAUDE.md` + `PLAN-TIMELINE.md`.
+- Git (web): `js/components/importRecipes.js` ongecommit in `~/Desktop/Project_weekschema_Productie/`.
+- iOS-build 66 staat in App Store Connect/TestFlight (verwerking). Android-build 72 status na herbouw nog te bevestigen + nog te submitten naar Play.
+
+### Versie
+
+`app.json.version` **3.1.0** · `ios.buildNumber` **66** · `android.versionCode` **72**. Nieuwe **builds** (geen EAS Update).
+> NB: de RecipeDetailScreen-weergavefix is een kleine functionele wijziging ná de 3.1.0-build. Niet gebumpt — beslis of dit meelift in een volgende build of een aparte patch (3.1.1) wordt.
+
+### Volgende stap
+
+1. **Supabase**: de UPDATE (Stap 2) uitvoeren om de 9 recepten met legacy-allergenen te migreren; daarna verificatie-SELECT (0 rijen).
+2. De drie ongecommitte wijzigingen committen (mobile: RecipeDetailScreen + docs; web: importRecipes.js — aparte repo's, aparte commits).
+3. **Android**: build 72-status bevestigen → `eas submit --platform android`.
+4. **iOS**: bevestigen dat build 66 in TestFlight zichtbaar is; indien gewenst indienen voor App Store-review.
+
+### Open vragen / blockers
+
+- Beslissing: telt de RecipeDetailScreen-allergeenfix mee in een nieuwe build (rebuild 3.1.0) of wordt het 3.1.1?
+- Android-submit-rechten (Play Console service-account) — was een eerdere blocker; bevestigen of opgelost.
+
+---
+
 ## 2026-05-30 (deel 2) — UGC-moderatie: rapporteren + blokkeren (v3.0.1 → v3.0.2)
 
 **Context**: De App Store-review wees v3.0.x af op **Guideline 1.2** (user-generated content vereist een report-mechanisme én gebruiker-blokkeren). Deze sessie heeft report + block over beide projecten afgewerkt en de release-build voor herindiening gebouwd. Eén-richting-blok-model: de blocker ziet de geblokkeerde niet meer; de geblokkeerde merkt niets.

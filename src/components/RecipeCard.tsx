@@ -9,6 +9,7 @@ import { colors, radius, spacing, shadows } from '../constants/theme';
 import { Stars } from './Stars';
 import type { Recipe, RatingSummary } from '../types';
 import { getMealMomentLabel } from '../constants/data';
+import { getRecipeAgeLabel } from '../lib/familyLayer';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -44,9 +45,16 @@ export function RecipeCard({
       </View>
 
       <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={2}>
-          {recipe.name}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2}>
+            {recipe.name}
+          </Text>
+          {getRecipeAgeLabel(recipe) ? (
+            <View style={styles.ageBadge}>
+              <Text style={styles.ageBadgeText}>{getRecipeAgeLabel(recipe)}</Text>
+            </View>
+          ) : null}
+        </View>
 
         <View style={styles.tagRow}>
           {(recipe.mealMoments || []).slice(0, 2).map(m => (
@@ -115,11 +123,30 @@ const styles = StyleSheet.create({
   body: {
     padding: spacing.lg,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
   title: {
+    flex: 1,
     fontSize: 17,
     fontWeight: '700',
     color: colors.dark,
-    marginBottom: spacing.sm,
+  },
+  ageBadge: {
+    flexShrink: 0,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(152, 195, 164, 0.25)',
+  },
+  ageBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#4a7c59',
   },
   tagRow: {
     flexDirection: 'row',
