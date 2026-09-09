@@ -167,8 +167,14 @@ export {
   getSubscriptionStatus,
   accessMessage,
   formatEndDate,
+  getOpzegverzoek,
+  createOpzegverzoek,
 } from './subscription';
-export type { SubscriptionStatus, AccessReason } from './subscription';
+export type {
+  SubscriptionStatus,
+  AccessReason,
+  Opzegverzoek,
+} from './subscription';
 export {
   registerPushToken,
   deregisterPushToken,

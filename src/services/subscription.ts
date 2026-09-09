@@ -118,3 +118,93 @@ export function formatEndDate(iso: string | null): string {
     year: 'numeric',
   });
 }
+
+/* ----------------------------------------
+   OPZEGVERZOEK
+   Klanten kunnen niet zelf opzeggen in Plug&Pay — zelfbediening zit daar
+   enkel in het Ultimate-pakket en Pril Leven draait op Premium. Het
+   verzoek loopt dus via ons: het endpoint legt een rij vast in
+   `cancellation_requests` en mailt het team. Die rij is leidend, de mail
+   is een seintje.
+
+   Endpoint (website `api/opzegverzoek.mjs`), WEL met JWT:
+     GET  /api/opzegverzoek → { open_verzoek: { aangevraagd_op } | null }
+     POST /api/opzegverzoek → 201 { ok, aangevraagd_op }
+                              200 { ok, al_ingediend: true, aangevraagd_op }
+
+   Het e-mailadres haalt de server uit het geverifieerde token, nooit uit
+   de body — anders kan iemand een opzegging voor een ander indienen.
+---------------------------------------- */
+
+import { supabase } from '../lib/supabase';
+
+/** Een openstaand opzegverzoek, of null als er geen loopt. */
+export interface Opzegverzoek {
+  aangevraagd_op: string;
+}
+
+async function authedFetch(init: RequestInit = {}): Promise<Response> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error('Sessie kon niet worden opgehaald.');
+  const token = data.session?.access_token;
+  if (!token) throw new Error('Je sessie is verlopen. Log opnieuw in.');
+  return fetch(`${RAG_API_URL}/api/opzegverzoek`, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+/**
+ * Staat er al een opzegverzoek open? Geeft `null` terug als er geen is,
+ * én bij elke fout: dit mag het profielscherm nooit blokkeren. De knop
+ * blijft dan gewoon staan, en een tweede indiening is onschadelijk omdat
+ * de server idempotent is.
+ */
+export async function getOpzegverzoek(): Promise<Opzegverzoek | null> {
+  try {
+    const response = await authedFetch({ method: 'GET' });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      open_verzoek?: Opzegverzoek | null;
+    };
+    return data?.open_verzoek ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dien een opzegverzoek in. Gooit met een leesbare NL-melding als het
+ * mislukt — hier mág de gebruiker het weten, want anders denkt hij
+ * opgezegd te hebben terwijl er niets vastligt.
+ *
+ * `al_ingediend` betekent dat er al een verzoek openstond; dat is geen
+ * fout, de server maakt dan geen tweede rij en stuurt geen tweede mail.
+ */
+export async function createOpzegverzoek(): Promise<{
+  aangevraagd_op: string | null;
+  al_ingediend: boolean;
+}> {
+  const response = await authedFetch({
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  const raw = await response.text();
+  let data: any = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    /* geen JSON — val terug op de statuscode hieronder */
+  }
+  if (!response.ok) {
+    throw new Error(data?.error || 'Kon het opzegverzoek niet indienen.');
+  }
+  return {
+    aangevraagd_op: data?.aangevraagd_op ?? null,
+    al_ingediend: !!data?.al_ingediend,
+  };
+}

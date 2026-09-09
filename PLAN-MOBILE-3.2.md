@@ -316,7 +316,7 @@ Gevolgen om te onthouden:
 | 6 — tabs weekschema | ✅ groene subtab-onderlijn, segmented dagkiezer, lage `activeToolbar`, dagblokken met groene rand + groene VANDAAG-badge. |
 | 7 — allergenen | ✅ `AllergenPathCard`, `SafetyBar` (2 niveaus), `HoeveelhedenBox` en arts-toezicht-banner opgeheven, segmentklik scrolt naar de tegel. Pencil-edit op doses/symptomen bleek al te bestaan. |
 | 2 — aanraders | ⬜ wacht op keuze native/WebView |
-| 3 — opzeggen | ⬜ `services/subscription.ts` staat klaar om uit te breiden |
+| 3 — opzeggen | ✅ `getOpzegverzoek`/`createOpzegverzoek` + rij "Lidmaatschap" en opzegblok in ProfileScreen. |
 | 4 — gamification | ⬜ wacht op keuze A/B/C |
 
 Nog niets gecommit in het app-project sinds `2f68625` (blok 1).

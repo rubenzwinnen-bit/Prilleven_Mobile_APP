@@ -45,6 +45,10 @@ import {
   setMemoryEnabled,
   exportUserData,
   deleteAccount,
+  getSubscriptionStatus,
+  formatEndDate,
+  getOpzegverzoek,
+  createOpzegverzoek,
   getCommunityProfile,
   updateCommunityProfile,
   getAvatarUploadUrl,
@@ -57,16 +61,15 @@ import {
   listBlocks,
   unblockUser,
 } from '../services';
-import type { CommunityProfile, BlockedUser } from '../services';
+import type { CommunityProfile, BlockedUser, SubscriptionStatus } from '../services';
 import type { RootStackParamList } from '../navigation/types';
+import { PRIVACY_URL, TERMS_URL } from '../constants/links';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
 const CONFIRM_WORD = 'VERWIJDER';
 
-/* Publieke juridische pagina's (gedeeld met de website). */
-const PRIVACY_URL = 'https://community-web.prilleven.be/privacy.html';
-const TERMS_URL = 'https://community-web.prilleven.be/voorwaarden.html';
+
 
 /* Lokale chevron-back — geïnlined om een require-cycle met RootStack te vermijden
    (RootStack importeert ProfileScreen; ProfileScreen mag dus niets uit
@@ -97,6 +100,15 @@ function ChevronBack({ onPress }: { onPress: () => void }) {
 export function ProfileScreen({ navigation }: Props) {
   const { user, logout } = useUser();
   const { show } = useToast();
+
+  /* Lidmaatschap + opzegverzoek. `opzeg` is de datum van een openstaand
+     verzoek; zolang die er is verdwijnt de knop, zodat niemand twee keer
+     indient en zich afvraagt of het aankwam. De status komt van de server,
+     niet uit AsyncStorage — dus na herinstalleren of op een ander toestel
+     klopt hij nog steeds. */
+  const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(null);
+  const [opzeg, setOpzeg] = useState<{ aangevraagd_op: string } | null>(null);
+  const [opzegBusy, setOpzegBusy] = useState(false);
 
   /* Memory-toggle state */
   const [memoryEnabled, setMemoryEnabledState] = useState<boolean | null>(null);
@@ -140,6 +152,59 @@ export function ProfileScreen({ navigation }: Props) {
   );
 
   /* ----- Community-profile: initial load ----- */
+  /* Lidmaatschapsstatus + openstaand opzegverzoek ophalen. Beide falen
+     stil: het profiel moet ook bruikbaar blijven als deze twee niet
+     laden. */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [status, verzoek] = await Promise.all([
+        getSubscriptionStatus(user),
+        getOpzegverzoek(),
+      ]);
+      if (cancelled) return;
+      setSubStatus(status);
+      setOpzeg(verzoek);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const handleOpzeggen = useCallback(() => {
+    Alert.alert(
+      'Abonnement opzeggen',
+      'Je houdt toegang tot het einde van de periode die je al betaald hebt. ' +
+        'We verwerken je verzoek en bevestigen het per mail.',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Opzeggen',
+          style: 'destructive',
+          onPress: async () => {
+            setOpzegBusy(true);
+            try {
+              const res = await createOpzegverzoek();
+              setOpzeg({
+                aangevraagd_op: res.aangevraagd_op || new Date().toISOString(),
+              });
+              show(
+                res.al_ingediend
+                  ? 'Je verzoek stond al bij ons open.'
+                  : 'Je opzegverzoek is verstuurd.',
+                'success'
+              );
+            } catch (err: any) {
+              show(err?.message || 'Kon het verzoek niet indienen.', 'error');
+            } finally {
+              setOpzegBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [show]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -536,6 +601,57 @@ export function ProfileScreen({ navigation }: Props) {
         {/* ----- 1. ACCOUNT ----- */}
         <Section title="Account">
           <Row label="E-mailadres" value={user || '—'} />
+          <Row
+            label="Lidmaatschap"
+            value={
+              subStatus === null
+                ? '—'
+                : subStatus.active
+                ? formatEndDate(subStatus.end_date)
+                  ? `Actief tot ${formatEndDate(subStatus.end_date)}`
+                  : 'Actief'
+                : 'Niet actief'
+            }
+          />
+
+          {/* Opzegverzoek. Zelf opzeggen kan niet in Plug&Pay — dat zit
+              enkel in het Ultimate-pakket — dus het verzoek loopt via ons
+              en wordt met de hand afgehandeld. */}
+          <View style={styles.opzegBlock}>
+            {opzeg ? (
+              <Text style={styles.opzegStatus}>
+                {formatEndDate(opzeg.aangevraagd_op)
+                  ? `Je opzegverzoek van ${formatEndDate(
+                      opzeg.aangevraagd_op
+                    )} is bij ons binnen. We bevestigen het per mail.`
+                  : 'Je opzegverzoek is bij ons binnen. We bevestigen het per mail.'}
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.opzegIntro}>
+                  Wil je stoppen? Dien hier je opzegverzoek in. Je houdt
+                  toegang tot het einde van de periode die je al betaald
+                  hebt, en wij bevestigen de opzegging.
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.opzegBtn,
+                    pressed && styles.btnPressed,
+                    opzegBusy && styles.opzegBtnBusy,
+                  ]}
+                  onPress={handleOpzeggen}
+                  disabled={opzegBusy}
+                >
+                  {opzegBusy ? (
+                    <ActivityIndicator size="small" color={colors.gray} />
+                  ) : (
+                    <Text style={styles.opzegBtnText}>Abonnement opzeggen</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </View>
+
           <Pressable
             style={({ pressed }) => [
               styles.btnSecondary,
@@ -1009,6 +1125,47 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  /* Opzegverzoek in de Account-sectie */
+  opzegBlock: {
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.light,
+  },
+  opzegIntro: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.gray,
+    marginBottom: spacing.sm,
+  },
+  opzegStatus: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.darkLight,
+  },
+  opzegBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 34,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.grayLight,
+    backgroundColor: colors.white,
+  },
+  opzegBtnBusy: {
+    opacity: 0.6,
+  },
+  opzegBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.gray,
+  },
+
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
