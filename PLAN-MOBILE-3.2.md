@@ -27,7 +27,7 @@ expo-notifications plugin), `package.json` (`expo-notifications`, `expo-device`,
 | 1.2 | Android-notificatiekleur in `app.json` (nu `#C98966`) → merkgroen na blok 5. | ⬜ wacht op blok 5 |
 | 1.3 | EAS-credentials: APNs-key (Apple) + FCM v1 service-account (Google). | ⬜ jij |
 | 1.4 | `eas build --profile preview` op een écht toestel — push werkt NIET in Expo Go. | ⬜ jij |
-| 1.5 | Test: app dicht / achtergrond / voorgrond; tik navigeert; badge klopt na openen tijdlijn; badge weg na uitloggen. | ⬜ na 1.4 |
+| 1.5 | Test: app dicht / achtergrond / voorgrond; tik navigeert; badge klopt na openen tijdlijn; badge weg na uitloggen. | ⬜ **uitgesteld tot het einde** — beslist 2026-09-09 |
 | 1.6 | Versie-bump naar 3.2.0 + committen (beide projecten). | ⬜ na 1.5 |
 
 ### 1.1 — wat er gebouwd is (2026-09-02)
@@ -276,6 +276,25 @@ fragment bevat die header niet. Nog een reden voor de native aanpak.
 
 ---
 
+## Testbeleid (beslist 2026-09-09)
+
+Niet per blok bouwen en testen, maar **alles eerst uitprogrammeren en dan één
+build**. Reden: blok 5 t/m 8 zijn puur JS/TS, dus een build levert daar niets op
+wat je niet ook in code ziet.
+
+Gevolgen om te onthouden:
+- **De pushtest (1.5) schuift naar het einde**, samen met de rest.
+- **Ruben heeft geen Android-toestel, enkel een iPhone.** De Android
+  preview-build van 2026-09-09 is daardoor enkel een configuratiecheck
+  (bewijst dat `google-services.json` + de plugin compileren), geen
+  testinstrument. Android push blijft ongetest tot iemand met een
+  Android-toestel meekijkt — regelen vóór de store-release.
+- **Kritiek pad voor iOS: de Apple Program License Agreement.** Zolang die niet
+  geaccepteerd is kan EAS geen APNs-sleutel maken en geen iOS-build tekenen.
+- Distributie naar de iPhone: TestFlight (production + `eas submit`, `ascAppId`
+  staat al ingesteld) of ad hoc (`eas device:create` + preview-profiel).
+  TestFlight heeft de voorkeur — geen UDID-beheer, en Anneleen kan mee testen.
+
 ## Voorgestelde volgorde
 
 | Release | Inhoud | Waarom hier |
@@ -286,6 +305,21 @@ fragment bevat die header niet. Nog een reden voor de native aanpak.
 | **3.5.0** | Blok 7 (allergenen) | Zelfstandig, groot, één scherm |
 | **3.6.0** | Blok 3 (opzeggen) + blok 2 (aanraders) | Beide nieuw en afgebakend |
 | **3.7.0** | Blok 4 (gamification) | Hangt af van keuze A/B/C |
+
+### Stand van zaken (2026-09-09)
+
+| Blok | Status |
+|---|---|
+| 1 — push | Code ✅ (app + server, server gedeployed). Testen ⬜ tot het einde. |
+| 8 — inlogzone | ✅ `services/subscription.ts`, `lib/useSubscriptionGate.ts`, `SubscriptionExpiredScreen`, `constants/links.ts`, AuthScreen-CTA + gesplitste registratiefout. |
+| 5 — kleuren | ✅ `greenText`/`greenDark` in `theme.ts`, 73 vervangingen over 22 bestanden, plus volgknop, genereerknop, leeftijd-badge en de HapjesHeld-tegel. |
+| 6 — tabs weekschema | ✅ groene subtab-onderlijn, segmented dagkiezer, lage `activeToolbar`, dagblokken met groene rand + groene VANDAAG-badge. |
+| 7 — allergenen | ✅ `AllergenPathCard`, `SafetyBar` (2 niveaus), `HoeveelhedenBox` en arts-toezicht-banner opgeheven, segmentklik scrolt naar de tegel. Pencil-edit op doses/symptomen bleek al te bestaan. |
+| 2 — aanraders | ⬜ wacht op keuze native/WebView |
+| 3 — opzeggen | ⬜ `services/subscription.ts` staat klaar om uit te breiden |
+| 4 — gamification | ⬜ wacht op keuze A/B/C |
+
+Nog niets gecommit in het app-project sinds `2f68625` (blok 1).
 
 ## Open beslissingen
 
