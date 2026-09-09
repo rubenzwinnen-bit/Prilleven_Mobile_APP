@@ -26,7 +26,14 @@ import { useUser } from '../context/UserContext';
 import { CompactHeader } from '../navigation/RootStack';
 import { ScheduleTable } from '../components/ScheduleTable';
 import { ActiveDayBlocks } from '../components/ActiveDayBlocks';
+import { CookingRhythm } from '../components/CookingRhythm';
 import { InfoModal } from '../components/InfoModal';
+import {
+  readCookedMeals,
+  cookedKeysForSchedule,
+  getCookingRhythmHistory,
+} from '../lib/cookingProgress';
+import type { CookedMeal } from '../lib/cookingProgress';
 import {
   getRecipes,
   saveSchedule,
@@ -84,6 +91,8 @@ export function WeekScheduleScreen({ navigation }: any) {
   const [preferFavorites, setPreferFavorites] = useState(false);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [infoVisible, setInfoVisible] = useState(false);
+  /* Cooked it / Pril Ritme — lokaal bijgehouden, zie lib/cookingProgress.ts. */
+  const [cookedMeals, setCookedMeals] = useState<CookedMeal[]>([]);
   const [scheduleName, setScheduleName] = useState('');
 
   /* Sub-tab + preset (persistent per gebruiker) */
@@ -184,6 +193,10 @@ export function WeekScheduleScreen({ navigation }: any) {
         .catch(() => {
           /* Stil: een mislukte verversing mag het scherm niet blokkeren. */
         });
+
+      /* Je vinkt een gerecht af op het receptdetail, dus bij terugkeer moet
+         het ritme en het vinkje op de tegel meteen kloppen. */
+      readCookedMeals(user).then(setCookedMeals);
     }, [user])
   );
 
@@ -375,6 +388,9 @@ export function WeekScheduleScreen({ navigation }: any) {
             </View>
           ) : (
             <View>
+              {/* Pril Ritme: de lopende week en de drie voorgaande. */}
+              <CookingRhythm history={getCookingRhythmHistory(cookedMeals)} />
+
               {/* Alleen de dagkiezer: de naam van het schema staat al in de
                   subtab-kaart erboven, dus die wordt hier niet herhaald. */}
               <View style={styles.activeToolbar}>
@@ -430,6 +446,7 @@ export function WeekScheduleScreen({ navigation }: any) {
                 recipeMap={recipeMap}
                 onPressRecipe={id => navigation.navigate('RecipeDetail', { id })}
                 todayDay={todayDay}
+                cookedKeys={cookedKeysForSchedule(cookedMeals, activeSchedule.id)}
               />
             </View>
           )

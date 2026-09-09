@@ -11,8 +11,10 @@
  * horizontaal. Vijf kolommen zou op een telefoon neerkomen op tegels van zo'n
  * 60 punten: te smal voor een leesbare receptnaam.
  *
- * Het Cooked it-vinkje en Pril Ritme zitten hier bewust niet in: die horen bij
- * de gamification en wachten op de cross-device Supabase-basis.
+ * Een afgevinkte tegel (Cooked it) krijgt een groene rand, een groene titel en
+ * een vinkje op de foto — spiegel van `.active-meal-card.is-cooked`. Welke
+ * tegels dat zijn komt via `cookedKeys` binnen; het afvinken zelf gebeurt op
+ * het receptdetail.
  */
 
 import React from 'react';
@@ -26,6 +28,7 @@ import {
 } from 'react-native';
 import { colors, spacing } from '../constants/theme';
 import { SCHEDULE_SLOTS, getSlotLabel } from '../constants/data';
+import { mealKey } from '../lib/cookingProgress';
 import type { Recipe } from '../types';
 
 /* Smal genoeg om er bijna drie tegelijk te zien — zo blijft het schuiven kort
@@ -39,6 +42,8 @@ interface Props {
   recipeMap: Map<string, Recipe>;
   onPressRecipe: (recipeId: string) => void;
   todayDay?: string;
+  /** Sleutels uit `mealKey(day, slot, recipeId)` die deze week afgevinkt zijn. */
+  cookedKeys?: Set<string>;
 }
 
 function capitalize(s: string) {
@@ -51,6 +56,7 @@ export function ActiveDayBlocks({
   recipeMap,
   onPressRecipe,
   todayDay,
+  cookedKeys,
 }: Props) {
   return (
     <>
@@ -98,22 +104,36 @@ export function ActiveDayBlocks({
                   );
                 }
 
+                const isCooked = Boolean(
+                  cookedKeys?.has(mealKey(day, slot.id, recipe.id))
+                );
+
                 return (
                   <Pressable
                     key={slot.id}
-                    style={styles.mealCard}
+                    style={[styles.mealCard, isCooked && styles.mealCardCooked]}
                     onPress={() => onPressRecipe(recipe.id)}
                   >
-                    {recipe.image ? (
-                      <Image source={{ uri: recipe.image }} style={styles.media} />
-                    ) : (
-                      <View style={[styles.media, styles.mediaPlaceholder]}>
-                        <Text style={styles.placeholderText}>Geen foto</Text>
-                      </View>
-                    )}
+                    <View>
+                      {recipe.image ? (
+                        <Image source={{ uri: recipe.image }} style={styles.media} />
+                      ) : (
+                        <View style={[styles.media, styles.mediaPlaceholder]}>
+                          <Text style={styles.placeholderText}>Geen foto</Text>
+                        </View>
+                      )}
+                      {isCooked && (
+                        <View style={styles.cookedBadge}>
+                          <Text style={styles.cookedBadgeText}>✓</Text>
+                        </View>
+                      )}
+                    </View>
                     <View style={styles.mealBody}>
                       <Text style={styles.mealSlot}>{slotLabel}</Text>
-                      <Text style={styles.mealName} numberOfLines={2}>
+                      <Text
+                        style={[styles.mealName, isCooked && styles.mealNameCooked]}
+                        numberOfLines={2}
+                      >
                         {recipe.name}
                       </Text>
                     </View>
@@ -180,6 +200,28 @@ const styles = StyleSheet.create({
   mealCardEmpty: {
     opacity: 0.85,
   },
+  /* Spiegel van .active-meal-card.is-cooked */
+  mealCardCooked: {
+    borderColor: 'rgba(79, 125, 108, 0.5)',
+    backgroundColor: 'rgba(79, 125, 108, 0.055)',
+  },
+  cookedBadge: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.greenText,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cookedBadgeText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
   media: {
     width: '100%',
     height: MEDIA_H,
@@ -212,6 +254,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 16,
+  },
+  mealNameCooked: {
+    color: colors.greenText,
   },
   mealEmpty: {
     color: colors.gray,

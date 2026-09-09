@@ -68,6 +68,7 @@ Node ≥ 20 lokaal voor Expo CLI.
     │                                ScheduleTable (weekschema als tabel),
     │                                ActiveDayBlocks (dagkaarten met fototegels),
     │                                InfoModal (uitleg achter de header-info-knop),
+    │                                CookingRhythm (Pril Ritme-balk),
     │                                TabIcons, UsernameHeader, UsernameModal,
     │                                HealthDisclaimerModal, AvatarButton,
     │                                AanraderKaart (+ gedeelde bouwstenen
@@ -84,6 +85,8 @@ Node ≥ 20 lokaal voor Expo CLI.
     ├── lib/                         supabase.ts (singleton client),
     │                                scheduleSelection.ts (receptkeuze bij het
     │                                genereren, incl. favorietenvoorkeur),
+    │                                cookingProgress.ts (Cooked it + Pril Ritme,
+    │                                lokaal — zie waarschuwing in het bestand),
     │                                useSubscriptionGate.ts (toegangscontrole-hook),
     │                                learningProgress.ts (Mijn leertraject, lokaal),
     │                                moderation.ts (gedeeld rapporteren+blokkeren-menu),
@@ -602,8 +605,15 @@ Bron: `Project_weekschema_Productie/PLAN-TIMELINE.md` (web v3.0.0).
    - ✅ v3.2.0: Allergenenpad (zie punt 3) en Mijn leertraject (statusbadges + "Ga verder met…" +
      afrondbalk). "Bezig" komt uit de server-bladwijzer en is dus gedeeld met de web; "Afgerond"
      staat lokaal en synchroniseert bewust niet.
-   - ⬜ Cooked it / Pril Ritme en de HapjesHeld-"Dit helpt mij" wachten op de cross-device
-     Supabase-basis (fase 3). Niet bouwen op de localStorage-preview.
+   - ✅ Cooked it + Pril Ritme in de app (2026-09-09). `lib/cookingProgress.ts` spiegelt het
+     kookgedeelte van `js/store.js`: afvinken per plaats in het actieve schema, weekritme op
+     unieke kookdagen (doel 3), ritmehistoriek over vier weken, en drie mijlpalen die als toast
+     verschijnen. Knop in `RecipeDetailScreen`, balk (`CookingRhythm`) boven het actieve schema,
+     vinkje op de tegels in `ActiveDayBlocks`.
+     **Opslag is lokaal (AsyncStorage), net als `localStorage` op de web — er is GEEN
+     synchronisatie tussen web en app of tussen toestellen.** Dat wacht nog steeds op fase 3
+     (Supabase-tabel met RLS); bouw er geen serverlogica op.
+   - ⬜ De HapjesHeld-"Dit helpt mij" wacht op diezelfde cross-device basis.
 
 **Werkvolgorde per feature:**
 1. CLAUDE.md uitbreiden (nieuwe service/screen toevoegen aan §3/§5/§6/§11).

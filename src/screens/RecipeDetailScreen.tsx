@@ -34,6 +34,15 @@ import {
   getActiveSchedule,
   getChildren,
 } from '../services';
+import {
+  readCookedMeals,
+  markMealCooked,
+  unmarkMealCooked,
+  cookedKeysForSchedule,
+  mealKey,
+  getCookingWeekProgress,
+} from '../lib/cookingProgress';
+import type { CookedMeal } from '../lib/cookingProgress';
 import type { Child } from '../services';
 import type { Recipe, RatingSummary, Comment } from '../types';
 import { getMealMomentLabel, WEEKDAYS, SCHEDULE_SLOTS, getSlotLabel } from '../constants/data';
@@ -45,6 +54,16 @@ import {
   type ChildEvaluation,
   type FamilyStatus,
 } from '../lib/familyLayer';
+
+/* Spiegel van cookingRhythmFeedback in js/components/recipeDetail.js. */
+function cookingFeedback(progress: { days: number; target: number }): string {
+  if (progress.days >= progress.target + 1) return 'Je houdt je Pril Ritme mooi vast.';
+  if (progress.days >= progress.target)
+    return 'Je derde kookdag deze week — je Pril Ritme is rond.';
+  if (progress.days === 2)
+    return 'Twee kookdagen deze week — nog één voor je Pril Ritme.';
+  return 'Je eerste kookdag van deze week.';
+}
 
 export function RecipeDetailScreen({ route, navigation }: any) {
   const { id } = route.params;
@@ -60,17 +79,79 @@ export function RecipeDetailScreen({ route, navigation }: any) {
   const [commentText, setCommentText] = useState('');
   const [children, setChildren] = useState<Child[]>([]);
   const [activeInfo, setActiveInfo] = useState<{
+    scheduleId: string;
     persons: number;
     portions: number;
     X: number;
     occurrences: number;
     daySlots: string[];
+    /* Alle plaatsen van dit recept in het actieve schema, om er één van te
+       kunnen afvinken (Cooked it). */
+    entries: { day: string; slot: string }[];
     selectedDays: number;
   } | null>(null);
+  const [cookedMeals, setCookedMeals] = useState<CookedMeal[]>([]);
+
+  /* Welke plaats in het schema vinken we af? Spiegel van de web: eerst een
+     nog niet afgevinkte plaats van vandaag, dan die van vandaag, dan de eerste
+     nog niet afgevinkte, anders de eerste. */
+  const cookEntry = React.useMemo(() => {
+    if (!activeInfo || activeInfo.entries.length === 0) return null;
+    const today = WEEKDAYS[(new Date().getDay() + 6) % 7];
+    const cooked = cookedKeysForSchedule(cookedMeals, activeInfo.scheduleId);
+    const isCookedEntry = (e: { day: string; slot: string }) =>
+      cooked.has(mealKey(e.day, e.slot, id));
+    const vandaag = activeInfo.entries.filter(e => e.day === today);
+    return (
+      vandaag.find(e => !isCookedEntry(e)) ||
+      vandaag[0] ||
+      activeInfo.entries.find(e => !isCookedEntry(e)) ||
+      activeInfo.entries[0]
+    );
+  }, [activeInfo, cookedMeals, id]);
+
+  const isCooked = Boolean(
+    activeInfo &&
+      cookEntry &&
+      cookedKeysForSchedule(cookedMeals, activeInfo.scheduleId).has(
+        mealKey(cookEntry.day, cookEntry.slot, id)
+      )
+  );
+
+  const handleCooked = async () => {
+    if (!activeInfo || !cookEntry) return;
+    const result = await markMealCooked(user, {
+      scheduleId: activeInfo.scheduleId,
+      day: cookEntry.day,
+      slot: cookEntry.slot,
+      recipeId: id,
+    });
+    if (!result.added) return;
+    setCookedMeals(result.meals);
+
+    /* Een bereikte mijlpaal is het vieren waard; anders volstaat de stand
+       van deze week. */
+    if (result.newlyReached.length > 0) {
+      show(`🎉 ${result.newlyReached[0].title}`);
+    } else {
+      show(cookingFeedback(getCookingWeekProgress(result.meals)));
+    }
+  };
+
+  const handleUncooked = async () => {
+    if (!activeInfo || !cookEntry) return;
+    const next = await unmarkMealCooked(user, {
+      scheduleId: activeInfo.scheduleId,
+      day: cookEntry.day,
+      slot: cookEntry.slot,
+      recipeId: id,
+    });
+    setCookedMeals(next);
+  };
 
   const load = useCallback(async () => {
     try {
-      const [r, isF, avg, uR, cs, activeSch, kids] = await Promise.all([
+      const [r, isF, avg, uR, cs, activeSch, kids, meals] = await Promise.all([
         getRecipe(id),
         isFavorite(id, user),
         getAverageRating(id),
@@ -80,7 +161,9 @@ export function RecipeDetailScreen({ route, navigation }: any) {
         /* Kinderen (family-layer) — defensief: een fout hier mag het
            recept niet blokkeren. */
         getChildren().catch(() => [] as Child[]),
+        readCookedMeals(user),
       ]);
+      setCookedMeals(meals);
       setRecipe(r);
       setFav(isF);
       setAvgRating(avg);
@@ -91,11 +174,13 @@ export function RecipeDetailScreen({ route, navigation }: any) {
       // Check of dit recept in het actieve schema zit
       if (activeSch && r) {
         const daySlots: string[] = [];
+        const entries: { day: string; slot: string }[] = [];
         WEEKDAYS.forEach(day => {
           SCHEDULE_SLOTS.forEach(slot => {
             if (activeSch.days?.[day]?.[slot.id] === id) {
               const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
               daySlots.push(`${dayLabel} - ${getSlotLabel(slot.id)}`);
+              entries.push({ day, slot: slot.id });
             }
           });
         });
@@ -105,11 +190,13 @@ export function RecipeDetailScreen({ route, navigation }: any) {
           const portions = r.portions || 1;
           const X = Math.max(1, Math.ceil(persons / portions));
           setActiveInfo({
+            scheduleId: activeSch.id,
             persons,
             portions,
             X,
             occurrences: daySlots.length,
             daySlots,
+            entries,
             selectedDays: 1,
           });
         } else {
@@ -268,6 +355,32 @@ export function RecipeDetailScreen({ route, navigation }: any) {
 
           {/* Voor jouw gezin (family-layer) */}
           <FamilyLayer recipe={recipe} children={children} />
+
+          {/* Cooked it — alleen wanneer dit recept in het actieve schema staat.
+              De website gebruikt hier een veegbeweging; op mobiel is een knop
+              met ongedaan maken bewuster en voorspelbaarder, net als bij de
+              afrondbalk van een learning. */}
+          {activeInfo && cookEntry && (
+            <View style={[styles.cookSection, isCooked && styles.cookSectionDone]}>
+              <Text style={styles.cookTitle}>
+                {isCooked ? 'Cooked it! ✓' : 'Heb je dit gemaakt?'}
+              </Text>
+              <Text style={styles.cookHint}>
+                {isCooked
+                  ? 'Deze kookdag telt mee voor je Pril Ritme.'
+                  : 'Vink af en het telt mee voor je Pril Ritme — drie kookdagen vormen een volle week.'}
+              </Text>
+              {isCooked ? (
+                <Pressable style={styles.cookUndo} onPress={handleUncooked}>
+                  <Text style={styles.cookUndoText}>Ongedaan maken</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.cookBtn} onPress={handleCooked}>
+                  <Text style={styles.cookBtnText}>Cooked it</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* Actief weekschema info */}
           {activeInfo && (
@@ -727,6 +840,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   tagAllergenText: { color: colors.danger, fontSize: 12, fontWeight: '500' },
+  /* Cooked it, spiegel van .recipe-cook-section */
+  cookSection: {
+    marginTop: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.18)',
+    backgroundColor: 'rgba(79, 125, 108, 0.06)',
+  },
+  cookSectionDone: {
+    borderColor: 'rgba(79, 125, 108, 0.5)',
+  },
+  cookTitle: {
+    color: colors.greenText,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cookHint: {
+    marginTop: 3,
+    marginBottom: spacing.md,
+    color: colors.gray,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  cookBtn: {
+    backgroundColor: colors.greenText,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  cookBtnText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cookUndo: {
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.35)',
+    alignItems: 'center',
+  },
+  cookUndoText: {
+    color: colors.greenText,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   activeScheduleInfo: {
     backgroundColor: colors.white,
     borderRadius: radius.md,
