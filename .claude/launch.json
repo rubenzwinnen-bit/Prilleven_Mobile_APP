@@ -4,13 +4,32 @@
     {
       "name": "website",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["/Users/anneleenplettinx/Desktop/Project_weekschema_Productie/.claude/static-server.mjs"],
+      "runtimeArgs": [
+        "/Users/anneleenplettinx/Desktop/Project_weekschema_Productie/.claude/static-server.mjs"
+      ],
       "port": 5500
     },
     {
       "name": "mobile-web",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start", "--web", "--port", "8081"],
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8081"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "mobile-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--dev-client",
+        "-c"
+      ],
       "port": 8081
     }
   ]
