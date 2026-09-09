@@ -752,7 +752,7 @@ function ChatroomTopicCard({
       onPress={() => onOpenTopic(post.id, roomTitle)}
     >
       <View style={styles.chatroomSource}>
-        <Feather name="message-square" size={13} color={colors.secondaryDark} />
+        <Feather name="message-square" size={13} color={colors.greenText} />
         <Text style={styles.chatroomSourceText} numberOfLines={1}>
           Chatruimte: {roomTitle}
         </Text>
@@ -1134,7 +1134,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   adminBadge: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     borderRadius: radius.sm,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -1165,7 +1165,7 @@ const styles = StyleSheet.create({
   /* Chatruimte-topic-kaart in de feed */
   chatroomCard: {
     borderLeftWidth: 3,
-    borderLeftColor: colors.secondary,
+    borderLeftColor: colors.greenText,
   },
   chatroomCardPressed: {
     opacity: 0.7,
@@ -1179,7 +1179,7 @@ const styles = StyleSheet.create({
   chatroomSourceText: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.secondaryDark,
+    color: colors.greenText,
     flexShrink: 1,
   },
   chatroomTitle: {
@@ -1365,7 +1365,7 @@ const styles = StyleSheet.create({
 
   /* Avatar */
   avatar: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

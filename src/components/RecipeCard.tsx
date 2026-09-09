@@ -141,12 +141,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(152, 195, 164, 0.25)',
+    backgroundColor: 'rgba(79, 125, 108, 0.16)',
   },
   ageBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#4a7c59',
+    color: colors.greenText,
   },
   tagRow: {
     flexDirection: 'row',
@@ -155,22 +155,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   tagMoment: {
-    backgroundColor: 'rgba(152, 195, 164, 0.2)',
+    backgroundColor: 'rgba(79, 125, 108, 0.2)',
     paddingVertical: 3,
     paddingHorizontal: 8,
   },
   tagMomentText: {
-    color: '#4a7c59',
+    color: colors.greenText,
     fontSize: 12,
     fontWeight: '500',
   },
   tagTime: {
-    backgroundColor: 'rgba(152, 195, 164, 0.15)',
+    backgroundColor: 'rgba(79, 125, 108, 0.15)',
     paddingVertical: 3,
     paddingHorizontal: 8,
   },
   tagTimeText: {
-    color: '#4a7c59',
+    color: colors.greenText,
     fontSize: 12,
     fontWeight: '500',
   },

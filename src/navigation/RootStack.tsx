@@ -69,7 +69,7 @@ function HomeIconButton({ onPress }: { onPress: () => void }) {
           width: 36,
           height: 36,
           borderRadius: 18,
-          backgroundColor: colors.secondary,
+          backgroundColor: colors.greenText,
           alignItems: 'center',
           justifyContent: 'center',
         }}

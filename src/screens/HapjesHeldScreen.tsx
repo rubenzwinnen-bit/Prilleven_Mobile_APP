@@ -464,7 +464,7 @@ export function HapjesHeldScreen({ route }: Props) {
             ListFooterComponent={
               loading ? (
                 <View style={[styles.bubble, styles.assistantBubble]}>
-                  <ActivityIndicator size="small" color={colors.secondaryDark} />
+                  <ActivityIndicator size="small" color={colors.greenText} />
                 </View>
               ) : null
             }
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     borderBottomRightRadius: radius.sm,
   },
   assistantBubble: {

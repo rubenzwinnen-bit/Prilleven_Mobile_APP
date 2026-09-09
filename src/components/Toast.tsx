@@ -58,7 +58,7 @@ function ToastBubble({ item }: { item: ToastItem }) {
       ? colors.danger
       : item.type === 'info'
       ? colors.info
-      : colors.secondaryDark;
+      : colors.greenText;
 
   return (
     <Animated.View style={[styles.toast, { backgroundColor: bg, opacity }]}>

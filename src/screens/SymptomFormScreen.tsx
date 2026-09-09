@@ -803,7 +803,7 @@ export function SymptomFormScreen({ navigation, route }: Props) {
 /* Actieve achtergrond per stoplicht-kleur. */
 function stoplightActiveStyle(value: SymptomSeverity) {
   if (value === 'mild') {
-    return { borderColor: colors.secondaryDark, backgroundColor: '#e8f3ec' };
+    return { borderColor: colors.greenText, backgroundColor: '#e8f3ec' };
   }
   if (value === 'matig') {
     return { borderColor: colors.warning, backgroundColor: '#fdf3cf' };

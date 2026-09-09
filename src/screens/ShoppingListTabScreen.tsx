@@ -181,9 +181,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   activeInfoBanner: {
-    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    backgroundColor: 'rgba(79, 125, 108, 0.18)',
     borderLeftWidth: 4,
-    borderLeftColor: colors.secondary,
+    borderLeftColor: colors.greenText,
     borderRadius: radius.sm,
     padding: spacing.md,
     marginTop: spacing.sm,
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   },
   activeInfoBold: {
     fontWeight: '700',
-    color: colors.secondaryDark,
+    color: colors.greenText,
   },
   helperTop: {
     fontSize: 13,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   allDoneText: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.secondaryDark,
+    color: colors.greenText,
   },
   clearBtn: {
     alignSelf: 'center',

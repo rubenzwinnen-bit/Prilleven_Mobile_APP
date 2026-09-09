@@ -449,7 +449,7 @@ const FAMILY_WARN_COLORS: Record<FamilyStatus, { border: string; bg: string }> =
   rood: { border: colors.danger, bg: 'rgba(192, 57, 43, 0.08)' },
   jong: { border: colors.info, bg: 'rgba(93, 173, 226, 0.10)' },
   oranje: { border: '#e67e22', bg: 'rgba(230, 126, 34, 0.10)' },
-  ok: { border: colors.secondary, bg: 'rgba(152, 195, 164, 0.10)' },
+  ok: { border: colors.greenText, bg: 'rgba(79, 125, 108, 0.10)' },
 };
 
 function FamilyLayer({
@@ -679,12 +679,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 999,
-    backgroundColor: 'rgba(152, 195, 164, 0.25)',
+    backgroundColor: 'rgba(79, 125, 108, 0.16)',
   },
   ageBadgeLgText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#4a7c59',
+    color: colors.greenText,
   },
   sectionSub: {
     fontSize: 13,
@@ -698,17 +698,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tagMoment: {
-    backgroundColor: 'rgba(152, 195, 164, 0.2)',
+    backgroundColor: 'rgba(79, 125, 108, 0.2)',
     paddingVertical: 4,
     paddingHorizontal: 10,
   },
-  tagMomentText: { color: '#4a7c59', fontSize: 12, fontWeight: '500' },
+  tagMomentText: { color: colors.greenText, fontSize: 12, fontWeight: '500' },
   tagTime: {
-    backgroundColor: 'rgba(152, 195, 164, 0.15)',
+    backgroundColor: 'rgba(79, 125, 108, 0.15)',
     paddingVertical: 4,
     paddingHorizontal: 10,
   },
-  tagTimeText: { color: '#4a7c59', fontSize: 12, fontWeight: '500' },
+  tagTimeText: { color: colors.greenText, fontSize: 12, fontWeight: '500' },
   tagPortions: {
     backgroundColor: 'rgba(221, 164, 97, 0.18)',
     paddingVertical: 4,
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: colors.secondary,
+    borderLeftColor: colors.greenText,
     ...shadows.sm,
   },
   dayPills: {
@@ -743,13 +743,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   dayPill: {
-    backgroundColor: 'rgba(152, 195, 164, 0.2)',
+    backgroundColor: 'rgba(79, 125, 108, 0.2)',
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 4,
   },
   dayPillText: {
-    color: '#4a7c59',
+    color: colors.greenText,
     fontSize: 12,
     fontWeight: '500',
   },

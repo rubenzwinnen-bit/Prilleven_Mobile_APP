@@ -94,7 +94,7 @@ export function AvatarButton({
 
 const styles = StyleSheet.create({
   circle: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

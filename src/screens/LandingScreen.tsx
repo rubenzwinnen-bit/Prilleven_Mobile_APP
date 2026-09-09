@@ -91,7 +91,7 @@ const TILES: TileDef[] = [
   {
     key: 'hapjesheld',
     image: IMG_HAPJESHELD,
-    overlayColor: 'rgba(130, 190, 147, 0.80)',
+    overlayColor: 'rgba(79, 125, 108, 0.80)',
     title: 'HapjesHeld 2.0',
     badge: 'NIEUW',
   },
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.secondaryDark,
+    color: colors.greenText,
     letterSpacing: 0.5,
   },
   moveHandle: {

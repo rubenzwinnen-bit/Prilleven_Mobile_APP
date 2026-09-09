@@ -775,7 +775,7 @@ export function ProfileScreen({ navigation }: Props) {
                 disabled={memorySaving}
                 trackColor={{
                   false: colors.grayLight,
-                  true: colors.secondary,
+                  true: colors.greenText,
                 }}
                 thumbColor={colors.white}
                 ios_backgroundColor={colors.grayLight}

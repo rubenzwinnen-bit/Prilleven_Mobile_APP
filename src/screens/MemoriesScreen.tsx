@@ -73,9 +73,9 @@ function importanceColor(importance: number): string {
     case 3:
       return colors.primary;
     case 2:
-      return colors.secondaryDark;
+      return colors.greenText;
     default:
-      return colors.secondary;
+      return colors.greenDark;
   }
 }
 

@@ -388,9 +388,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   explainer: {
-    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    backgroundColor: 'rgba(79, 125, 108, 0.18)',
     borderLeftWidth: 4,
-    borderLeftColor: colors.secondaryDark,
+    borderLeftColor: colors.greenText,
     borderRadius: radius.sm,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -414,10 +414,10 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
   scheduleCardActive: {
-    borderColor: colors.secondary,
+    borderColor: colors.greenText,
   },
   activeBadge: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     paddingVertical: 2,
     paddingHorizontal: 8,
     borderRadius: 4,
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   btnSecondary: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
   },
   btnDanger: {
     backgroundColor: colors.danger,

@@ -388,9 +388,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   intro: {
-    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    backgroundColor: 'rgba(79, 125, 108, 0.18)',
     borderLeftWidth: 4,
-    borderLeftColor: colors.secondaryDark,
+    borderLeftColor: colors.greenText,
     borderRadius: radius.sm,
     padding: spacing.md,
     marginBottom: spacing.md,

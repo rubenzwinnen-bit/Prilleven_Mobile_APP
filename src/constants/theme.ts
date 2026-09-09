@@ -1,11 +1,28 @@
 /**
  * THEMA / DESIGN TOKENS
- * Gebaseerd op de website (prilleven.be) — warm terracotta + sage groen
+ * Gebaseerd op de website (prilleven.be) — warm terracotta + merkgroen.
+ *
+ * Terracotta `primary` (#C98966) is de hoofdkleur. Sinds 2026-08-01 is
+ * `greenText` (#4F7D6C) op de website DE groentint — voor tekst én vlakken:
+ * koppen, knoppen, badges, chatbubbels, tabs, avatars. `greenDark` (#3F6558)
+ * is de donkerdere tint daarvan, voor een ingedrukte staat of wanneer er
+ * echt twee groenstappen naast elkaar nodig zijn (zie AVATAR_COLORS in
+ * lib/familyLayer.ts, dat het web-palet 1-op-1 spiegelt).
+ *
+ * Wit op #4F7D6C haalt 4.68 contrast, de kleur zelf 4.42 op de paginakleur
+ * #faf8f5 — bewust net onder de 4.5-norm voor kleine tekst, ruim boven de
+ * 3.0 voor koppen. Keuze van Anneleen, dus niet "corrigeren".
  */
 export const colors = {
   primary: '#C98966',
   primaryDark: '#BE764E',
   primaryLight: '#FFBC7D',
+  /* HET merkgroen. Gebruik dit voor alles wat groen is. */
+  greenText: '#4F7D6C',
+  greenDark: '#3F6558',
+  /* AFGESCHREVEN (2026-08-01) — de oude salie-vulgroenen. Blijven staan voor
+     het geval er ergens nog naar verwezen wordt; gebruik ze niet in nieuw
+     werk, pak `greenText`. */
   secondary: '#98C3A4',
   secondaryDark: '#82BE93',
   danger: '#c0392b',

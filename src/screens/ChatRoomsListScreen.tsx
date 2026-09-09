@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     marginRight: spacing.sm,
   },
 });

@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   adminBadge: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     borderRadius: radius.sm,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
 
   /* Avatar */
   avatar: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.greenText,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -848,14 +848,14 @@ const styles = StyleSheet.create({
     gap: 4,
     borderRadius: radius.lg,
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: colors.greenText,
     backgroundColor: colors.bg,
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
   },
   followBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.greenText,
+    borderColor: colors.greenText,
   },
   followBtnPressed: {
     opacity: 0.7,
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
   followBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.greenText,
   },
   followBtnTextActive: {
     color: colors.white,

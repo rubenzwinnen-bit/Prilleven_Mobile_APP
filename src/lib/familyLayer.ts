@@ -110,11 +110,11 @@ export function childAgeLabel(months: number | null): string {
 ---------------------------------------- */
 const AVATAR_COLORS = [
   colors.primary,
-  colors.secondaryDark,
+  colors.greenText,
   colors.info,
   colors.warning,
   colors.primaryDark,
-  colors.secondary,
+  colors.greenDark,
 ];
 
 export function colorFromSeed(seed: string): string {

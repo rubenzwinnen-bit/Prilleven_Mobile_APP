@@ -267,7 +267,7 @@ export function DoseFormScreen({ navigation, route }: Props) {
                 <Feather
                   name="check-circle"
                   size={18}
-                  color={colors.secondaryDark}
+                  color={colors.greenText}
                 />
                 <Text style={styles.warningText}>
                   Alle 3 introducties zijn al geregistreerd voor dit allergeen.
