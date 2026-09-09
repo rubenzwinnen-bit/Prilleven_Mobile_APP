@@ -10,8 +10,9 @@
  * detailpagina. Niet verstoppen, niet afkorten.
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, Linking } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import {
   RELATIE_LABELS,
@@ -47,16 +48,53 @@ export function AanraderLabels({ product }: { product: AanraderProduct }) {
   );
 }
 
-/** Kortingscode. Zonder `expo-clipboard` is er geen kopieerknop; de tekst
- *  is `selectable`, zodat lang indrukken wél kopiëren toelaat. */
+/**
+ * Kortingscode met kopieerknop. Het label wisselt 1,8 s naar "Gekopieerd"
+ * en springt dan terug — zelfde bevestiging als `kopieerCode()` op de
+ * website. De tekst blijft `selectable`, zodat handmatig kopiëren mogelijk
+ * blijft als het klembord onverhoopt weigert.
+ */
 export function AanraderCode({ code }: { code: string }) {
+  const [gekopieerd, setGekopieerd] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Opruimen bij unmount: anders zet de timer state op een verdwenen
+     component wanneer je meteen terugnavigeert. */
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
+
+  const kopieer = async () => {
+    try {
+      await Clipboard.setStringAsync(code);
+      setGekopieerd(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setGekopieerd(false), 1800);
+    } catch {
+      /* Stil: de code staat er nog gewoon en is selecteerbaar. */
+    }
+  };
+
   return (
-    <View style={styles.code}>
-      <Text style={styles.codeLabel}>Kortingscode</Text>
+    <Pressable
+      onPress={kopieer}
+      style={({ pressed }) => [
+        styles.code,
+        gekopieerd && styles.codeGekopieerd,
+        pressed && styles.pressed,
+      ]}
+      accessibilityLabel={`Kortingscode ${code} kopiëren`}
+    >
+      <Text style={styles.codeLabel}>
+        {gekopieerd ? 'Gekopieerd ✓' : 'Kortingscode · tik om te kopiëren'}
+      </Text>
       <Text style={styles.codeWaarde} selectable>
         {code}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -293,6 +331,10 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: colors.greenText,
     backgroundColor: 'rgba(79, 125, 108, 0.07)',
+  },
+  codeGekopieerd: {
+    backgroundColor: 'rgba(79, 125, 108, 0.16)',
+    borderStyle: 'solid',
   },
   codeLabel: {
     fontSize: 9,
