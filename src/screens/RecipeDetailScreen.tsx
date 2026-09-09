@@ -34,6 +34,7 @@ import {
   getActiveSchedule,
   getChildren,
 } from '../services';
+import { CookSlider } from '../components/CookSlider';
 import {
   readCookedMeals,
   markMealCooked,
@@ -87,43 +88,44 @@ export function RecipeDetailScreen({ route, navigation }: any) {
     daySlots: string[];
     /* Alle plaatsen van dit recept in het actieve schema, om er één van te
        kunnen afvinken (Cooked it). */
-    entries: { day: string; slot: string }[];
+    entries: { day: string; slot: string; label: string }[];
     selectedDays: number;
   } | null>(null);
   const [cookedMeals, setCookedMeals] = useState<CookedMeal[]>([]);
 
-  /* Welke plaats in het schema vinken we af? Spiegel van de web: eerst een
-     nog niet afgevinkte plaats van vandaag, dan die van vandaag, dan de eerste
-     nog niet afgevinkte, anders de eerste. */
-  const cookEntry = React.useMemo(() => {
-    if (!activeInfo || activeInfo.entries.length === 0) return null;
-    const today = WEEKDAYS[(new Date().getDay() + 6) % 7];
-    const cooked = cookedKeysForSchedule(cookedMeals, activeInfo.scheduleId);
-    const isCookedEntry = (e: { day: string; slot: string }) =>
-      cooked.has(mealKey(e.day, e.slot, id));
-    const vandaag = activeInfo.entries.filter(e => e.day === today);
-    return (
-      vandaag.find(e => !isCookedEntry(e)) ||
-      vandaag[0] ||
-      activeInfo.entries.find(e => !isCookedEntry(e)) ||
-      activeInfo.entries[0]
-    );
-  }, [activeInfo, cookedMeals, id]);
+  /* Welke plaatsen bieden we aan om af te vinken?
+     Alleen vandaag en de resterende dagen van de week — een dag die voorbij
+     is kan je niet meer afronden. Elke plaats krijgt een eigen baan, zodat
+     een recept dat twee keer op dezelfde dag staat ook twee keer afgevinkt
+     kan worden. */
+  const openEntries = React.useMemo(() => {
+    if (!activeInfo) return [];
+    const todayIndex = (new Date().getDay() + 6) % 7;
+    return activeInfo.entries
+      .map(e => ({ ...e, dagIndex: (WEEKDAYS as readonly string[]).indexOf(e.day) }))
+      .filter(e => e.dagIndex >= todayIndex)
+      .sort(
+        (a, b) =>
+          a.dagIndex - b.dagIndex ||
+          SCHEDULE_SLOTS.findIndex(sl => sl.id === a.slot) -
+            SCHEDULE_SLOTS.findIndex(sl => sl.id === b.slot)
+      );
+  }, [activeInfo]);
 
-  const isCooked = Boolean(
-    activeInfo &&
-      cookEntry &&
-      cookedKeysForSchedule(cookedMeals, activeInfo.scheduleId).has(
-        mealKey(cookEntry.day, cookEntry.slot, id)
-      )
+  const cookedKeys = React.useMemo(
+    () =>
+      activeInfo
+        ? cookedKeysForSchedule(cookedMeals, activeInfo.scheduleId)
+        : new Set<string>(),
+    [cookedMeals, activeInfo]
   );
 
-  const handleCooked = async () => {
-    if (!activeInfo || !cookEntry) return;
+  const handleCooked = async (entry: { day: string; slot: string }) => {
+    if (!activeInfo) return;
     const result = await markMealCooked(user, {
       scheduleId: activeInfo.scheduleId,
-      day: cookEntry.day,
-      slot: cookEntry.slot,
+      day: entry.day,
+      slot: entry.slot,
       recipeId: id,
     });
     if (!result.added) return;
@@ -138,12 +140,12 @@ export function RecipeDetailScreen({ route, navigation }: any) {
     }
   };
 
-  const handleUncooked = async () => {
-    if (!activeInfo || !cookEntry) return;
+  const handleUncooked = async (entry: { day: string; slot: string }) => {
+    if (!activeInfo) return;
     const next = await unmarkMealCooked(user, {
       scheduleId: activeInfo.scheduleId,
-      day: cookEntry.day,
-      slot: cookEntry.slot,
+      day: entry.day,
+      slot: entry.slot,
       recipeId: id,
     });
     setCookedMeals(next);
@@ -174,13 +176,14 @@ export function RecipeDetailScreen({ route, navigation }: any) {
       // Check of dit recept in het actieve schema zit
       if (activeSch && r) {
         const daySlots: string[] = [];
-        const entries: { day: string; slot: string }[] = [];
+        const entries: { day: string; slot: string; label: string }[] = [];
         WEEKDAYS.forEach(day => {
           SCHEDULE_SLOTS.forEach(slot => {
             if (activeSch.days?.[day]?.[slot.id] === id) {
               const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
-              daySlots.push(`${dayLabel} - ${getSlotLabel(slot.id)}`);
-              entries.push({ day, slot: slot.id });
+              const label = `${dayLabel} - ${getSlotLabel(slot.id)}`;
+              daySlots.push(label);
+              entries.push({ day, slot: slot.id, label });
             }
           });
         });
@@ -356,32 +359,6 @@ export function RecipeDetailScreen({ route, navigation }: any) {
           {/* Voor jouw gezin (family-layer) */}
           <FamilyLayer recipe={recipe} children={children} />
 
-          {/* Cooked it — alleen wanneer dit recept in het actieve schema staat.
-              De website gebruikt hier een veegbeweging; op mobiel is een knop
-              met ongedaan maken bewuster en voorspelbaarder, net als bij de
-              afrondbalk van een learning. */}
-          {activeInfo && cookEntry && (
-            <View style={[styles.cookSection, isCooked && styles.cookSectionDone]}>
-              <Text style={styles.cookTitle}>
-                {isCooked ? 'Cooked it! ✓' : 'Heb je dit gemaakt?'}
-              </Text>
-              <Text style={styles.cookHint}>
-                {isCooked
-                  ? 'Deze kookdag telt mee voor je Pril Ritme.'
-                  : 'Vink af en het telt mee voor je Pril Ritme — drie kookdagen vormen een volle week.'}
-              </Text>
-              {isCooked ? (
-                <Pressable style={styles.cookUndo} onPress={handleUncooked}>
-                  <Text style={styles.cookUndoText}>Ongedaan maken</Text>
-                </Pressable>
-              ) : (
-                <Pressable style={styles.cookBtn} onPress={handleCooked}>
-                  <Text style={styles.cookBtnText}>Cooked it</Text>
-                </Pressable>
-              )}
-            </View>
-          )}
-
           {/* Actief weekschema info */}
           {activeInfo && (
             <View style={styles.activeScheduleInfo}>
@@ -481,6 +458,30 @@ export function RecipeDetailScreen({ route, navigation }: any) {
             {/* Algemene babyhapje-uitleg (papje vs. stukjes) */}
             <BabyPrepTips />
           </View>
+
+          {/* Cooked it — alleen wanneer dit recept in het actieve schema staat.
+              Sleepbeweging zoals op de website: afronden mag niet per ongeluk
+              gebeuren. */}
+          {activeInfo && openEntries.length > 0 && (
+            <View style={styles.cookSection}>
+              <Text style={styles.cookTitle}>Klaar met koken?</Text>
+              <Text style={styles.cookSub}>
+                {openEntries.length === 1
+                  ? 'Rond het gerecht af met één beweging.'
+                  : 'Dit gerecht staat meerdere keren gepland. Rond elke keer apart af.'}
+              </Text>
+              {openEntries.map(entry => (
+                <CookSlider
+                  key={`${entry.day}-${entry.slot}`}
+                  isCooked={cookedKeys.has(mealKey(entry.day, entry.slot, id))}
+                  slotLabel={entry.label}
+                  feedback={cookingFeedback(getCookingWeekProgress(cookedMeals))}
+                  onCooked={() => handleCooked(entry)}
+                  onUndo={() => handleUncooked(entry)}
+                />
+              ))}
+            </View>
+          )}
 
           {/* Beoordeling */}
           <View style={styles.section}>
@@ -841,6 +842,7 @@ const styles = StyleSheet.create({
   },
   tagAllergenText: { color: colors.danger, fontSize: 12, fontWeight: '500' },
   /* Cooked it, spiegel van .recipe-cook-section */
+  /* Omlijsting rond de Cooked it-banen, spiegel van .recipe-cook-section */
   cookSection: {
     marginTop: spacing.lg,
     padding: spacing.lg,
@@ -849,43 +851,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(79, 125, 108, 0.18)',
     backgroundColor: 'rgba(79, 125, 108, 0.06)',
   },
-  cookSectionDone: {
-    borderColor: 'rgba(79, 125, 108, 0.5)',
-  },
   cookTitle: {
-    color: colors.greenText,
+    color: colors.dark,
     fontSize: 16,
     fontWeight: '700',
   },
-  cookHint: {
-    marginTop: 3,
-    marginBottom: spacing.md,
+  cookSub: {
+    marginTop: 2,
     color: colors.gray,
     fontSize: 12.5,
     lineHeight: 18,
-  },
-  cookBtn: {
-    backgroundColor: colors.greenText,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    alignItems: 'center',
-  },
-  cookBtnText: {
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  cookUndo: {
-    paddingVertical: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(79, 125, 108, 0.35)',
-    alignItems: 'center',
-  },
-  cookUndoText: {
-    color: colors.greenText,
-    fontSize: 14,
-    fontWeight: '700',
   },
   activeScheduleInfo: {
     backgroundColor: colors.white,
