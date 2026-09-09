@@ -20,7 +20,7 @@
  * AllergenenChildrenScreen (kind-picker).
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -92,23 +92,48 @@ function easeAccordion() {
   });
 }
 
-/** Spiegel van `shouldShowArtsWarning()` in `js/components/allergenen.js`:
- *  toont de gele arts-warn-banner als er in de laatste 14 dagen een dose met
- *  reactie 'ernstig' of een symptoom met severity 'heftig' werd gelogd. */
-function shouldShowArtsWarning(doses: EhDose[], symptoms: EhSymptom[]) {
+/** Eén veiligheidsmelding per kindje, met twee niveaus — spiegel van
+ *  `renderSafetyBar()` in `js/components/allergenen.js`. Ernstig heeft
+ *  voorrang op twijfel; er verschijnt er nooit meer dan één tegelijk.
+ *  Kijkvenster: 14 dagen. */
+type SafetyLevel = 'ernstig' | 'twijfel' | null;
+
+function recentDoseReaction(doses: EhDose[], reacties: string[]) {
   const cutoff = Date.now() - 14 * 86400000;
-  const recentErnstigeDose = doses.some(d => {
-    if (d.reaction !== 'ernstig') return false;
+  return doses.some(d => {
+    if (!reacties.includes(d.reaction)) return false;
     const t = new Date((d.intro_date || '') + 'T00:00:00Z').getTime();
     return Number.isFinite(t) && t >= cutoff;
   });
-  const recentHeftigSymptom = symptoms.some(s => {
-    if (s.severity !== 'heftig') return false;
+}
+
+function recentSymptomSeverity(symptoms: EhSymptom[], severities: string[]) {
+  const cutoff = Date.now() - 14 * 86400000;
+  return symptoms.some(s => {
+    if (!severities.includes(s.severity)) return false;
     const t = new Date(s.occurred_at || 0).getTime();
     return Number.isFinite(t) && t >= cutoff;
   });
-  return recentErnstigeDose || recentHeftigSymptom;
 }
+
+function safetyLevel(doses: EhDose[], symptoms: EhSymptom[]): SafetyLevel {
+  if (recentDoseReaction(doses, ['ernstig']) || recentSymptomSeverity(symptoms, ['heftig'])) {
+    return 'ernstig';
+  }
+  if (recentDoseReaction(doses, ['mild']) || recentSymptomSeverity(symptoms, ['matig'])) {
+    return 'twijfel';
+  }
+  return null;
+}
+
+/** De hoeveelheid per introductie. Stond eerder in een losse inklapbare
+ *  "Hoeveelheden"-tegel; die is vervallen omdat de hoeveelheid alleen
+ *  relevant is bij de introductie die nú aan de beurt is. */
+const DOSE_AMOUNT_TEXT: Record<number, string> = {
+  1: 'Hoeveelheid: starten met ¼ koffielepel',
+  2: 'Hoeveelheid: ½ koffielepel',
+  3: 'Hoeveelheid: volledige koffielepel',
+};
 
 /* ----------------------------------------
    Foto's per allergeen — Metro vereist statische require()-paden
@@ -160,7 +185,7 @@ function statusVisual(
     case 'veilig':
       return {
         label: '✅ Veilig',
-        color: colors.secondaryDark,
+        color: colors.greenText,
         icon: 'check-circle',
       };
     case 'in-progress':
@@ -198,96 +223,207 @@ function statusVisual(
 }
 
 /* ----------------------------------------
-   Hoeveelheden-box (collapsible)
+   Veiligheidsbalk — maximaal één melding per kindje, niet inklapbaar.
+   Spiegel van `renderSafetyBar()`. De statusteksten worden hier bewust
+   NIET herhaald; die staan in de tegels eronder.
 ---------------------------------------- */
-function HoeveelhedenBox() {
-  const [open, setOpen] = useState(false);
+function SafetyBar({
+  level,
+  childName,
+}: {
+  level: Exclude<SafetyLevel, null>;
+  childName: string;
+}) {
+  const ernstig = level === 'ernstig';
   return (
-    <View style={styles.hoeveelheden}>
-      <Pressable
-        onPress={() => {
-          easeAccordion();
-          setOpen(o => !o);
-        }}
-        style={styles.hoeveelhedenHead}
-      >
-        <Text style={styles.hoeveelhedenTitle}>📏 Hoeveelheden</Text>
-        <Feather
-          name={open ? 'chevron-up' : 'chevron-down'}
-          size={18}
-          color={colors.darkLight}
-        />
-      </Pressable>
-      {open && (
-        <View style={styles.hoeveelhedenBody}>
-          <Text style={styles.hoeveelhedenItem}>
-            <Text style={styles.bold}>Introductie 1:</Text> starten met ¼
-            koffielepel
-          </Text>
-          <Text style={styles.hoeveelhedenItem}>
-            <Text style={styles.bold}>Introductie 2:</Text> ½ koffielepel
-          </Text>
-          <Text style={styles.hoeveelhedenItem}>
-            <Text style={styles.bold}>Introductie 3:</Text> volledige
-            koffielepel
-          </Text>
-        </View>
-      )}
+    <View style={[styles.safetyBar, ernstig ? styles.safetyBarErnstig : styles.safetyBarTwijfel]}>
+      <Text style={[styles.safetyIcon, ernstig && styles.safetyIconErnstig]}>
+        {ernstig ? '⚠️' : '●'}
+      </Text>
+      <View style={styles.safetyCopy}>
+        <Text style={[styles.safetyTitle, ernstig && styles.safetyTitleErnstig]}>
+          {ernstig ? 'Ernstige reactie' : 'Reactie met twijfel'} recent gelogd voor{' '}
+          {childName}
+        </Text>
+        <Text style={[styles.safetyText, ernstig && styles.safetyTextErnstig]}>
+          {ernstig
+            ? 'Pril Leven geeft geen medisch advies. Neem contact op met je huisarts, kinderarts of kinderdiëtiste voor verdere begeleiding.'
+            : 'Bespreek de reactie met je huisarts, kinderarts of kinderdiëtiste voordat je dit allergeen opnieuw aanbiedt.'}
+        </Text>
+      </View>
     </View>
   );
 }
 
 /* ----------------------------------------
-   Volgende stap-banner met foto rechts + gradient
+   ALLERGENENPAD
+   Eén kaart boven de tegels: teller x/9, negen klikbare statussegmenten,
+   een korte mijlpaal, en de eerstvolgende introductie mét hoeveelheid,
+   allergeenfoto en CTA. Vervangt de losse "Volgende stap"-banner, de
+   Hoeveelheden-tegel en de arts-toezicht-banner — die stonden alle drie
+   los boven elkaar en zeiden deels hetzelfde.
+   Spiegel van `renderAllergenPath()` in `js/components/allergenen.js`.
 ---------------------------------------- */
-interface NextUpBannerProps {
-  allergen: AllergenFlowItem;
-  doseNumber: 1 | 2 | 3;
-  onPress: () => void;
+
+/** Segmentkleur per status. Web: .allergenen-path-step.is-* */
+const STEP_STYLE: Record<string, { bg: string; border: string }> = {
+  safe: { bg: colors.greenText, border: colors.greenText },
+  known: { bg: '#f6eee9', border: 'rgba(201, 137, 102, 0.5)' },
+  active: { bg: colors.primary, border: colors.primary },
+  paused: { bg: '#f4f0e8', border: '#d8cdb9' },
+  neutral: { bg: '#ecefea', border: 'rgba(79, 125, 108, 0.24)' },
+};
+
+function stepVariant(
+  status: AllergenStatus,
+  isNext: boolean
+): keyof typeof STEP_STYLE {
+  if (status === 'veilig') return 'safe';
+  if (status === 'allergisch') return 'known';
+  if (status === 'in-progress') return 'active';
+  if (isNext) return 'active';
+  if (status === 'paused') return 'paused';
+  return 'neutral';
 }
 
-function NextUpBanner({
-  allergen,
-  doseNumber,
-  onPress,
-}: NextUpBannerProps) {
-  const photo = ALLERGEN_PHOTOS[allergen.key];
+interface AllergenPathCardProps {
+  childName: string;
+  allergens: readonly AllergenFlowItem[];
+  ctx: AllergenContext;
+  nextUp: { allergen: AllergenFlowItem; doseNumber: 1 | 2 | 3 } | null;
+  artsToezicht: boolean;
+  onSelectAllergen: (key: string) => void;
+  onRegister: () => void;
+}
+
+function AllergenPathCard({
+  childName,
+  allergens,
+  ctx,
+  nextUp,
+  artsToezicht,
+  onSelectAllergen,
+  onRegister,
+}: AllergenPathCardProps) {
+  const resolved = new Set([...ctx.completed, ...ctx.knownAllergies]);
+  const resolvedCount = resolved.size;
+
+  /* Alleen wat écht in de app is opgevolgd telt voor de mijlpaal: gekende
+     allergieën en vooraf aangevinkte allergenen zijn geen prestatie. */
+  const trackedCompleted = ctx.completed.filter(
+    k => !ctx.knownAllergies.includes(k) && !ctx.preIntroduced.includes(k)
+  ).length;
+
+  const milestone =
+    resolvedCount >= allergens.length
+      ? 'Allergenenpad afgerond'
+      : trackedCompleted === 1
+      ? 'Eerste allergeen afgerond'
+      : null;
+
+  const photo = nextUp ? ALLERGEN_PHOTOS[nextUp.allergen.key] : null;
+  const amount = nextUp ? DOSE_AMOUNT_TEXT[nextUp.doseNumber] : '';
+
   return (
-    <View style={styles.nextUp}>
-      {photo ? (
-        <Image source={photo} style={styles.nextUpBg} resizeMode="cover" />
-      ) : null}
-      <LinearGradient
-        colors={[
-          'rgba(238,243,232,1)',
-          'rgba(238,243,232,0.92)',
-          'rgba(238,243,232,0.4)',
-        ]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        locations={[0, 0.55, 1]}
-        style={styles.nextUpGradient}
-      />
-      <View style={styles.nextUpContent}>
-        <Text style={styles.nextUpLabel}>VOLGENDE STAP</Text>
-        <Text style={styles.nextUpTitle}>
-          {allergen.label} — introductie {doseNumber}/3
+    <View style={styles.path}>
+      <View style={styles.pathHead}>
+        <Text style={styles.pathEyebrow} numberOfLines={2}>
+          Allergenenpad · {childName}
         </Text>
-        <Text style={styles.nextUpSub} numberOfLines={2}>
-          {allergen.suggestion}
-        </Text>
-        <Pressable
-          onPress={onPress}
-          style={({ pressed }) => [
-            styles.nextUpCta,
-            pressed && styles.btnPressed,
-          ]}
-        >
-          <Text style={styles.nextUpCtaText}>
-            Introductie {doseNumber} registreren
-          </Text>
-        </Pressable>
+        <View style={styles.pathCount}>
+          <Text style={styles.pathCountNum}>{resolvedCount}</Text>
+          <Text style={styles.pathCountTotal}>/{allergens.length}</Text>
+        </View>
       </View>
+
+      <View style={styles.pathSteps}>
+        {allergens.map(a => {
+          const status = getAllergenStatus(a.key, ctx);
+          const isExcluded = ctx.excludedKeys.includes(a.key);
+          const shown: AllergenStatus =
+            isExcluded && status !== 'veilig' && status !== 'allergisch'
+              ? 'excluded'
+              : status;
+          const variant = stepVariant(shown, nextUp?.allergen.key === a.key);
+          const kleur = STEP_STYLE[variant];
+          return (
+            <Pressable
+              key={a.key}
+              onPress={() => onSelectAllergen(a.key)}
+              style={[
+                styles.pathStep,
+                { backgroundColor: kleur.bg, borderColor: kleur.border },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`${a.label}: ${shown}`}
+              hitSlop={8}
+            />
+          );
+        })}
+      </View>
+
+      {milestone && (
+        <View style={styles.pathMoment}>
+          <Text style={styles.pathMomentIcon}>✓</Text>
+          <Text style={styles.pathMomentText}>{milestone}</Text>
+        </View>
+      )}
+
+      {nextUp ? (
+        <View style={styles.pathNext}>
+          {photo ? (
+            <Image source={photo} style={styles.pathNextBg} resizeMode="cover" />
+          ) : null}
+          <LinearGradient
+            colors={[
+              'rgba(238,243,232,1)',
+              'rgba(238,243,232,0.92)',
+              'rgba(238,243,232,0.4)',
+            ]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            locations={[0, 0.55, 1]}
+            style={styles.pathNextGradient}
+          />
+          <View style={styles.pathNextContent}>
+            <Text style={styles.pathNextLabel}>VOLGENDE STAP</Text>
+            <Text style={styles.pathNextTitle}>
+              {nextUp.allergen.label} · introductie {nextUp.doseNumber}/3
+            </Text>
+            {!!amount && (
+              <View style={styles.pathNextAmount}>
+                <Text style={styles.pathNextAmountText}>{amount}</Text>
+              </View>
+            )}
+            <Text style={styles.pathNextSub} numberOfLines={2}>
+              {nextUp.allergen.suggestion}
+            </Text>
+            <Pressable
+              onPress={onRegister}
+              style={({ pressed }) => [styles.pathNextCta, pressed && styles.btnPressed]}
+            >
+              <Text style={styles.pathNextCtaText}>
+                Introductie {nextUp.doseNumber} registreren
+              </Text>
+            </Pressable>
+            {/* Medisch toezicht staat bewust hier, compact onder de CTA —
+                niet meer als losse banner bovenaan het scherm. */}
+            {artsToezicht && (
+              <View style={styles.pathSupervision}>
+                <Text style={styles.pathSupervisionText}>
+                  🩺 Introductie onder medisch toezicht
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      ) : resolvedCount < allergens.length ? (
+        <View style={styles.pathWait}>
+          <Text style={styles.pathWaitText}>
+            Op dit moment is er geen volgende introductie beschikbaar.
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1083,6 +1219,28 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
   const [symptoms, setSymptoms] = useState<EhSymptom[]>([]);
   const [loading, setLoading] = useState(true);
   const [openKey, setOpenKey] = useState<string | null>(null);
+
+  /* Een tik op een segment in het Allergenenpad opent de bijbehorende tegel
+     en scrolt ernaartoe. De y-posities komen uit onLayout; die van de lijst
+     zelf is nodig omdat een tegel-y relatief aan de lijst gemeten wordt. */
+  const scrollRef = useRef<ScrollView>(null);
+  const listYRef = useRef(0);
+  const tileYRef = useRef<Record<string, number>>({});
+
+  const focusAllergen = useCallback((key: string) => {
+    easeAccordion();
+    setOpenKey(key);
+    /* Even wachten tot de accordeon uitgeklapt is, anders scrollen we naar
+       de positie van vóór de animatie. */
+    setTimeout(() => {
+      const y = tileYRef.current[key];
+      if (y == null) return;
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, listYRef.current + y - spacing.md),
+        animated: true,
+      });
+    }, 260);
+  }, []);
   const [pauseBusy, setPauseBusy] = useState(false);
   const [setupBusy, setSetupBusy] = useState(false);
   const [welcomeBusy, setWelcomeBusy] = useState(false);
@@ -1408,8 +1566,8 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
     !!allergenState?.started &&
     !allergenState?.setup_done &&
     !isPaused;
-  const showArtsWarn = useMemo(
-    () => shouldShowArtsWarning(doses, symptoms),
+  const veiligheid = useMemo(
+    () => safetyLevel(doses, symptoms),
     [doses, symptoms]
   );
   const showArtsToezicht = !!allergenState?.arts_toezicht;
@@ -1428,7 +1586,7 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
           {/* Intro-tekst paritair met `.allergenen-intro` op de website. */}
           <Text style={styles.introText}>
             Volg de 9 allergenen, telkens 3 introducties met een rustpauze
@@ -1457,31 +1615,15 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
                 ]}
                 accessibilityLabel="Symptoom loggen"
               >
-                <Feather name="plus" size={13} color={colors.secondaryDark} />
+                <Feather name="plus" size={13} color={colors.greenText} />
                 <Text style={styles.symptomLogBtnText}>Symptoom loggen</Text>
               </Pressable>
             )}
           </View>
 
-          {/* Hoeveelheden-box — verborgen tijdens pauze-flow + wanneer de
-             functie is uitgeschakeld (v2.8.9). */}
-          {!isPaused && !needsDisabled && <HoeveelhedenBox />}
-
-          {/* Arts-warning banner — paritair met `.allergenen-arts-warn` in
-             de website. Toont bij recente ernstige reactie/heftig symptoom. */}
-          {showArtsWarn && (
-            <View style={styles.artsWarn}>
-              <Text style={styles.artsWarnStrong}>
-                ⚠️ Er is recent een ernstige reactie of heftig symptoom
-                gelogd voor je kindje.
-              </Text>
-              <Text style={styles.artsWarnText}>
-                Pril Leven geeft geen medisch advies, neem contact op met je
-                huisarts, kinderarts of kinderdiëtiste voor verdere
-                begeleiding.
-              </Text>
-            </View>
-          )}
+          {/* Eén veiligheidsmelding, niet inklapbaar. Ernstig verdringt
+             twijfel; nooit twee balken tegelijk. */}
+          {veiligheid && <SafetyBar level={veiligheid} childName={child.name} />}
 
           {needsDisabled ? (
             /* Functie uitgeschakeld — paritair met `renderDisabled()`. */
@@ -1519,46 +1661,30 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
             />
           ) : (
             <>
-              {/* Arts-toezicht banner — paritair met `.allergenen-arts-toezicht-banner`. */}
-              {showArtsToezicht && (
-                <View style={styles.artsToezichtBanner}>
-                  <Text style={styles.artsToezichtIcon}>🩺</Text>
-                  <View style={styles.artsToezichtBody}>
-                    <Text style={styles.artsToezichtTitle}>
-                      Introductie onder medisch toezicht
-                    </Text>
-                    <Text style={styles.artsToezichtText}>
-                      Ga enkel verder met het introduceren van allergenen
-                      onder toezicht van je arts. Sla allergenen over via de
-                      knop per allergeen.
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {/* Volgende stap-banner */}
-              {nextUp && (
-                <NextUpBanner
-                  allergen={nextUp.allergen}
-                  doseNumber={nextUp.doseNumber}
-                  onPress={() => goToDoseForm(nextUp.allergen.key)}
-                />
-              )}
-              {!nextUp && ctx.completed.length > 0 && (
-                <View style={styles.nextUpDone}>
-                  <Text style={styles.nextUpDoneText}>
-                    🎉 Alle allergenen zijn afgewerkt. Je hoeft niets meer te
-                    doen — bekijk de historiek per tegel hieronder.
-                  </Text>
-                </View>
-              )}
+              {/* Allergenenpad: teller, segmenten, mijlpaal en de volgende
+                  introductie in één kaart. Vervangt de losse volgende-stap-,
+                  hoeveelheden- en arts-toezicht-blokken. */}
+              <AllergenPathCard
+                childName={child.name}
+                allergens={ordered}
+                ctx={ctx}
+                nextUp={nextUp}
+                artsToezicht={showArtsToezicht}
+                onSelectAllergen={focusAllergen}
+                onRegister={() => nextUp && goToDoseForm(nextUp.allergen.key)}
+              />
 
               {/* Allergenen-lijst */}
               <Text style={styles.listLabel}>
                 Tik op een allergeen voor info en om een introductie te
                 registreren.
               </Text>
-              <View style={styles.list}>
+              <View
+                style={styles.list}
+                onLayout={e => {
+                  listYRef.current = e.nativeEvent.layout.y;
+                }}
+              >
                 {ordered.map(item => {
                   const rawStatus = getAllergenStatus(item.key, ctx);
                   const isExcluded = ctx.excludedKeys.includes(item.key);
@@ -1589,8 +1715,13 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
                         new Date(a.occurred_at).getTime()
                     );
                   return (
-                    <AllergenCard
+                    <View
                       key={item.key}
+                      onLayout={e => {
+                        tileYRef.current[item.key] = e.nativeEvent.layout.y;
+                      }}
+                    >
+                    <AllergenCard
                       allergen={item}
                       status={status}
                       successCount={successCount}
@@ -1609,6 +1740,7 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
                       excludeBusy={excludeBusyKey === item.key}
                       onToggleExclude={() => handleToggleExclude(item.key)}
                     />
+                    </View>
                   );
                 })}
               </View>
@@ -1677,36 +1809,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* Hoeveelheden-box */
-  hoeveelheden: {
-    backgroundColor: '#fdf7e4',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: '#f5e8b8',
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-  },
-  hoeveelhedenHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-  },
-  hoeveelhedenTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.darkLight,
-  },
-  hoeveelhedenBody: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    gap: 4,
-  },
-  hoeveelhedenItem: {
-    fontSize: 13,
-    color: colors.dark,
-    lineHeight: 19,
-  },
   bold: {
     fontWeight: '700',
   },
@@ -1733,61 +1835,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  /* Arts-warning (recent ernstige reactie / heftig symptoom) — geel/oranje,
-     paritair met `.allergenen-arts-warn` op de website. */
-  artsWarn: {
-    backgroundColor: '#fff4e5',
-    borderWidth: 1,
-    borderColor: '#f0b97a',
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  artsWarnStrong: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6b3a00',
-    marginBottom: 4,
-    lineHeight: 18,
-  },
-  artsWarnText: {
-    fontSize: 13,
-    color: '#6b3a00',
-    lineHeight: 18,
-  },
-
-  /* Arts-toezicht banner (na bevestigde ernstige allergie). */
-  artsToezichtBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: '#fff8e1',
-    borderWidth: 1,
-    borderColor: '#e9c46a',
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  artsToezichtIcon: {
-    fontSize: 22,
-    marginTop: 1,
-  },
-  artsToezichtBody: {
-    flex: 1,
-  },
-  artsToezichtTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6b3a00',
-    marginBottom: 2,
-  },
-  artsToezichtText: {
-    fontSize: 12,
-    color: '#6b3a00',
-    lineHeight: 17,
-  },
 
   /* Pause-flow card — paritair met `.allergenen-pause-flow`. */
   pauseFlowCard: {
@@ -1865,74 +1912,220 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
 
-  /* Volgende stap-banner */
-  nextUp: {
-    position: 'relative',
+  /* ====== ALLERGENENPAD ======
+     Spiegel van .allergenen-path* — zachtgroene kaart met teller,
+     statussegmenten, mijlpaal en de volgende introductie. */
+  path: {
+    backgroundColor: 'rgba(79, 125, 108, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.14)',
     borderRadius: radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: spacing.md,
+  },
+  pathHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  pathEyebrow: {
+    flex: 1,
+    color: colors.greenText,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 19,
+  },
+  pathCount: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexShrink: 0,
+  },
+  pathCountNum: {
+    color: colors.greenText,
+    fontSize: 26,
+    fontWeight: '700',
+  },
+  pathCountTotal: {
+    color: colors.greenText,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pathSteps: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 10,
+  },
+  pathStep: {
+    flex: 1,
+    height: 11,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  pathMoment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 7,
+  },
+  pathMomentIcon: {
+    color: colors.greenText,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pathMomentText: {
+    color: colors.greenText,
+    fontSize: 12,
+  },
+
+  /* Volgende introductie — met allergeenfoto rechts, zoals
+     .allergenen-path-next[data-key] op de website. */
+  pathNext: {
+    position: 'relative',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.24)',
     overflow: 'hidden',
-    marginBottom: spacing.lg,
+    marginTop: 10,
     backgroundColor: '#eef3e8',
     minHeight: 130,
-    ...shadows.sm,
   },
-  nextUpBg: {
+  pathNextBg: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
     width: '70%',
   },
-  nextUpGradient: {
+  pathNextGradient: {
     ...StyleSheet.absoluteFillObject,
   },
-  nextUpContent: {
+  pathNextContent: {
     padding: spacing.md,
-    width: '70%',
+    width: '72%',
   },
-  nextUpLabel: {
+  pathNextLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.secondaryDark,
+    color: colors.greenText,
     letterSpacing: 1,
     marginBottom: 2,
   },
-  nextUpTitle: {
+  pathNextTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.dark,
-    marginBottom: 4,
   },
-  nextUpSub: {
+  pathNextAmount: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.18)',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  },
+  pathNextAmountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.dark,
+  },
+  pathNextSub: {
     fontSize: 12,
     color: colors.darkLight,
     lineHeight: 16,
+    marginTop: 4,
     marginBottom: spacing.sm,
   },
-  nextUpCta: {
+  pathNextCta: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.sm,
     backgroundColor: colors.primary,
   },
-  nextUpCtaDisabled: {
-    backgroundColor: colors.grayLight,
-  },
-  nextUpCtaText: {
+  pathNextCtaText: {
     fontSize: 13,
     fontWeight: '700',
     color: colors.white,
   },
-  nextUpDone: {
-    backgroundColor: '#eaf3ed',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
+  /* Medisch toezicht: compact onder de CTA, geen eigen banner meer. */
+  pathSupervision: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(109, 93, 50, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
   },
-  nextUpDoneText: {
+  pathSupervisionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6d5d32',
+  },
+  pathWait: {
+    marginTop: 10,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    backgroundColor: 'rgba(79, 125, 108, 0.07)',
+  },
+  pathWaitText: {
+    fontSize: 12,
+    color: colors.darkLight,
+    lineHeight: 17,
+  },
+
+  /* ====== VEILIGHEIDSBALK ======
+     Eén melding, twee niveaus. Kleuren van .allergenen-safety-bar--*. */
+  safetyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    marginBottom: spacing.md,
+  },
+  safetyBarErnstig: {
+    backgroundColor: '#fdecec',
+    borderColor: '#e49a98',
+  },
+  safetyBarTwijfel: {
+    backgroundColor: '#fff9e7',
+    borderColor: '#e8c66d',
+  },
+  safetyIcon: {
+    fontSize: 15,
+    color: '#8a5a19',
+  },
+  safetyIconErnstig: {
+    color: '#9b2f2c',
+  },
+  safetyCopy: {
+    flex: 1,
+  },
+  safetyTitle: {
     fontSize: 13,
-    color: colors.dark,
-    lineHeight: 18,
+    fontWeight: '700',
+    color: '#8a5a19',
+  },
+  safetyTitleErnstig: {
+    color: '#9b2f2c',
+  },
+  safetyText: {
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.darkLight,
+  },
+  safetyTextErnstig: {
+    color: '#6f3a38',
   },
 
   /* Allergen-cards */
@@ -2153,16 +2346,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 2,
-    borderColor: colors.secondaryDark,
+    borderColor: colors.greenText,
     backgroundColor: 'transparent',
   },
   symptomLogBtnPressed: {
-    backgroundColor: colors.secondaryDark,
+    backgroundColor: colors.greenText,
   },
   symptomLogBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.secondaryDark,
+    color: colors.greenText,
   },
 
   /* "Overslaan"/"Opnemen"-toggle in arts-toezicht modus, paritair met
