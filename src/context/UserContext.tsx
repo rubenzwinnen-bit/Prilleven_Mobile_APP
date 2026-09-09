@@ -26,7 +26,14 @@ import React, {
   useCallback,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearCache, signOut, getSession, onAuthStateChange } from '../services';
+import {
+  clearCache,
+  signOut,
+  getSession,
+  onAuthStateChange,
+  deregisterPushToken,
+  clearAppBadge,
+} from '../services';
 
 const USER_KEY = 'receptenboek_user';
 
@@ -104,6 +111,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   /** Log volledig uit. */
   const logout = useCallback(async () => {
+    /* Push-token server-side wissen VÓÓR signOut (JWT is dan nog geldig)
+       zodat deze telefoon geen pushes meer krijgt na uitloggen. Wis ook
+       meteen de app-icoon-badge. Beide zijn niet-blokkerend. */
+    await deregisterPushToken();
+    await clearAppBadge();
     try {
       await signOut();
     } catch {

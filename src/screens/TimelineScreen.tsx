@@ -853,11 +853,14 @@ export function TimelineScreen() {
   const navigation =
     useNavigation<BottomTabNavigationProp<LandingTabParamList, 'Tijdlijn'>>();
 
-  /* Tik op een chatruimte-topic → open het in de Chatruimtes-tab. */
+  /* Tik op een chatruimte-topic → open het in de Chatruimtes-tab.
+     initial: false houdt RoomList onder ChatTopic in de stack, zodat de
+     terugknop naar het chatruimtes-overzicht gaat i.p.v. de tab te verlaten. */
   const openChatroomTopic = useCallback(
     (topicId: string, roomTitle: string) => {
       navigation.navigate('Chatruimtes', {
         screen: 'ChatTopic',
+        initial: false,
         params: { topicId, roomTitle },
       });
     },

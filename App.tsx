@@ -32,6 +32,7 @@ import { NotificationProvider } from './src/context/NotificationContext';
 import { ShoppingListProvider } from './src/context/ShoppingListContext';
 import { ToastProvider } from './src/components/Toast';
 import { RootStackNavigator } from './src/navigation/RootStack';
+import { navigationRef, PushRouter } from './src/navigation/pushRouting';
 import { AuthScreen } from './src/screens/AuthScreen';
 
 /* ----------------------------------------
@@ -60,9 +61,11 @@ function AppGate() {
     );
   }
 
-  /* Ingelogd → toon de app */
+  /* Ingelogd → toon de app. PushRouter hangt de notificatie-listeners op;
+     hij staat binnen de container zodat navigationRef gegarandeerd bestaat. */
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
+      <PushRouter />
       <RootStackNavigator />
     </NavigationContainer>
   );

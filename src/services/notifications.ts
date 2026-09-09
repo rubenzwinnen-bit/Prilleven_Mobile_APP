@@ -1,32 +1,30 @@
 /**
  * NOTIFICATIONS SERVICE — admin-post tellers
  *
- * Berekent het aantal NIEUWE admin-posts sinds een "laatst gezien"-tijdstip,
+ * Berekent het aantal NIEUWE items sinds een "laatst gezien"-tijdstip,
  * gescheiden in twee tellers (mirror van de twee footer-tab-badges):
  *
- *   Tijdlijn    → admin-posts in de community-feed (source_type 'community')
- *   Chatruimtes → admin-activiteit (topics + replies) per chatruimte EN
- *                 per topic, opgeteld over alle rooms
+ *   Tijdlijn    → SERVER-SIDE teller (fetchTimelineBadge → getAppBadges):
+ *                 nieuwe posts ÉN replies in de community-feed + gevolgde
+ *                 chatruimte-topics. De server bepaalt zelf admin-status en
+ *                 past de telregel + 6-weken-vervaltermijn toe.
+ *   Chatruimtes → CLIENT-SIDE admin-activiteit (topics + replies) per
+ *                 chatruimte EN per topic, opgeteld over alle rooms.
  *
  * Er is GEEN push-mechanisme; de NotificationContext pollt deze functies.
  * Beide functies zijn defensief: bij een fout geven ze 0 terug zodat de
  * polling-loop nooit crasht.
  *
- * "Admin-post" = een post/topic met `author_is_admin === true`.
  * "Nieuw" = `created_at` strikt na het meegegeven `since`-tijdstip.
  *
- * `includeAllAuthors` (admin-modus): wanneer true tellen ALLE nieuwe posts/
- * topics mee, niet enkel die van admins. Gewone gebruikers zien dus enkel
- * admin-aankondigingen; admins zien alle nieuwe community-activiteit.
+ * `includeAllAuthors` (admin-modus, enkel nog voor de chatruimte-teller):
+ * wanneer true tellen ALLE nieuwe topics/replies mee, niet enkel die van
+ * admins. Gewone gebruikers zien dus enkel admin-aankondigingen; admins
+ * zien alle nieuwe activiteit.
  */
 
-import { listPosts } from './community';
+import { getAppBadges } from './community';
 import { listRooms, getRoom, getTopic } from './chatRooms';
-
-/* Hoeveel posts/topics we per area ophalen om te tellen. Ruim genoeg:
-   admins plaatsen niet bij bosjes en de feed is cursor-gesorteerd op
-   created_at (nieuwste eerst). */
-const SCAN_LIMIT = 50;
 
 /* Vervaltermijn op de badges: items ouder dan deze termijn tellen nooit als
    "nieuw", ook niet wanneer de gebruiker de tab/het topic nooit opende. Zo
@@ -55,25 +53,22 @@ function isNewerThan(createdAt: string, since: string | null): boolean {
 }
 
 /* ----------------------------------------
-   countNewAdminTimelinePosts
-   Aantal nieuwe items in de tijdlijn sinds `since`, opgeteld:
-     - admin-posts in de community-feed (source_type 'community')
-     - ALLE nieuwe gevolgde chatruimte-topics (source_type 'chatroom') —
-       deze staan al in de feed omdat de gebruiker de room/het topic volgt,
-       dus tellen ze altijd mee, ongeacht auteur.
+   fetchTimelineBadge
+   Server-side teller voor de tijdlijn-badge. Telt nieuwe POSTS én REPLIES
+   sinds `since` (de oude client-telling telde enkel posts). De server
+   bepaalt zelf of de gebruiker admin is en past de telregel toe:
+     - admin: alle nieuwe posts + replies;
+     - gewone gebruiker: enkel admin-geschreven posts + replies + alle
+       nieuwe gevolgde chatruimte-topics.
+   Vervaltermijn (6 weken) + geblokkeerde auteurs zitten server-side.
+   Defensief: bij een fout → 0 zodat de polling-loop nooit crasht.
 ---------------------------------------- */
-export async function countNewAdminTimelinePosts(
-  since: string | null,
-  includeAllAuthors = false
+export async function fetchTimelineBadge(
+  since: string | null
 ): Promise<number> {
   try {
-    const ref = withExpiry(since);
-    const posts = await listPosts({ limit: SCAN_LIMIT });
-    return posts.filter((p) => {
-      if (!isNewerThan(p.created_at, ref)) return false;
-      if (p.source_type === 'chatroom') return true;
-      return includeAllAuthors || p.author_is_admin;
-    }).length;
+    const { timeline } = await getAppBadges(since);
+    return timeline;
   } catch {
     return 0;
   }

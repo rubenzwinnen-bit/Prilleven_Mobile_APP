@@ -4,7 +4,7 @@
  * Houdt twee tellers bij die als rode badge (cijfer in rode rondje)
  * op de footer-tabs verschijnen:
  *
- *   timelineCount   → nieuwe admin-posts in de tijdlijn (community-feed)
+ *   timelineCount   → nieuwe posts + replies in de tijdlijn (server-side geteld)
  *   chatroomsCount  → nieuwe admin-activiteit over alle chatruimtes, opgeteld
  *
  * De chatruimtes-teller is opgebouwd uit drie niveaus die uit één telling
@@ -23,8 +23,11 @@
  * nieuw, ook niet als de gebruiker de tab/het topic nooit opende — zo lopen de
  * badges niet eindeloop op. Die ondergrens zit in services/notifications.ts.
  *
- * Er is GEEN push: we pollen elke POLL_INTERVAL_MS én bij elke keer dat
- * de app weer naar de voorgrond komt (AppState 'active').
+ * In-app pollen we elke POLL_INTERVAL_MS én bij elke keer dat de app weer
+ * naar de voorgrond komt (AppState 'active'). Bij elke telling spiegelen we
+ * het TOTAAL (tijdlijn + chatruimtes) naar de app-icoon-badge via setAppBadge.
+ * Wanneer de app dicht is zet de server het absolute badge-getal rechtstreeks
+ * via de push (APNs/FCM); de push-token wordt bij (her)login geregistreerd.
  *
  * Bij de allereerste run voor een gebruiker (nog geen markeerpunt) zetten
  * we het markeerpunt op "nu" zodat bestaande posts niet allemaal als
@@ -57,9 +60,12 @@ import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from './UserContext';
 import {
-  countNewAdminTimelinePosts,
+  fetchTimelineBadge,
   countNewAdminChatroomActivity,
   getIsAdmin,
+  registerPushToken,
+  syncBadgeState,
+  setAppBadge,
 } from '../services';
 
 const POLL_INTERVAL_MS = 60_000;
@@ -132,7 +138,7 @@ export function NotificationProvider({
   const refresh = useCallback(async () => {
     if (!user) return;
     const [tl, chatroom] = await Promise.all([
-      countNewAdminTimelinePosts(seenTimelineRef.current, isAdminRef.current),
+      fetchTimelineBadge(seenTimelineRef.current),
       countNewAdminChatroomActivity(
         seenChatroomsRef.current,
         isAdminRef.current,
@@ -143,6 +149,10 @@ export function NotificationProvider({
     setChatroomsCount(chatroom.total);
     setChatroomRoomCounts(chatroom.perRoom);
     setChatroomTopicCounts(chatroom.perTopic);
+    /* App-icoon-badge = alles opgeteld (tijdlijn + chatruimtes). Zolang de
+       app open is spiegelen we het totaal lokaal; wanneer de app dicht is
+       zet de server het absolute getal via de push (APNs/FCM). */
+    setAppBadge(tl + chatroom.total);
   }, [user]);
 
   /* Bij login/wissel van gebruiker: markeerpunten laden (of initialiseren
@@ -163,6 +173,11 @@ export function NotificationProvider({
     }
 
     (async () => {
+      /* Push-token registreren bij (her)login — mapt de Expo-push-token
+         server-side op de user_id zodat de server pushes + app-icoon-badge
+         kan sturen wanneer de app dicht is. Niet-blokkerend (gooit nooit). */
+      registerPushToken();
+
       /* Admin-status bepalen vóór de eerste telling. */
       try {
         isAdminRef.current = await getIsAdmin(user);
@@ -201,6 +216,14 @@ export function NotificationProvider({
         topicReadsRef.current = {};
       }
 
+      /* Volledige baseline naar de server spiegelen zodat die bij een push
+         (app dicht) het juiste app-icoon-getal per ontvanger kan berekenen. */
+      syncBadgeState({
+        timeline_seen_at: seenTimelineRef.current || undefined,
+        chatrooms_seen_at: seenChatroomsRef.current || undefined,
+        topic_reads: topicReadsRef.current,
+      });
+
       if (!cancelled) await refresh();
     })();
 
@@ -233,6 +256,8 @@ export function NotificationProvider({
     seenTimelineRef.current = nowIso;
     setTimelineCount(0);
     if (timelineKey) AsyncStorage.setItem(timelineKey, nowIso).catch(() => {});
+    /* Server-spiegel bijwerken (voor de push-badge wanneer de app dicht is). */
+    syncBadgeState({ timeline_seen_at: nowIso });
   }, [timelineKey]);
 
   const markTopicSeen = useCallback(
@@ -247,6 +272,8 @@ export function NotificationProvider({
           topicReadsKey,
           JSON.stringify(topicReadsRef.current)
         ).catch(() => {});
+      /* Server-spiegel bijwerken (voor de push-badge wanneer de app dicht is). */
+      syncBadgeState({ topic_reads: topicReadsRef.current });
       refresh();
     },
     [topicReadsKey, refresh]

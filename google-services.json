@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "206833500636",
+    "project_id": "prilleven-d2186",
+    "storage_bucket": "prilleven-d2186.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:206833500636:android:330288d7e857fdcc924f19",
+        "android_client_info": {
+          "package_name": "be.prilleven.mobileapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtqWo7HHyyg9dhUkv0I0s77NgbyR60-CM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

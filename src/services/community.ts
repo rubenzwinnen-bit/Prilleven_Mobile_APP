@@ -185,6 +185,24 @@ export async function listPosts(opts: {
 }
 
 /* ----------------------------------------
+   getAppBadges
+   GET /api/community/app-badges?since=<iso>
+
+   Server-side teller voor de tijdlijn-badge. Telt nieuwe posts ÉN
+   replies sinds `since` (admin = alles, gewone gebruiker = admin-content
+   + gevolgde topics). Ondergrens 6 weken zit server-side. `since` null
+   → server geeft 0.
+---------------------------------------- */
+export async function getAppBadges(
+  since: string | null
+): Promise<{ timeline: number }> {
+  const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+  const response = await authedFetch(`/api/community/app-badges${qs}`);
+  const data = await jsonOrThrow<{ timeline?: number }>(response);
+  return { timeline: typeof data?.timeline === 'number' ? data.timeline : 0 };
+}
+
+/* ----------------------------------------
    createPost (admin-only in de UI, server staat eigen insert toe)
    POST /api/community/posts { body, category, image_path, poll }
    412 wanneer er nog geen nickname is ingesteld.

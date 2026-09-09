@@ -66,6 +66,7 @@ export {
 export type { CommunityProfile } from './communityProfile';
 export {
   listPosts,
+  getAppBadges,
   createPost,
   togglePostLike,
   toggleReplyLike,
@@ -158,10 +159,20 @@ export {
 } from './memory';
 export type { Memory } from './memory';
 export {
-  countNewAdminTimelinePosts,
+  fetchTimelineBadge,
   countNewAdminChatroomActivity,
 } from './notifications';
 export type { ChatroomActivity } from './notifications';
+export {
+  registerPushToken,
+  deregisterPushToken,
+  syncBadgeState,
+  setAppBadge,
+  clearAppBadge,
+  addPushResponseListener,
+  getInitialPushResponse,
+} from './push';
+export type { BadgeStatePatch, PushData, PushKind, PushResponse } from './push';
 export {
   ALLERGEN_FLOW,
   ALLERGEN_COOLDOWN_DAYS,
