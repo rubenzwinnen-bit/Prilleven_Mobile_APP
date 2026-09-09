@@ -51,5 +51,8 @@ export interface Schedule {
 export interface ActiveSchedule {
   days: Record<string, Record<string, string | null>>;
   excludedAllergens: string[];
+  /* Favorietenvoorkeur bij het genereren (web-parity). Optioneel: schema's van
+     vóór deze feature hebben het veld niet. */
+  preferFavorites?: boolean;
   generatedAt: string;
 }
