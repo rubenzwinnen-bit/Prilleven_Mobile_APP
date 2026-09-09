@@ -340,54 +340,59 @@ export function WeekScheduleScreen({ navigation }: any) {
             </View>
           ) : (
             <View>
-              <Text style={styles.title} numberOfLines={2}>
-                {activeSchedule.name || 'Actief weekschema'}
-              </Text>
+              {/* Lage titel-/segmentbalk: de naam van het schema en de
+                  dagkiezer horen bij elkaar, dus staan ze in één blok zonder
+                  kaart of uitleg eromheen (web-pariteit met
+                  .active-schedule-toolbar). */}
+              <View style={styles.activeToolbar}>
+                <Text style={styles.activeToolbarTitle} numberOfLines={2}>
+                  {activeSchedule.name || 'Actief weekschema'}
+                </Text>
 
-              {/* Preset-bar */}
-              <View style={styles.presetBar}>
-                <Pressable
-                  style={[styles.presetBtn, preset === 'today' && styles.presetBtnActive]}
-                  onPress={() => persistPreset('today')}
-                >
-                  <Text
-                    style={[
-                      styles.presetBtnText,
-                      preset === 'today' && styles.presetBtnTextActive,
-                    ]}
+                <View style={styles.presetBar}>
+                  <Pressable
+                    style={[styles.presetBtn, preset === 'today' && styles.presetBtnActive]}
+                    onPress={() => persistPreset('today')}
                   >
-                    Vandaag
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.presetBtn,
-                    preset === 'today-tomorrow' && styles.presetBtnActive,
-                  ]}
-                  onPress={() => persistPreset('today-tomorrow')}
-                >
-                  <Text
+                    <Text
+                      style={[
+                        styles.presetBtnText,
+                        preset === 'today' && styles.presetBtnTextActive,
+                      ]}
+                    >
+                      Vandaag
+                    </Text>
+                  </Pressable>
+                  <Pressable
                     style={[
-                      styles.presetBtnText,
-                      preset === 'today-tomorrow' && styles.presetBtnTextActive,
+                      styles.presetBtn,
+                      preset === 'today-tomorrow' && styles.presetBtnActive,
                     ]}
+                    onPress={() => persistPreset('today-tomorrow')}
                   >
-                    Vandaag & morgen
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.presetBtn, preset === 'week' && styles.presetBtnActive]}
-                  onPress={() => persistPreset('week')}
-                >
-                  <Text
-                    style={[
-                      styles.presetBtnText,
-                      preset === 'week' && styles.presetBtnTextActive,
-                    ]}
+                    <Text
+                      style={[
+                        styles.presetBtnText,
+                        preset === 'today-tomorrow' && styles.presetBtnTextActive,
+                      ]}
+                    >
+                      Vandaag & morgen
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.presetBtn, preset === 'week' && styles.presetBtnActive]}
+                    onPress={() => persistPreset('week')}
                   >
-                    Heel weekschema
-                  </Text>
-                </Pressable>
+                    <Text
+                      style={[
+                        styles.presetBtnText,
+                        preset === 'week' && styles.presetBtnTextActive,
+                      ]}
+                    >
+                      Heel weekschema
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
 
               {getDaysForPreset(preset).map(day => {
@@ -490,7 +495,7 @@ export function WeekScheduleScreen({ navigation }: any) {
 
               <View style={styles.buttonRow}>
                 <Pressable
-                  style={[styles.btn, styles.btnPrimary, styles.btnLg]}
+                  style={[styles.btn, styles.btnSecondary, styles.btnLg]}
                   onPress={generate}
                 >
                   <Text style={styles.btnPrimaryText}>🎲 Genereer Weekschema</Text>
@@ -642,9 +647,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   intro: {
-    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    backgroundColor: 'rgba(79, 125, 108, 0.18)',
     borderLeftWidth: 4,
-    borderLeftColor: colors.secondaryDark,
+    borderLeftColor: colors.greenText,
     borderRadius: radius.sm,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -714,7 +719,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
   },
   btnPrimary: { backgroundColor: colors.primary },
-  btnSecondary: { backgroundColor: colors.secondary },
+  btnSecondary: { backgroundColor: colors.greenText },
   btnPrimaryText: { color: colors.white, fontWeight: '600' },
   btnOutline: {
     borderWidth: 2,
@@ -869,55 +874,83 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   subtabBtnActive: {
-    borderBottomColor: colors.primary,
+    borderBottomColor: colors.greenText,
   },
   subtabBtnText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: colors.gray,
+    fontWeight: '500',
+    color: colors.darkLight,
   },
   subtabBtnTextActive: {
-    color: colors.primary,
+    color: colors.greenText,
+    fontWeight: '600',
   },
 
-  /* ====== Preset bar (Vandaag / Vandaag & morgen / Heel weekschema) ====== */
+  /* ====== Lage titel-/segmentbalk boven het actieve schema ======
+     Web-pariteit met .active-schedule-toolbar: geen kaart, geen schaduw,
+     geen uitleg — alleen de naam en de dagkiezer. */
+  activeToolbar: {
+    marginBottom: spacing.lg,
+  },
+  activeToolbarTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.dark,
+    marginBottom: spacing.sm,
+  },
+
+  /* ====== Dagkiezer (Vandaag / Vandaag & morgen / Heel weekschema) ======
+     Segmented control: één omlijnde bak met daarin pillen, i.p.v. drie losse
+     omrande knoppen. Spiegel van .day-selector-bar / .day-selector-btn. */
   presetBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: spacing.lg,
+    gap: 3,
+    padding: 4,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.light,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   presetBtn: {
     paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderRadius: radius.sm,
-    backgroundColor: colors.white,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+    backgroundColor: 'transparent',
   },
   presetBtnActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.greenText,
+    shadowColor: colors.greenText,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 2,
   },
   presetBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.greenText,
   },
   presetBtnTextActive: {
     color: colors.white,
   },
 
   /* ====== Actief weekschema dag-blokken ====== */
+  /* Web-pariteit met .active-day-block: een rondom lopende, zachtgroene rand
+     in plaats van een dikke linkerbalk. Vandaag valt op doordat die rand
+     terracotta wordt — niet doordat er een streep bij komt. */
   activeDayBlock: {
     backgroundColor: colors.white,
-    borderRadius: radius.md,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.14)',
     padding: spacing.md,
     marginBottom: spacing.md,
     ...shadows.sm,
   },
   activeDayBlockToday: {
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
+    borderColor: colors.primary,
   },
   activeDayHeader: {
     flexDirection: 'row',
@@ -934,15 +967,15 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
   },
   activeDayBadge: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.greenText,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: radius.sm,
+    borderRadius: 12,
   },
   activeDayBadgeText: {
     color: colors.white,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '500',
     letterSpacing: 0.5,
   },
   activeRow: {
