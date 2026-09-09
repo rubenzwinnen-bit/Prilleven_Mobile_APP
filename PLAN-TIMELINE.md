@@ -6,6 +6,192 @@
 
 ---
 
+## 2026-09-09 (deel 2) — Toestel-testronde: stijl, weergaven en prestaties
+
+**Context**: eerste sessie waarin de 3.2.0-code écht op een toestel draaide. Expo Go bleek
+onbruikbaar (App Store levert enkel SDK 57, project staat op 54) en er staat geen Xcode op de
+Mac, dus testen loopt voortaan via een EAS development build op de iPhone. De Apple-overeenkomst
+was al goedgekeurd, waardoor die build kon.
+
+### Opgelost onderweg
+
+- **Metro bundelde niet.** `babel-preset-expo` zat genest onder `node_modules/expo/node_modules/`
+  en was dus niet vindbaar vanaf de projectroot, waar `babel.config.js` staat. Stond al zo in de
+  vastgelegde `package-lock.json`; viel nooit op omdat er lokaal nooit gebundeld werd. Opgelost
+  door hem expliciet als devDependency toe te voegen — wat de Babel-foutmelding zelf voorstelt.
+- **`expo-dev-client`** is door de EAS-build aan `package.json` toegevoegd.
+- **Launch-profiel `mobile-dev`** toegevoegd zodat Metro met één commando in dev-client-modus start.
+
+### Stijlronde (web-pariteit)
+
+- **Inlogscherm**: titel, tabs, links en CTA naar `greenText`, conform `.auth-modal`.
+- **Favorieten**: herbouwd naar `js/components/favorites.js` — hero met tel-tabs, panelen per tab,
+  schemakaarten volgens `.saved-schedule-card`, lege staten volgens `.favorites-empty-state`.
+  De knop "Bewerken" is bewust niet overgenomen: schema's bewerken bestaat niet in de app.
+- **Weekschema**: sub-tabs als kaarten in de favorietenstijl (afwijking van de web), de
+  genereer-tab toont `ScheduleTable` (spiegel van `renderScheduleGrid`), de actieve tab
+  `ActiveDayBlocks` (spiegel van `renderActiveDays`) — net als op de website twee weergaven.
+- **Landing**: hero-kaart in dezelfde stijl, volledig aanklikbaar naar het profiel. Tegels
+  kregen één neutrale verdonkering; het veld `overlayColor` per tegel is geschrapt.
+- **Ruimtewinst**: introblokken verhuisd naar een info-knop in de header (`InfoModal`), koppen
+  geschrapt die de sub-tabs al zeggen, paginapadding verkleind.
+
+### Favorietenvoorkeur bij het genereren
+
+Nieuw `lib/scheduleSelection.ts`, één-op-één van `js/components/weekSchedule.js`: kans en plafond
+schalen met het aantal passende favorieten (20%/2, 30%/4, 35%/7), het onderscheid vervalt onder
+een niet-favoriete pool van 4, een favoriet komt hoogstens tweemaal voor, en `ensureFavoriteAppears`
+forceert er één als alle kansen misten. `preferFavorites` wordt in het schema bewaard.
+
+### Prestaties
+
+- **Chatruimte-badges naar de server** (grootste winst). De app deed per telronde `listRooms()` +
+  `getRoom()` per ruimte + `getTopic()` per recent actief topic: vijf tot twintig verzoeken, elke
+  minuut. `countChatroomBadge` bestond al server-side voor de push-badge; die geeft nu
+  `{ total, perRoom, perTopic }` en de route `app-badges` geeft `{ timeline, chatrooms }`.
+  Eén verzoek per telronde. `services/notifications.ts` ging van 184 naar 62 regels, en de
+  `getIsAdmin`-call bij het inloggen verviel omdat de server de telregel zelf toepast.
+  **Website-commit `d8e84a7`; moet gedeployed zijn voor de app-kant zin heeft.**
+- **Poll van 60 naar 180 seconden**, en terugkeren naar de voorgrond ververst hoogstens eens per
+  30 seconden in plaats van bij elke wissel.
+- **Lijstinstellingen** (`initialNumToRender`, `maxToRenderPerBatch`, `windowSize`,
+  `removeClippedSubviews`) op zes lijstschermen; die stonden nergens ingesteld.
+- **Receptenlijst versmald**: `getRecipes()` haalt geen ingrediënten en bereidingsstappen meer op.
+  Daarom vult die functie de per-recept-cache niet meer — anders kreeg de boodschappenlijst een
+  recept zonder ingrediënten.
+
+### Bewust niet gedaan
+
+- **`expo-image`** (schijfcache voor foto's): native module, dus de dev-build op het toestel zou
+  breken tot er een nieuwe build is. Hoort in dezelfde ronde als de volgende build.
+- **De acht require-cycles** in de navigatielaag: veel bestanden, kans op stukke navigatie, minste
+  zichtbare winst. Slecht moment vlak voor een release.
+
+### Volgende stap
+
+1. Website deployen (commit `d8e84a7`), anders staan de chatruimtebadges op nul.
+2. Verder met de testmatrix; punt 1 t/m 5 (push) vraagt nog een `preview`-build.
+
+---
+
+## 2026-09-09 — Web-pariteit ronde 4: acht blokken in één release (3.1.1 → 3.2.0)
+
+**Context**: de web-app liep op zeven punten voor. Ruben vroeg om die op te zoeken in de
+web-code en er een plan van te maken; dat werd `PLAN-MOBILE-3.2.md` met acht blokken (het
+achtste — de inlogzone — kwam er tijdens het opzoekwerk bij). Alle acht zijn deze sessie
+geprogrammeerd. De push-server-kant is op 2026-09-02 al naar productie gegaan.
+
+### Afgerond deze sessie
+
+- **Blok 1 — app-icoon-push afgemaakt.** `services/push.ts` uitgebreid met tik-afhandeling
+  (`addPushResponseListener` + `getInitialPushResponse`) en een nieuw
+  `navigation/pushRouting.tsx` met `navigationRef` + `<PushRouter/>`: een tik opent de
+  Tijdlijn of rechtstreeks het juiste ChatTopic. `handledIds` voorkomt dubbel navigeren na
+  een koude start; `initial: false` houdt RoomList onder ChatTopic zodat de terugknop in de
+  tab blijft.
+  **Website-kant (gedeployed naar productie, commits `6463c82` + `a5fb38a`)**: de server
+  stuurde enkel title/body/badge, dus er viel niets te routeren. `notifyNewActivity` hangt nu
+  `data: { kind, topicId?, postId?, roomSlug?, roomTitle? }` aan elk Expo-bericht.
+- **Blok 8 — toegangscontrole op het lidmaatschap.** De app controleerde dit NERGENS:
+  `allowed_users` werd enkel bij registratie geraadpleegd, dus een verlopen lid hield
+  onbeperkt toegang. Nieuw: `services/subscription.ts`, `lib/useSubscriptionGate.ts`
+  (login + 60 s-poll + AppState), `screens/SubscriptionExpiredScreen.tsx`,
+  `constants/links.ts`. Registratiefout gesplitst in "je hebt al een account" vs. "dit adres
+  is bij ons niet bekend".
+- **Blok 5 — merkgroen `#4F7D6C`.** `greenText`/`greenDark` in `theme.ts`; 73 vervangingen
+  over 22 bestanden, plus de lichte `rgba(152,195,164,α)`-vlakken, volgknoppen, genereerknop,
+  leeftijd-badge en de HapjesHeld-landingstegel.
+- **Blok 6 — weekschema-tabs.** Groene subtab-onderlijn, segmented dagkiezer, lage
+  `activeToolbar`, dagblokken met rondlopende groene rand en groene VANDAAG-badge.
+- **Blok 7 — allergenen.** `AllergenPathCard` vervangt drie losse blokken (Hoeveelheden,
+  Volgende stap, arts-toezicht). `SafetyBar` met twee niveaus i.p.v. één. Segmentklik opent
+  de tegel en scrolt ernaartoe.
+- **Blok 3 — abonnement opzeggen** vanuit het profiel (`getOpzegverzoek` /
+  `createOpzegverzoek` + rij "Lidmaatschap").
+- **Blok 2 — Aanraders native.** `services/aanraders.ts` leest de drie `affiliate_*`-tabellen
+  Supabase-direct; `AanradersScreen` + `AanraderProductScreen` + gedeelde `AanraderKaart`;
+  vijfde landingstegel. `expo-clipboard` toegevoegd voor het kopiëren van kortingscodes.
+- **Blok 4 — gamification, fase C.** Mijn leertraject: statusbadges Nieuw/Bezig/Afgerond,
+  "X afgerond · Y bezig", "Ga verder met…", en een afrondbalk in zowel het detailscherm als
+  de pdf-viewer.
+- **Release-voorbereiding.** `app.json` naar `3.2.0`; patch-versies van `expo`,
+  `expo-constants`, `expo-file-system` en `expo-font` bij → `expo-doctor` 18/18.
+- **Firebase/FCM opgezet** (project `prilleven-d2186`): Android-app geregistreerd,
+  `google-services.json` in de root + `android.googleServicesFile` in `app.json`,
+  FCM-service-account geüpload naar EAS. Android preview-build geslaagd
+  (`5a56a851-fc2b-4f39-82e2-bf20509b026a`) — enkel als configuratiecheck.
+
+### Beslissingen
+
+- **Checkout-links: optie A, platform-afhankelijk.** Het lidmaatschap is een digitale dienst;
+  App Store 3.1.1 verbiedt een call-to-action naar een andere aankoopmethode. Op iOS dus geen
+  knop en geen domein, enkel een neutrale zin over "de webversie"; op Android de echte link.
+  Schakelaar + motivering in `constants/links.ts` (`MAG_NAAR_CHECKOUT_LINKEN`).
+  Diezelfde regel geldt bij Aanraders: `magKoopknopTonen()` verbergt op iOS de koopknop bij
+  Pril Levens eigen Plug&Pay-producten (masterclass, roadmap). De kaart blijft staan.
+- **Aanraders wordt native, geen WebView.** De RLS staat anon-lezen toe, dus geen
+  website-endpoint nodig. Een WebView zou bovendien de "Lid worden"-knop uit de paginaheader
+  meebrengen, precies wat op iOS niet mag.
+- **Gamification: optie C.** Allergenenpad en leertraject nu; Cooked it / Pril Ritme en de
+  HapjesHeld-"Dit helpt mij" wachten op de cross-device Supabase-basis (fase 3 van het
+  gamificatieplan). Niet bouwen op de localStorage-preview.
+- **Testen pas op het einde, in één build.** Blok 2 t/m 8 zijn puur JS, dus een dev-build per
+  blok levert niets op. Gevolg: de pushtest schuift mee naar het einde.
+- **Eén release i.p.v. zes.** De versies 3.2.0 t/m 3.7.0 uit het plan zijn nooit apart
+  gebouwd; alles is genormaliseerd naar `v3.2.0`, ook in de CLAUDE.md-annotaties.
+
+### Afwijkingen t.o.v. web (bewust)
+
+- **Geen categoriescherm** bij Aanraders (`/aanraders/c/<slug>`): dat bestaat op de web vooral
+  voor Google; de categoriefilter doet in de app hetzelfde zonder extra navigatie.
+- **Afronden van een learning is een knop met undo**, niet de schuifbeweging van de web. Op
+  een telefoon even bewust en voorspelbaarder.
+- De stoplicht-tinten in `SymptomFormScreen` (`#e8f3ec`/`#fdf3cf`/`#f7e3df`) blijven staan:
+  dat is een op elkaar afgestemd trio pale wassingen, alleen de groene omzetten breekt de set.
+
+### Status
+
+- `npx tsc --noEmit` groen. `expo-doctor` 18/18.
+- **11 commits lokaal op `main`, niets gepusht** — bewust, zodat er na de eerste build nog
+  vrij herschikt kan worden. `2f68625` t/m `c6b81ad`.
+- De website-kant van de push-payload staat **wel** live op productie.
+- **Niets van blok 2 t/m 8 heeft ooit op een toestel gedraaid.** Typecheck zegt niets over
+  lay-out of scrollgedrag; `AllergenPathCard` en het Aanraders-overzicht zijn blind gebouwd op
+  basis van de web-CSS en zullen bijstelling vragen.
+
+### Blockers
+
+- ~~**Apple Program License Agreement is niet geaccepteerd.**~~ **Opgelost op 2026-09-09**:
+  Ruben heeft de overeenkomst goedgekeurd, iOS-builds kunnen weer ondertekend worden.
+- **Testen kan niet meer via Expo Go.** De App Store levert enkel de nieuwste Expo Go (SDK 57)
+  en het project staat op SDK 54; een oudere Expo Go bijzetten kan niet op iOS. Er staat ook
+  geen Xcode op de Mac (`xcode-select` wijst naar de Command Line Tools, `simctl` geeft nul
+  toestellen), dus de simulator is evenmin een uitweg. Testen loopt daarom voortaan via een
+  EAS-build op het toestel — die bouwt in de cloud, dus Xcode is niet nodig. Een SDK-upgrade
+  naar 57 is bewust NIET nu gedaan: ze haalt de release-blokkade niet weg, push blijft ook in
+  Expo Go ontestbaar, en ze zou de nooit-op-toestel-gedraaide blokken 2 t/m 8 met een tweede
+  onbekende vermengen. Eigen project, ná deze release.
+- **Geen Android-toestel beschikbaar** (Ruben heeft enkel een iPhone). Android push blijft
+  ongetest tot iemand met een Android-telefoon meekijkt — regelen vóór de store-release.
+- **Notificatie-icoon** staat nog op het kleurenlogo (`adaptive-icon.png`); Android vereist
+  wit-op-transparant, anders een witte vlek in de statusbalk. Vraagt een asset van Anneleen.
+
+### Volgende stap
+
+1. ✅ PLA geaccepteerd. iPhone geregistreerd voor internal distribution
+   (`eas device:create`; Apple-team `MTXU526TZL`).
+2. **`eas build --platform ios --profile development`** → dev-client op de iPhone, met hot
+   reload. Daarmee punt 6 t/m 13 van de testmatrix aflopen en de blind gebouwde schermen
+   (`AllergenPathCard`, Aanraders) bijstellen.
+3. Daarna `eas build --platform ios --profile preview` voor punt 1 t/m 5 (push, tik-routing,
+   icoonbadge). Push werkt niet in de dev-build: `aps-environment` staat hard op `production`
+   terwijl een dev-build de APNs-sandbox gebruikt.
+4. APNs-sleutel aanmaken via `eas credentials --platform ios` (kan nu de PLA rond is).
+5. `eas build --platform ios --profile production` + `eas submit`; de door `autoIncrement`
+   gebumpte build-nummers daarna committen.
+
+---
+
 ## 2026-06-04 (deel 2) — Leeftijd-badge + multi-select leeftijdsfilter (web-parity 3.1.0→3.1.3)
 
 **Context**: De web-app kreeg tussen 3.1.0 en 3.1.3 een leeftijdscategorie-badge op recepten + een multi-select leeftijdsfilter (web-commits `9623ed0`, `91c5d4c`, `afd9885`, merge `63e81f6`). Deze sessie neemt die feature 1-op-1 over in de mobiele app.
