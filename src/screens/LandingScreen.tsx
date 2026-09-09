@@ -44,6 +44,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useUser } from '../context/UserContext';
 import { AvatarButton } from '../components/AvatarButton';
@@ -82,7 +83,6 @@ type TileKey =
 interface TileDef {
   key: TileKey;
   image: ImageSourcePropType;
-  overlayColor: string;
   title: string;
   badge?: string;
 }
@@ -91,34 +91,29 @@ const TILES: TileDef[] = [
   {
     key: 'recepten',
     image: IMG_RECEPTEN,
-    overlayColor: 'rgba(0, 0, 0, 0.45)',
     title: 'Receptenboek & Weekschema',
   },
   {
     key: 'hapjesheld',
     image: IMG_HAPJESHELD,
-    overlayColor: 'rgba(79, 125, 108, 0.80)',
     title: 'HapjesHeld 2.0',
     badge: 'NIEUW',
   },
   {
     key: 'learnings',
     image: IMG_LEARNINGS,
-    overlayColor: 'rgba(190, 118, 78, 0.55)',
     title: 'Learnings',
     badge: 'NIEUW',
   },
   {
     key: 'allergenen',
     image: IMG_ALLERGENEN,
-    overlayColor: 'rgba(201, 137, 102, 0.55)',
     title: 'Allergenen-introductie',
     badge: 'NIEUW',
   },
   {
     key: 'aanraders',
     image: IMG_AANRADERS,
-    overlayColor: 'rgba(79, 125, 108, 0.55)',
     title: 'Aanraders',
     badge: 'NIEUW',
   },
@@ -213,9 +208,7 @@ function DraggableTile({
             imageStyle={styles.tileImage}
             resizeMode="cover"
           >
-            <View
-              style={[styles.overlay, { backgroundColor: item.overlayColor }]}
-            />
+            <View style={styles.overlay} />
             <View style={styles.tileContent}>
               <Text style={styles.tileTitle}>{item.title}</Text>
             </View>
@@ -344,41 +337,43 @@ export function LandingScreen({ navigation }: Props) {
   );
 
   const header = (
-    <View>
-      {/* Header — ingelogd als + avatar (opent Profile) */}
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <Text style={styles.userLabel}>INGELOGD ALS</Text>
-          <Text style={styles.userEmail} numberOfLines={1}>
-            👤 {user}
-          </Text>
-        </View>
-        <AvatarButton
-          email={user}
-          avatarUrl={avatarUrl}
-          onPress={() => navigation.navigate('Profile')}
-        />
-      </View>
+    <Pressable
+      onPress={() => navigation.navigate('Profile')}
+      disabled={editing}
+      style={({ pressed }) => [pressed && styles.pressed]}
+    >
+      <LinearGradient
+        colors={['rgba(79, 125, 108, 0.12)', 'rgba(79, 125, 108, 0.035)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroRow}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.title}>Welkom bij Pril Leven</Text>
+            <Text style={styles.userEmail} numberOfLines={1}>
+              {editing ? 'Sleep de tegels in de gewenste volgorde' : user}
+            </Text>
+          </View>
 
-      {/* Titel + optionele Klaar-knop in edit-modus */}
-      <View style={styles.titleRow}>
-        <View style={styles.titleCol}>
-          <Text style={styles.title}>Welkom bij Pril Leven</Text>
-          <Text style={styles.subtitle}>
-            {editing ? 'Sleep de tegels in de gewenste volgorde' : 'Kies wat je wil doen'}
-          </Text>
+          {editing ? (
+            <Pressable
+              onPress={() => setEditing(false)}
+              style={({ pressed }) => [styles.doneBtn, pressed && styles.pressed]}
+              hitSlop={8}
+            >
+              <Text style={styles.doneBtnText}>Klaar</Text>
+            </Pressable>
+          ) : (
+            <AvatarButton
+              email={user}
+              avatarUrl={avatarUrl}
+              onPress={() => navigation.navigate('Profile')}
+            />
+          )}
         </View>
-        {editing ? (
-          <Pressable
-            onPress={() => setEditing(false)}
-            style={({ pressed }) => [styles.doneBtn, pressed && styles.pressed]}
-            hitSlop={8}
-          >
-            <Text style={styles.doneBtnText}>Klaar</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
+      </LinearGradient>
+    </Pressable>
   );
 
   return (
@@ -409,47 +404,33 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xl,
-  },
-  userInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  userLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.gray,
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
   userEmail: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
+    fontSize: 13,
+    color: colors.gray,
   },
-  titleRow: {
+  /* Kop in dezelfde vorm als de favorietenzone. */
+  hero: {
+    padding: spacing.lg,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.18)',
+    marginBottom: spacing.lg,
+  },
+  heroRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
+    gap: spacing.md,
   },
-  titleCol: {
+  heroCopy: {
     flex: 1,
-    marginRight: spacing.md,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
-    color: colors.dark,
+    color: colors.greenText,
+    lineHeight: 31,
     marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: colors.gray,
   },
   doneBtn: {
     backgroundColor: colors.primary,
@@ -482,8 +463,11 @@ const styles = StyleSheet.create({
   tileImage: {
     borderRadius: radius.lg,
   },
+  /* Eén neutrale verdonkering voor álle tegels: geen kleurzweem over de
+     foto's, alleen genoeg contrast om de titel leesbaar te houden. */
   overlay: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
   },
   tileContent: {
     padding: spacing.lg,
@@ -493,9 +477,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.white,
     letterSpacing: 0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    textShadowRadius: 7,
   },
   badge: {
     position: 'absolute',

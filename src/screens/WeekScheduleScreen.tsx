@@ -13,25 +13,40 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Image,
   Alert,
   TextInput,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { useUser } from '../context/UserContext';
 import { CompactHeader } from '../navigation/RootStack';
-import { Stars } from '../components/Stars';
-import { getRecipes, saveSchedule, getActiveSchedule, getAllRatings } from '../services';
+import { ScheduleTable } from '../components/ScheduleTable';
+import { ActiveDayBlocks } from '../components/ActiveDayBlocks';
+import { InfoModal } from '../components/InfoModal';
+import {
+  getRecipes,
+  saveSchedule,
+  getActiveSchedule,
+  getAllRatings,
+  getFavoriteRecipeIds,
+} from '../services';
+import {
+  createSelectionState,
+  recordSelection,
+  removeSelection,
+  selectRecipeForSlot,
+  ensureFavoriteAppears,
+  buildSelectionStateFromSchedule,
+} from '../lib/scheduleSelection';
 import {
   ALLERGENS,
   WEEKDAYS,
   SCHEDULE_SLOTS,
   slotToMealMoment,
-  getSlotLabel,
 } from '../constants/data';
 import type { Recipe, ActiveSchedule, Schedule, RatingSummary } from '../types';
 
@@ -56,10 +71,6 @@ function getDaysForPreset(preset: Preset): readonly string[] {
   return Array.from({ length: 7 }, (_, i) => WEEKDAYS[(today + i) % 7]);
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 export function WeekScheduleScreen({ navigation }: any) {
   const { user } = useUser();
   const { show } = useToast();
@@ -69,7 +80,10 @@ export function WeekScheduleScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [schedule, setSchedule] = useState<ActiveSchedule | null>(null);
   const [excluded, setExcluded] = useState<string[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [preferFavorites, setPreferFavorites] = useState(false);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [scheduleName, setScheduleName] = useState('');
 
   /* Sub-tab + preset (persistent per gebruiker) */
@@ -99,17 +113,20 @@ export function WeekScheduleScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     try {
-      const [r, savedRaw, subtabRaw, presetRaw, active, allRatings] = await Promise.all([
-        getRecipes(),
-        AsyncStorage.getItem(activeKey),
-        AsyncStorage.getItem(subtabKey),
-        AsyncStorage.getItem(presetKey),
-        getActiveSchedule(user),
-        getAllRatings(),
-      ]);
+      const [r, savedRaw, subtabRaw, presetRaw, active, allRatings, favIds] =
+        await Promise.all([
+          getRecipes(),
+          AsyncStorage.getItem(activeKey),
+          AsyncStorage.getItem(subtabKey),
+          AsyncStorage.getItem(presetKey),
+          getActiveSchedule(user),
+          getAllRatings(),
+          getFavoriteRecipeIds(user || ''),
+        ]);
       setRecipes(r);
       setActiveSchedule(active);
       setRatings(allRatings);
+      setFavoriteIds(new Set(favIds));
 
       if (savedRaw) {
         try {
@@ -117,6 +134,7 @@ export function WeekScheduleScreen({ navigation }: any) {
           if (parsed && parsed.days) {
             setSchedule(parsed);
             setExcluded(parsed.excludedAllergens || []);
+            setPreferFavorites(Boolean(parsed.preferFavorites));
           }
         } catch {
           /* ignore */
@@ -156,6 +174,19 @@ export function WeekScheduleScreen({ navigation }: any) {
     load();
   }, [load]);
 
+  /* Dit scherm blijft in de tabbalk gemonteerd. Zonder herladen bij focus zou
+     de favorietenvoorkeur met een verouderde lijst werken zodra je in de tab
+     Recepten een hartje aantikt en terugkomt. */
+  useFocusEffect(
+    useCallback(() => {
+      getFavoriteRecipeIds(user || '')
+        .then(ids => setFavoriteIds(new Set(ids)))
+        .catch(() => {
+          /* Stil: een mislukte verversing mag het scherm niet blokkeren. */
+        });
+    }, [user])
+  );
+
   const persistSchedule = useCallback(
     async (s: ActiveSchedule | null) => {
       if (s) {
@@ -177,6 +208,11 @@ export function WeekScheduleScreen({ navigation }: any) {
       return;
     }
 
+    /* Met favorietenvoorkeur bewaken we tegelijk variatie; zonder voorkeur
+       blijft de bestaande uniforme random-selectie behouden. */
+    const usePreference = preferFavorites && favoriteIds.size > 0;
+    const selectionState = createSelectionState(available, usePreference, favoriteIds);
+
     const days: ActiveSchedule['days'] = {};
     WEEKDAYS.forEach(day => {
       days[day] = {};
@@ -185,18 +221,19 @@ export function WeekScheduleScreen({ navigation }: any) {
         const suitable = available.filter(r =>
           (r.mealMoments || []).includes(mealMoment)
         );
-        if (suitable.length > 0) {
-          const random = suitable[Math.floor(Math.random() * suitable.length)];
-          days[day][slot.id] = random.id;
-        } else {
-          days[day][slot.id] = null;
-        }
+
+        const selection = selectRecipeForSlot(suitable, selectionState);
+        days[day][slot.id] = selection.recipe?.id || null;
+        recordSelection(selectionState, selection.recipe, selection.usedPreference);
       });
     });
+
+    ensureFavoriteAppears(days, available, selectionState);
 
     const newSchedule: ActiveSchedule = {
       days,
       excludedAllergens: excluded,
+      preferFavorites: usePreference,
       generatedAt: new Date().toISOString(),
     };
     setSchedule(newSchedule);
@@ -215,9 +252,15 @@ export function WeekScheduleScreen({ navigation }: any) {
       (r.mealMoments || []).includes(mealMoment)
     );
 
-    const currentId = schedule.days[day]?.[slotId];
-    const alternatives = suitable.filter(r => r.id !== currentId);
-    const pool = alternatives.length > 0 ? alternatives : suitable;
+    const currentId = schedule.days[day]?.[slotId] ?? null;
+    const selectionState = buildSelectionStateFromSchedule(
+      schedule,
+      available,
+      recipeMap,
+      favoriteIds
+    );
+    removeSelection(selectionState, currentId);
+    const selection = selectRecipeForSlot(suitable, selectionState, currentId);
 
     const newSchedule = {
       ...schedule,
@@ -225,10 +268,7 @@ export function WeekScheduleScreen({ navigation }: any) {
         ...schedule.days,
         [day]: {
           ...schedule.days[day],
-          [slotId]:
-            pool.length > 0
-              ? pool[Math.floor(Math.random() * pool.length)].id
-              : null,
+          [slotId]: selection.recipe?.id || null,
         },
       },
     };
@@ -287,34 +327,29 @@ export function WeekScheduleScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
-      <CompactHeader onBack={goToLanding} />
+      <CompactHeader
+        onBack={goToLanding}
+        onInfo={subtab === 'generate' ? () => setInfoVisible(true) : undefined}
+      />
 
-      {/* Sub-tab bar */}
+      {/* Sub-tabs in de stijl van de favorietenzone */}
       <View style={styles.subtabBar}>
         <Pressable
-          style={[styles.subtabBtn, subtab === 'active' && styles.subtabBtnActive]}
+          style={[styles.subtabCard, subtab === 'active' && styles.subtabCardActive]}
           onPress={() => persistSubtab('active')}
         >
-          <Text
-            style={[
-              styles.subtabBtnText,
-              subtab === 'active' && styles.subtabBtnTextActive,
-            ]}
-          >
-            Actief weekschema
+          <Text style={styles.subtabTitle}>Actief weekschema</Text>
+          <Text style={styles.subtabHint} numberOfLines={1}>
+            {activeSchedule ? activeSchedule.name : 'Nog geen actief schema'}
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.subtabBtn, subtab === 'generate' && styles.subtabBtnActive]}
+          style={[styles.subtabCard, subtab === 'generate' && styles.subtabCardActive]}
           onPress={() => persistSubtab('generate')}
         >
-          <Text
-            style={[
-              styles.subtabBtnText,
-              subtab === 'generate' && styles.subtabBtnTextActive,
-            ]}
-          >
-            Genereren
+          <Text style={styles.subtabTitle}>Genereren</Text>
+          <Text style={styles.subtabHint} numberOfLines={1}>
+            Nieuw schema samenstellen
           </Text>
         </Pressable>
       </View>
@@ -340,15 +375,9 @@ export function WeekScheduleScreen({ navigation }: any) {
             </View>
           ) : (
             <View>
-              {/* Lage titel-/segmentbalk: de naam van het schema en de
-                  dagkiezer horen bij elkaar, dus staan ze in één blok zonder
-                  kaart of uitleg eromheen (web-pariteit met
-                  .active-schedule-toolbar). */}
+              {/* Alleen de dagkiezer: de naam van het schema staat al in de
+                  subtab-kaart erboven, dus die wordt hier niet herhaald. */}
               <View style={styles.activeToolbar}>
-                <Text style={styles.activeToolbarTitle} numberOfLines={2}>
-                  {activeSchedule.name || 'Actief weekschema'}
-                </Text>
-
                 <View style={styles.presetBar}>
                   <Pressable
                     style={[styles.presetBtn, preset === 'today' && styles.presetBtnActive]}
@@ -395,76 +424,43 @@ export function WeekScheduleScreen({ navigation }: any) {
                 </View>
               </View>
 
-              {getDaysForPreset(preset).map(day => {
-                const dayData = activeSchedule.days[day] || {};
-                const isToday = day === todayDay;
-                return (
-                  <View
-                    key={day}
-                    style={[styles.activeDayBlock, isToday && styles.activeDayBlockToday]}
-                  >
-                    <View style={styles.activeDayHeader}>
-                      <Text style={styles.activeDayHeaderText}>{capitalize(day)}</Text>
-                      {isToday ? (
-                        <View style={styles.activeDayBadge}>
-                          <Text style={styles.activeDayBadgeText}>VANDAAG</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    {SCHEDULE_SLOTS.map(slot => {
-                      const recipeId = dayData[slot.id];
-                      const recipe = recipeId ? recipeMap.get(recipeId) : null;
-                      const userRating =
-                        recipeId && ratings[recipeId]?.average ? ratings[recipeId].average : 0;
-                      return (
-                        <View key={slot.id} style={styles.activeRow}>
-                          <Text style={styles.activeRowSlot}>
-                            {getSlotLabel(slot.id)}
-                          </Text>
-                          {recipe ? (
-                            <Pressable
-                              style={styles.activeRowRecipe}
-                              onPress={() =>
-                                navigation.navigate('RecipeDetail', { id: recipe.id })
-                              }
-                            >
-                              <Text style={styles.activeRowName} numberOfLines={1}>
-                                {recipe.name}
-                              </Text>
-                              {userRating > 0 ? (
-                                <Stars rating={userRating} size={12} />
-                              ) : null}
-                            </Pressable>
-                          ) : (
-                            <Text style={styles.activeRowEmpty}>—</Text>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })}
+              <ActiveDayBlocks
+                days={getDaysForPreset(preset)}
+                daysData={activeSchedule.days}
+                recipeMap={recipeMap}
+                onPressRecipe={id => navigation.navigate('RecipeDetail', { id })}
+                todayDay={todayDay}
+              />
             </View>
           )
         ) : (
           /* ============ GENEREREN ============ */
           <>
-            <Text style={styles.title}>Weekschema Generator</Text>
-            <View style={styles.intro}>
-              <Text style={styles.introText}>
-                💡 Bewaar je weekschema in <Text style={styles.bold}>Favorieten</Text> en
-                genereer er nadien een <Text style={styles.bold}>boodschappenlijst</Text> van.
-                Die verschijnt automatisch in de tab{' '}
-                <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
-              </Text>
-            </View>
-
             <View style={styles.controls}>
-              <Text style={styles.subTitle}>Allergenen uitsluiten</Text>
-              <Text style={styles.helperText}>
-                Vink allergenen aan die je wilt uitsluiten. Recepten met deze
-                allergenen worden niet gebruikt.
-              </Text>
+              <View style={styles.controlsHeader}>
+                <Text style={styles.subTitle}>Allergenen uitsluiten</Text>
+                <Pressable
+                  onPress={() => favoriteIds.size > 0 && setPreferFavorites(v => !v)}
+                  disabled={favoriteIds.size === 0}
+                  style={[
+                    styles.favToggle,
+                    preferFavorites && favoriteIds.size > 0 && styles.favToggleActive,
+                    favoriteIds.size === 0 && styles.favToggleDisabled,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.favBox,
+                      preferFavorites && favoriteIds.size > 0 && styles.favBoxChecked,
+                    ]}
+                  >
+                    {preferFavorites && favoriteIds.size > 0 && (
+                      <Text style={styles.favCheck}>✓</Text>
+                    )}
+                  </View>
+                  <Text style={styles.favToggleText}>Gebruik favorieten</Text>
+                </Pressable>
+              </View>
               <View style={styles.allergenRow}>
                 {ALLERGENS.filter(a => usedAllergens.has(a)).map(a => {
                   const active = excluded.includes(a);
@@ -512,68 +508,14 @@ export function WeekScheduleScreen({ navigation }: any) {
             </View>
 
             {schedule ? (
-              <View>
-                {WEEKDAYS.map(day => {
-                  const dayData = schedule.days[day] || {};
-                  const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
-                  return (
-                    <View key={day} style={styles.dayBlock}>
-                      <Text style={styles.dayTitle}>{dayLabel}</Text>
-                      {SCHEDULE_SLOTS.map(slot => {
-                        const recipeId = dayData[slot.id];
-                        const recipe = recipeId ? recipeMap.get(recipeId) : null;
-                        return (
-                          <View key={slot.id} style={styles.slotRow}>
-                            <Text style={styles.slotLabel}>{slot.label}</Text>
-                            <Pressable
-                              style={styles.slotContent}
-                              onPress={() =>
-                                recipe &&
-                                navigation.navigate('RecipeDetail', { id: recipe.id })
-                              }
-                            >
-                              {recipe ? (
-                                <View style={styles.recipeChip}>
-                                  {recipe.image ? (
-                                    <Image
-                                      source={{ uri: recipe.image }}
-                                      style={styles.recipeChipImg}
-                                    />
-                                  ) : (
-                                    <View
-                                      style={[
-                                        styles.recipeChipImg,
-                                        styles.recipeChipPlaceholder,
-                                      ]}
-                                    >
-                                      <Text style={{ fontSize: 18 }}>🍽️</Text>
-                                    </View>
-                                  )}
-                                  <Text
-                                    style={styles.recipeChipName}
-                                    numberOfLines={2}
-                                  >
-                                    {recipe.name}
-                                  </Text>
-                                </View>
-                              ) : (
-                                <Text style={styles.slotEmpty}>Geen recept</Text>
-                              )}
-                            </Pressable>
-                            <Pressable
-                              style={styles.refreshBtn}
-                              onPress={() => refreshSlot(day, slot.id)}
-                              hitSlop={6}
-                            >
-                              <Text style={styles.refreshBtnText}>↻</Text>
-                            </Pressable>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  );
-                })}
-              </View>
+              <ScheduleTable
+                days={WEEKDAYS}
+                daysData={schedule.days}
+                recipeMap={recipeMap}
+                ratings={ratings}
+                onPressRecipe={id => navigation.navigate('RecipeDetail', { id })}
+                onRefreshSlot={refreshSlot}
+              />
             ) : (
               <View style={styles.empty}>
                 <Text style={styles.emptyIcon}>📅</Text>
@@ -587,6 +529,31 @@ export function WeekScheduleScreen({ navigation }: any) {
           </>
         )}
       </ScrollView>
+
+      <InfoModal
+        visible={infoVisible}
+        onClose={() => setInfoVisible(false)}
+        title="Zo werkt het weekschema"
+      >
+        <Text style={styles.introText}>
+          Bewaar je weekschema in <Text style={styles.bold}>Favorieten</Text> en
+          genereer er nadien een <Text style={styles.bold}>boodschappenlijst</Text>{' '}
+          van. Die verschijnt automatisch in de tab{' '}
+          <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
+        </Text>
+
+        <Text style={[styles.introText, { marginTop: spacing.md }]}>
+          <Text style={styles.bold}>Allergenen uitsluiten:</Text> vink aan wat je
+          wil vermijden. Recepten met die allergenen worden niet gebruikt.
+        </Text>
+
+        <Text style={[styles.introText, { marginTop: spacing.md }]}>
+          <Text style={styles.bold}>Gebruik favorieten:</Text>{' '}
+          {favoriteIds.size > 0
+            ? 'favorieten krijgen vaker een plek, terwijl je weekschema gevarieerd blijft.'
+            : 'zodra je recepten als favoriet bewaart, kan je ze hier vaker laten terugkomen.'}
+        </Text>
+      </InfoModal>
 
       <Modal
         visible={saveModalVisible}
@@ -637,22 +604,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   scroll: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: 100,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.dark,
-    marginBottom: spacing.md,
-  },
-  intro: {
-    backgroundColor: 'rgba(79, 125, 108, 0.18)',
-    borderLeftWidth: 4,
-    borderLeftColor: colors.greenText,
-    borderRadius: radius.sm,
-    padding: spacing.md,
-    marginBottom: spacing.md,
   },
   introText: {
     fontSize: 13,
@@ -686,6 +640,54 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginBottom: spacing.md,
+  },
+  controlsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  favToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.35)',
+    backgroundColor: colors.white,
+  },
+  favToggleActive: {
+    backgroundColor: 'rgba(79, 125, 108, 0.13)',
+    borderColor: 'rgba(79, 125, 108, 0.52)',
+  },
+  favToggleDisabled: {
+    opacity: 0.5,
+  },
+  favToggleText: {
+    color: colors.greenText,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  favBox: {
+    width: 15,
+    height: 15,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: colors.greenText,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favBoxChecked: {
+    backgroundColor: colors.greenText,
+  },
+  favCheck: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 12,
   },
   allergenChip: {
     paddingVertical: 8,
@@ -728,77 +730,6 @@ const styles = StyleSheet.create({
   btnOutlineText: {
     color: colors.primary,
     fontWeight: '600',
-  },
-  dayBlock: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    ...shadows.sm,
-  },
-  dayTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primaryDark,
-    marginBottom: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.light,
-  },
-  slotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    gap: 8,
-  },
-  slotLabel: {
-    width: 90,
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.gray,
-    textTransform: 'uppercase',
-  },
-  slotContent: {
-    flex: 1,
-  },
-  slotEmpty: {
-    fontSize: 13,
-    color: colors.grayLight,
-    fontStyle: 'italic',
-  },
-  recipeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  recipeChipImg: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    backgroundColor: colors.light,
-  },
-  recipeChipPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recipeChipName: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.dark,
-    fontWeight: '500',
-  },
-  refreshBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.light,
-    borderRadius: 16,
-  },
-  refreshBtnText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: '700',
   },
   empty: {
     padding: spacing.xxl,
@@ -860,30 +791,38 @@ const styles = StyleSheet.create({
   },
 
   /* ====== Sub-tab bar ====== */
+  /* ====== Sub-tabs ======
+     Zelfde kaartvorm als de tel-tabs in de favorietenzone. Bewuste afwijking
+     van de web, waar dit platte teksttabs met een onderlijn zijn. */
   subtabBar: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.light,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
   },
-  subtabBtn: {
+  subtabCard: {
     flex: 1,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.16)',
+    borderRadius: 16,
   },
-  subtabBtnActive: {
-    borderBottomColor: colors.greenText,
+  subtabCardActive: {
+    backgroundColor: 'rgba(79, 125, 108, 0.13)',
+    borderColor: 'rgba(79, 125, 108, 0.52)',
   },
-  subtabBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.darkLight,
-  },
-  subtabBtnTextActive: {
+  subtabTitle: {
     color: colors.greenText,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  subtabHint: {
+    marginTop: spacing.xs,
+    color: colors.gray,
+    fontSize: 12,
   },
 
   /* ====== Lage titel-/segmentbalk boven het actieve schema ======
@@ -891,12 +830,6 @@ const styles = StyleSheet.create({
      geen uitleg — alleen de naam en de dagkiezer. */
   activeToolbar: {
     marginBottom: spacing.lg,
-  },
-  activeToolbarTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.dark,
-    marginBottom: spacing.sm,
   },
 
   /* ====== Dagkiezer (Vandaag / Vandaag & morgen / Heel weekschema) ======
@@ -940,72 +873,4 @@ const styles = StyleSheet.create({
   /* Web-pariteit met .active-day-block: een rondom lopende, zachtgroene rand
      in plaats van een dikke linkerbalk. Vandaag valt op doordat die rand
      terracotta wordt — niet doordat er een streep bij komt. */
-  activeDayBlock: {
-    backgroundColor: colors.white,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(79, 125, 108, 0.14)',
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    ...shadows.sm,
-  },
-  activeDayBlockToday: {
-    borderColor: colors.primary,
-  },
-  activeDayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.light,
-  },
-  activeDayHeaderText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primaryDark,
-  },
-  activeDayBadge: {
-    backgroundColor: colors.greenText,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  activeDayBadgeText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-  },
-  activeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    gap: spacing.sm,
-  },
-  activeRowSlot: {
-    width: 90,
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.gray,
-    textTransform: 'uppercase',
-  },
-  activeRowRecipe: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  activeRowName: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.dark,
-    fontWeight: '500',
-  },
-  activeRowEmpty: {
-    flex: 1,
-    color: colors.grayLight,
-    fontStyle: 'italic',
-  },
 });

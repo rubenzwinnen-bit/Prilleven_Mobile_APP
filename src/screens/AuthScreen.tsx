@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.dark,
+    color: colors.greenText,
   },
   subtitle: {
     fontSize: 16,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     color: colors.gray,
   },
   tabTextActive: {
-    color: colors.primaryDark,
+    color: colors.greenText,
   },
   card: {
     backgroundColor: colors.white,
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   linkText: {
-    color: colors.primary,
+    color: colors.greenText,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   consentLink: {
-    color: colors.primary,
+    color: colors.greenText,
     fontWeight: '600',
   },
   membershipBox: {
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   membershipLink: {
-    color: colors.primary,
+    color: colors.greenText,
     fontWeight: '700',
   },
   legalFooter: {

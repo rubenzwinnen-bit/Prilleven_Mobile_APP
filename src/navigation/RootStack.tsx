@@ -82,6 +82,29 @@ function HomeIconButton({ onPress }: { onPress: () => void }) {
   );
 }
 
+/* Info-knop (rechtsboven) — opent de uitleg die anders als blok op het
+   scherm zou staan. Open cirkel, zodat ze minder gewicht heeft dan het
+   huisje. */
+function InfoIconButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={12}>
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          borderWidth: 1.5,
+          borderColor: colors.greenText,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather name="info" size={19} color={colors.greenText} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 /* Vaste hoogte voor de inhoud van álle compacte headers — voorkomt
    layout-shift / "schok" bij navigatie tussen schermen waar de header
    verschillende elementen bevat (chevron, huisje, zoekveld...). */
@@ -92,9 +115,11 @@ export const HEADER_CONTENT_HEIGHT = 42;
 function CompactHeader({
   onBack,
   onHome,
+  onInfo,
 }: {
   onBack: () => void;
   onHome?: () => void;
+  onInfo?: () => void;
 }) {
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: colors.bg }}>
@@ -108,7 +133,10 @@ function CompactHeader({
         }}
       >
         <ChevronBack onPress={onBack} />
-        {onHome ? <HomeIconButton onPress={onHome} /> : <View />}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          {onInfo ? <InfoIconButton onPress={onInfo} /> : null}
+          {onHome ? <HomeIconButton onPress={onHome} /> : null}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -245,4 +273,11 @@ export function RootStackNavigator() {
 }
 
 /* Re-export voor de inner stacks zodat ze dezelfde knoppen kunnen gebruiken */
-export { ChevronBack, HomeIconButton, CompactHeader, MainHeader, useResetMainHeader };
+export {
+  ChevronBack,
+  HomeIconButton,
+  InfoIconButton,
+  CompactHeader,
+  MainHeader,
+  useResetMainHeader,
+};

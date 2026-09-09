@@ -15,6 +15,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { InfoModal } from '../components/InfoModal';
+import { ScheduleTable } from '../components/ScheduleTable';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { RecipeCard } from '../components/RecipeCard';
@@ -31,8 +34,17 @@ import {
   setActiveSchedule,
   deactivateSchedule,
 } from '../services';
-import { WEEKDAYS, SCHEDULE_SLOTS, getSlotLabel } from '../constants/data';
+import { WEEKDAYS } from '../constants/data';
 import type { Recipe, RatingSummary, Schedule } from '../types';
+
+/* Spiegel van formatDateShort in js/utils.js op de website. */
+function formatDateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString('nl-BE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
 export function FavoritesScreen({ navigation }: any) {
   const { user } = useUser();
@@ -43,9 +55,12 @@ export function FavoritesScreen({ navigation }: any) {
   const [ratings, setRatings] = useState<Record<string, RatingSummary>>({});
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [expandedSchedules, setExpandedSchedules] = useState<Set<string>>(new Set());
-  const [scheduleRecipeNames, setScheduleRecipeNames] = useState<Record<string, string>>({});
+  const [scheduleRecipes, setScheduleRecipes] = useState<Map<string, Recipe>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  /* Web-parity: twee panelen achter tel-tabs, recepten staan vooraan. */
+  const [tab, setTab] = useState<'recipes' | 'schedules'>('recipes');
+  const [infoVisible, setInfoVisible] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -69,9 +84,7 @@ export function FavoritesScreen({ navigation }: any) {
       });
       if (allIds.size > 0) {
         const recs = await getRecipesByIds([...allIds]);
-        const nameMap: Record<string, string> = {};
-        recs.forEach(r => { nameMap[r.id] = r.name; });
-        setScheduleRecipeNames(nameMap);
+        setScheduleRecipes(new Map(recs.map(r => [r.id, r])));
       }
     } catch (err: any) {
       show('Fout: ' + err.message, 'error');
@@ -181,9 +194,29 @@ export function FavoritesScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
-      <CompactHeader onBack={goToLanding} />
+      <CompactHeader
+        onBack={goToLanding}
+        onInfo={tab === 'schedules' ? () => setInfoVisible(true) : undefined}
+      />
+
+      <InfoModal
+        visible={infoVisible}
+        onClose={() => setInfoVisible(false)}
+        title="Boodschappenlijst uit een weekschema"
+      >
+        <Text style={styles.explainerText}>
+          Per opgeslagen weekschema kan je een boodschappenlijst genereren. Kies
+          welke dagen en maaltijden je wil meenemen, en de app maakt automatisch
+          een lijst met alle benodigde ingrediënten. Die verschijnt vervolgens in
+          de tab <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
+        </Text>
+      </InfoModal>
       <FlatList
-        data={recipes}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        removeClippedSubviews
+        data={tab === 'recipes' ? recipes : []}
         keyExtractor={r => r.id}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -198,21 +231,55 @@ export function FavoritesScreen({ navigation }: any) {
         }
         ListHeaderComponent={
           <View>
-            <Text style={styles.heading}>Opgeslagen weekschema's</Text>
-            <View style={styles.explainer}>
-              <Text style={styles.explainerText}>
-                💡 <Text style={styles.bold}>Tip:</Text> per opgeslagen
-                weekschema kan je een boodschappenlijst genereren. Kies welke
-                dagen en maaltijden je wil meenemen, en de app maakt automatisch
-                een lijst met alle benodigde ingrediënten. Die verschijnt
-                vervolgens in de tab{' '}
-                <Text style={styles.bold}>Boodschappenlijst</Text> onderaan.
-              </Text>
-            </View>
+            <LinearGradient
+              colors={['rgba(79, 125, 108, 0.12)', 'rgba(79, 125, 108, 0.035)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.hero}
+            >
+              <Text style={styles.eyebrow}>Voor later bewaard</Text>
+              <Text style={styles.heroTitle}>Jouw favorieten</Text>
+              <View style={styles.summary}>
+                <Pressable
+                  onPress={() => setTab('recipes')}
+                  style={[
+                    styles.summaryItem,
+                    tab === 'recipes' && styles.summaryItemActive,
+                  ]}
+                >
+                  <Text style={styles.summaryCount}>{recipes.length}</Text>
+                  <Text style={styles.summaryLabel}>
+                    {recipes.length === 1 ? 'recept' : 'recepten'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setTab('schedules')}
+                  style={[
+                    styles.summaryItem,
+                    tab === 'schedules' && styles.summaryItemActive,
+                  ]}
+                >
+                  <Text style={styles.summaryCount}>{schedules.length}</Text>
+                  <Text style={styles.summaryLabel}>
+                    {schedules.length === 1 ? 'weekschema' : "weekschema's"}
+                  </Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+
+            {tab === 'schedules' && (
+            <View>
             {schedules.length === 0 ? (
-              <Text style={styles.muted}>
-                Nog geen weekschema's. Genereer er een via de Weekschema-tab.
-              </Text>
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyLabel}>Nog leeg</Text>
+                <Text style={styles.emptyStateTitle}>
+                  Geen opgeslagen weekschema's
+                </Text>
+                <Text style={styles.emptyStateText}>
+                  Sla een weekschema op en je kunt het hier later opnieuw
+                  activeren.
+                </Text>
+              </View>
             ) : (
               schedules.map(s => (
                 <View
@@ -223,128 +290,122 @@ export function FavoritesScreen({ navigation }: any) {
                   ]}
                 >
                   <View style={styles.scheduleHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.scheduleName}>{s.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={styles.scheduleDate}>
-                          {s.createdAt
-                            ? new Date(s.createdAt).toLocaleDateString('nl-BE')
-                            : ''}
-                        </Text>
+                    <View style={styles.scheduleHeading}>
+                      <View style={styles.scheduleLabelRow}>
+                        <Text style={styles.scheduleLabel}>Weekschema</Text>
                         {s.isActive && (
                           <View style={styles.activeBadge}>
-                            <Text style={styles.activeBadgeText}>
-                              Actief · {s.persons || 4} personen
-                            </Text>
+                            <Text style={styles.activeBadgeText}>Actief</Text>
                           </View>
                         )}
                       </View>
+                      <Text style={styles.scheduleName}>{s.name}</Text>
+                      <Text style={styles.scheduleDate}>
+                        {s.createdAt
+                          ? `Opgeslagen ${formatDateShort(s.createdAt)}`
+                          : 'Opgeslagen'}
+                      </Text>
+                    </View>
+                    <View style={styles.personsPill}>
+                      <Text style={styles.personsPillText}>
+                        {s.persons || 4} personen
+                      </Text>
                     </View>
                   </View>
+
                   <View style={styles.scheduleActions}>
-                    {s.isActive ? (
+                    <View style={styles.mainActions}>
+                      {s.isActive ? (
+                        <Pressable
+                          style={[styles.action, styles.actionPrimary]}
+                          onPress={() =>
+                            navigation.navigate('ShoppingList', {
+                              id: s.id,
+                              persons: s.persons,
+                            })
+                          }
+                        >
+                          <Text style={styles.actionPrimaryText}>
+                            Boodschappenlijst
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={[styles.action, styles.actionPrimary]}
+                          onPress={() => handleActivateSchedule(s.id, s.persons)}
+                        >
+                          <Text style={styles.actionPrimaryText}>Activeren</Text>
+                        </Pressable>
+                      )}
+
                       <Pressable
-                        style={[styles.btn, styles.btnOutline]}
-                        onPress={() => handleDeactivateSchedule(s.id)}
-                      >
-                        <Text style={styles.btnOutlineText}>Deactiveren</Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        style={[styles.btn, styles.btnSecondary]}
-                        onPress={() => handleActivateSchedule(s.id, s.persons)}
-                      >
-                        <Text style={styles.btnPrimaryText}>Activeren</Text>
-                      </Pressable>
-                    )}
-                    <Pressable
-                      style={[styles.btn, styles.btnOutline]}
-                      onPress={() =>
-                        setExpandedSchedules(prev => {
-                          const next = new Set(prev);
-                          if (next.has(s.id)) next.delete(s.id);
-                          else next.add(s.id);
-                          return next;
-                        })
-                      }
-                    >
-                      <Text style={styles.btnOutlineText}>
-                        {expandedSchedules.has(s.id) ? 'Verbergen' : 'Details'}
-                      </Text>
-                    </Pressable>
-                    {s.isActive && (
-                      <Pressable
-                        style={[styles.btn, styles.btnPrimary]}
+                        style={[styles.action, styles.actionSecondary]}
                         onPress={() =>
-                          navigation.navigate('ShoppingList', {
-                            id: s.id,
-                            persons: s.persons,
+                          setExpandedSchedules(prev => {
+                            const next = new Set(prev);
+                            if (next.has(s.id)) next.delete(s.id);
+                            else next.add(s.id);
+                            return next;
                           })
                         }
                       >
-                        <Text style={styles.btnPrimaryText}>
-                          🛒 Boodschappenlijst
+                        <Text style={styles.actionSecondaryText}>
+                          {expandedSchedules.has(s.id)
+                            ? 'Details verbergen'
+                            : 'Details bekijken'}
                         </Text>
                       </Pressable>
-                    )}
+
+                      {s.isActive && (
+                        <Pressable
+                          style={[styles.action, styles.actionSecondary]}
+                          onPress={() => handleDeactivateSchedule(s.id)}
+                        >
+                          <Text style={styles.actionSecondaryText}>
+                            Deactiveren
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+
                     <Pressable
-                      style={[styles.btn, styles.btnDanger]}
+                      style={styles.deleteAction}
                       onPress={() => handleDeleteSchedule(s.id, s.name)}
                     >
-                      <Text style={styles.btnPrimaryText}>Verwijderen</Text>
+                      <Text style={styles.deleteActionText}>Verwijderen</Text>
                     </Pressable>
                   </View>
+
                   {expandedSchedules.has(s.id) && (
                     <View style={styles.scheduleDetail}>
-                      {WEEKDAYS.map(day => {
-                        const slots = SCHEDULE_SLOTS.filter(
-                          slot => s.days?.[day]?.[slot.id]
-                        );
-                        if (slots.length === 0) return null;
-                        const dayLabel = day.charAt(0).toUpperCase() + day.slice(1);
-                        return (
-                          <View key={day} style={styles.detailDay}>
-                            <Text style={styles.detailDayLabel}>{dayLabel}</Text>
-                            {slots.map(slot => {
-                              const rid = s.days[day][slot.id]!;
-                              const recipeName = scheduleRecipeNames[rid] || '...';
-                              return (
-                                <Pressable
-                                  key={slot.id}
-                                  style={styles.detailSlot}
-                                  onPress={() => navigation.navigate('RecipeDetail', { id: rid })}
-                                >
-                                  <Text style={styles.detailSlotLabel}>
-                                    {getSlotLabel(slot.id)}
-                                  </Text>
-                                  <Text style={styles.detailRecipeName} numberOfLines={1}>
-                                    {recipeName}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        );
-                      })}
+                      <ScheduleTable
+                        days={WEEKDAYS}
+                        daysData={s.days || {}}
+                        recipeMap={scheduleRecipes}
+                        onPressRecipe={id =>
+                          navigation.navigate('RecipeDetail', { id })
+                        }
+                      />
                     </View>
                   )}
                 </View>
               ))
             )}
-
-            <Text style={[styles.heading, { marginTop: spacing.xl }]}>
-              Favoriete recepten
-            </Text>
+            </View>
+            )}
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🤍</Text>
-            <Text style={styles.emptyTitle}>Nog geen favorieten</Text>
-            <Text style={styles.emptyText}>
-              Tik op het hartje bij een recept om het hier te bewaren.
-            </Text>
-          </View>
+          tab === 'recipes' ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyLabel}>Nog leeg</Text>
+              <Text style={styles.emptyStateTitle}>Geen favoriete recepten</Text>
+              <Text style={styles.emptyStateText}>
+                Bewaar een recept vanuit het receptenboek en je vindt het hier
+                meteen terug.
+              </Text>
+            </View>
+          ) : null
         }
         renderItem={({ item }) => (
           <RecipeCard
@@ -372,28 +433,86 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: 100,
   },
-  heading: {
-    fontSize: 20,
+  /* Hero + tel-tabs, gespiegeld van .favorites-hero / .favorites-summary */
+  hero: {
+    padding: spacing.lg,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.18)',
+    marginBottom: spacing.lg,
+  },
+  eyebrow: {
+    color: colors.greenText,
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.dark,
-    marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primary,
-    alignSelf: 'flex-start',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
-  muted: {
-    color: colors.gray,
-    fontStyle: 'italic',
-    marginBottom: spacing.md,
+  heroTitle: {
+    marginTop: spacing.xs,
+    color: colors.greenText,
+    fontSize: 30,
+    fontWeight: '700',
+    lineHeight: 34,
   },
-  explainer: {
-    backgroundColor: 'rgba(79, 125, 108, 0.18)',
-    borderLeftWidth: 4,
-    borderLeftColor: colors.greenText,
-    borderRadius: radius.sm,
+  summary: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  summaryItem: {
+    flex: 1,
     padding: spacing.md,
-    marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.16)',
+    borderRadius: 16,
+  },
+  summaryItemActive: {
+    backgroundColor: 'rgba(79, 125, 108, 0.13)',
+    borderColor: 'rgba(79, 125, 108, 0.52)',
+  },
+  summaryCount: {
+    color: colors.greenText,
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 28,
+  },
+  summaryLabel: {
+    marginTop: spacing.xs,
+    color: colors.gray,
+    fontSize: 12,
+  },
+  /* Lege staat, gespiegeld van .favorites-empty-state */
+  emptyState: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    backgroundColor: 'rgba(79, 125, 108, 0.045)',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(79, 125, 108, 0.28)',
+    borderRadius: 18,
+  },
+  emptyLabel: {
+    color: colors.greenText,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  emptyStateTitle: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    color: colors.dark,
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    color: colors.gray,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
   },
   explainerText: {
     fontSize: 13,
@@ -404,127 +523,133 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primaryDark,
   },
+  /* Opgeslagen weekschema, gespiegeld van .saved-schedule-card */
   scheduleCard: {
     backgroundColor: colors.white,
-    borderRadius: radius.lg,
+    borderRadius: 22,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.17)',
     ...shadows.sm,
   },
   scheduleCardActive: {
-    borderColor: colors.greenText,
+    borderColor: 'rgba(79, 125, 108, 0.5)',
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  scheduleHeading: {
+    flex: 1,
+  },
+  scheduleLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scheduleLabel: {
+    color: colors.greenText,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   activeBadge: {
     backgroundColor: colors.greenText,
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 9,
+    borderRadius: 999,
   },
   activeBadgeText: {
     color: colors.white,
     fontSize: 11,
     fontWeight: '600',
   },
-  scheduleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
   scheduleName: {
-    fontSize: 16,
+    marginTop: 5,
+    marginBottom: 3,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.dark,
-    flex: 1,
+    lineHeight: 25,
   },
   scheduleDate: {
     fontSize: 12,
     color: colors.gray,
   },
+  personsPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+    backgroundColor: colors.bg,
+    borderRadius: 999,
+  },
+  personsPillText: {
+    color: colors.gray,
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  /* Actierij, gespiegeld van .saved-schedule-actions */
   scheduleActions: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.light,
+  },
+  mainActions: {
+    flex: 1,
+    flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
   },
-  btn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+  action: {
+    minHeight: 38,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    borderRadius: 9,
+    borderWidth: 1,
+    justifyContent: 'center',
   },
-  btnPrimary: {
-    backgroundColor: colors.primary,
-  },
-  btnSecondary: {
+  actionPrimary: {
     backgroundColor: colors.greenText,
+    borderColor: colors.greenText,
   },
-  btnDanger: {
-    backgroundColor: colors.danger,
-  },
-  btnOutline: {
-    borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: 'transparent',
-  },
-  btnOutlineText: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  btnPrimaryText: {
+  actionPrimaryText: {
     color: colors.white,
-    fontWeight: '600',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  actionSecondary: {
+    backgroundColor: colors.white,
+    borderColor: 'rgba(79, 125, 108, 0.35)',
+  },
+  actionSecondaryText: {
+    color: colors.greenText,
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  deleteAction: {
+    minHeight: 38,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    borderRadius: 9,
+    justifyContent: 'center',
+  },
+  deleteActionText: {
+    color: '#a7372c',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
   scheduleDetail: {
     marginTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.light,
     paddingTop: spacing.md,
-  },
-  detailDay: {
-    marginBottom: spacing.sm,
-  },
-  detailDayLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primaryDark,
-    marginBottom: 4,
-  },
-  detailSlot: {
-    flexDirection: 'row',
-    paddingVertical: 4,
-    paddingLeft: spacing.sm,
-    gap: spacing.sm,
-  },
-  detailSlotLabel: {
-    width: 80,
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.gray,
-    textTransform: 'uppercase',
-  },
-  detailRecipeName: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  empty: {
-    padding: spacing.xxl,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 56,
-    marginBottom: spacing.md,
-    opacity: 0.4,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.darkLight,
-    marginBottom: spacing.sm,
-  },
-  emptyText: {
-    color: colors.gray,
-    textAlign: 'center',
   },
 });
