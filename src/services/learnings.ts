@@ -52,6 +52,13 @@ export interface Learning {
   created_at: string;
   /** Of deze gebruiker dit item als favoriet heeft gemarkeerd. */
   is_favorite: boolean;
+  /** Laatst bewaarde positie, of null. De lijst-API stuurt dit mee, zodat
+   *  "Bezig" afgeleid kan worden zonder een call per item. Gedeeld met de
+   *  website: een bladwijzer daar maakt het item hier ook "Bezig". */
+  bookmark?: {
+    position: LearningBookmarkPosition;
+    updated_at: string;
+  } | null;
 }
 
 /** Detail zoals teruggegeven door GET /api/learnings/:id. */

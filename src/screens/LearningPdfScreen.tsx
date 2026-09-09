@@ -23,11 +23,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WebView } from 'react-native-webview';
-import { colors, spacing } from '../constants/theme';
+import { colors, radius, spacing } from '../constants/theme';
+import { useUser } from '../context/UserContext';
+import { leesVoortgang, setLearningCompleted } from '../lib/learningProgress';
 import { useToast } from '../components/Toast';
 import { getLearning, getLearningBookmark, putLearningBookmark } from '../services';
 import type { RootStackParamList } from '../navigation/types';
@@ -155,8 +158,30 @@ export function LearningPdfScreen({ navigation, route }: Props) {
   const { id, title } = route.params;
   const { show } = useToast();
 
+  const { user } = useUser();
   const [html, setHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  /* Afgerond-status, lokaal per gebruiker — zie lib/learningProgress.ts.
+     Documenten openen via dit scherm en niet via LearningDetailScreen, dus
+     de afrondactie hoort hier óók te staan. */
+  const [afgerond, setAfgerond] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    leesVoortgang(user).then(map => {
+      if (!cancelled) setAfgerond(!!map[id]?.completed_at);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, id]);
+
+  const toggleAfgerond = useCallback(async () => {
+    const volgende = !afgerond;
+    setAfgerond(volgende);
+    await setLearningCompleted(user, id, volgende);
+  }, [afgerond, user, id]);
 
   /* Laatst gerapporteerde pagina + debounce-timer voor het bewaren. */
   const pageRef = useRef<number>(1);
@@ -269,11 +294,61 @@ export function LearningPdfScreen({ navigation, route }: Props) {
           )}
         />
       )}
+
+      <View style={styles.afrondBalk}>
+        {afgerond ? (
+          <>
+            <Text style={styles.afrondKlaar}>Afgerond ✓</Text>
+            <Pressable onPress={toggleAfgerond}>
+              <Text style={styles.afrondUndo}>Ongedaan maken</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.afrondVraag}>Klaar met dit document?</Text>
+            <Pressable onPress={toggleAfgerond} style={styles.afrondBtn}>
+              <Text style={styles.afrondBtnText}>Markeer als afgerond</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  afrondBalk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.light,
+    backgroundColor: colors.white,
+  },
+  afrondVraag: { flex: 1, fontSize: 14, color: colors.darkLight },
+  afrondBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderRadius: radius.sm,
+    backgroundColor: colors.greenText,
+  },
+  afrondBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
+  afrondKlaar: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.greenText,
+  },
+  afrondUndo: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.gray,
+    textDecorationLine: 'underline',
+  },
+
   safe: {
     flex: 1,
     backgroundColor: colors.bg,

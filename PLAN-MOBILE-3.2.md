@@ -317,7 +317,7 @@ Gevolgen om te onthouden:
 | 7 — allergenen | ✅ `AllergenPathCard`, `SafetyBar` (2 niveaus), `HoeveelhedenBox` en arts-toezicht-banner opgeheven, segmentklik scrolt naar de tegel. Pencil-edit op doses/symptomen bleek al te bestaan. |
 | 2 — aanraders | ✅ **native** (beslist 2026-09-09). `services/aanraders.ts` leest Supabase-direct, `AanradersScreen` + `AanraderProductScreen` + gedeelde `AanraderKaart`, 5de landingstegel. Geen categoriescherm (de filter doet dat werk). Koopknop verborgen op iOS bij de eigen Plug&Pay-producten. |
 | 3 — opzeggen | ✅ `getOpzegverzoek`/`createOpzegverzoek` + rij "Lidmaatschap" en opzegblok in ProfileScreen. |
-| 4 — gamification | ⬜ wacht op keuze A/B/C |
+| 4 — gamification | 🟡 **optie C** (beslist 2026-09-09). Allergenenpad ✅ (blok 7). Mijn leertraject ✅ — statusbadges, "X afgerond · Y bezig", "Ga verder met…", afrondbalk in detail + pdf-viewer. **Nog open**: Cooked it / Pril Ritme en de HapjesHeld-"Dit helpt mij" wachten op de cross-device Supabase-basis (fase 3 van het gamificatieplan). |
 
 Nog niets gecommit in het app-project sinds `2f68625` (blok 1).
 

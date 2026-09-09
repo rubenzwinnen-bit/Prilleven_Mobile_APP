@@ -30,6 +30,8 @@ import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as WebBrowser from 'expo-web-browser';
 import { colors, radius, spacing, shadows } from '../constants/theme';
+import { useUser } from '../context/UserContext';
+import { leesVoortgang, setLearningCompleted } from '../lib/learningProgress';
 import { useToast } from '../components/Toast';
 import {
   getLearning,
@@ -96,10 +98,31 @@ export function LearningDetailScreen({ navigation, route }: Props) {
   const { show } = useToast();
   const { width } = useWindowDimensions();
 
+  const { user } = useUser();
   const [learning, setLearning] = useState<LearningDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [favBusy, setFavBusy] = useState(false);
   const [opening, setOpening] = useState(false);
+
+  /* Afgerond-status. Lokaal per gebruiker — zie lib/learningProgress.ts;
+     dit synchroniseert bewust nog niet met de website. */
+  const [afgerond, setAfgerond] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    leesVoortgang(user).then(map => {
+      if (!cancelled) setAfgerond(!!map[id]?.completed_at);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, id]);
+
+  const toggleAfgerond = useCallback(async () => {
+    const nieuw = !afgerond;
+    setAfgerond(nieuw); // optimistisch: het is lokale state, niet de server
+    await setLearningCompleted(user, id, nieuw);
+  }, [afgerond, user, id]);
 
   /* Video-positie sync (cross-device, gedeeld met de website):
        resumeRef    — seconden waarnaar we moeten springen zodra de speler klaar is
@@ -329,11 +352,75 @@ export function LearningDetailScreen({ navigation, route }: Props) {
           </View>
         </ScrollView>
       )}
+
+      {/* Afronden — bewuste actie, altijd terug te draaien. De website
+          gebruikt hier een schuifbeweging; op mobiel is een knop met undo
+          even bewust en een stuk voorspelbaarder. */}
+      {!loading && !!learning && (
+        <View style={styles.afrondBalk}>
+          {afgerond ? (
+            <>
+              <Text style={styles.afrondKlaar}>Afgerond ✓</Text>
+              <Pressable
+                onPress={toggleAfgerond}
+                style={({ pressed }) => [pressed && styles.pressed]}
+              >
+                <Text style={styles.afrondUndo}>Ongedaan maken</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={styles.afrondVraag}>Klaar met deze learning?</Text>
+              <Pressable
+                onPress={toggleAfgerond}
+                style={({ pressed }) => [
+                  styles.afrondBtn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.afrondBtnText}>Markeer als afgerond</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  afrondBalk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.light,
+    backgroundColor: colors.white,
+  },
+  afrondVraag: { flex: 1, fontSize: 14, color: colors.darkLight },
+  afrondBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderRadius: radius.sm,
+    backgroundColor: colors.greenText,
+  },
+  afrondBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
+  afrondKlaar: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.greenText,
+  },
+  afrondUndo: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.gray,
+    textDecorationLine: 'underline',
+  },
+
   safe: {
     flex: 1,
     backgroundColor: colors.bg,

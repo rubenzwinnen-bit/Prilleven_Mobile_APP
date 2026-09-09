@@ -29,6 +29,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { useUser } from '../context/UserContext';
+import {
+  leesVoortgang,
+  getLearningStatus,
+  type LearningStatusKey,
+} from '../lib/learningProgress';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../constants/theme';
@@ -80,7 +86,13 @@ function ChevronBack({ onPress }: { onPress: () => void }) {
 export function LearningsScreen({ navigation }: Props) {
   const { show } = useToast();
 
+  const { user } = useUser();
   const [items, setItems] = useState<Learning[]>([]);
+  /* Afgerond-status staat lokaal (zie lib/learningProgress.ts). Bij elke
+     focus opnieuw lezen, want het detailscherm kan hem gewijzigd hebben. */
+  const [voortgang, setVoortgang] = useState<
+    Record<string, { completed_at: string }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
@@ -108,7 +120,8 @@ export function LearningsScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      leesVoortgang(user).then(setVoortgang);
+    }, [load, user])
   );
 
   const onToggleFavorite = useCallback(
@@ -174,6 +187,7 @@ export function LearningsScreen({ navigation }: Props) {
   const renderItem = useCallback(
     ({ item }: { item: Learning }) => {
       const duration = formatDuration(item.duration_sec);
+      const status = getLearningStatus(item, voortgang);
       return (
         <Pressable
           onPress={() => onOpen(item)}
@@ -206,6 +220,12 @@ export function LearningsScreen({ navigation }: Props) {
               {duration ? (
                 <Text style={styles.duration}>{duration}</Text>
               ) : null}
+              <View style={styles.kindRowSpacer} />
+              <View style={[styles.statusBadge, STATUS_STYLE[status.key]]}>
+                <Text style={[styles.statusText, STATUS_TEXT[status.key]]}>
+                  {status.label}
+                </Text>
+              </View>
             </View>
             <Text style={styles.cardTitle} numberOfLines={2}>
               {item.title}
@@ -236,7 +256,7 @@ export function LearningsScreen({ navigation }: Props) {
         </Pressable>
       );
     },
-    [onOpen, onToggleFavorite, pinningId]
+    [onOpen, onToggleFavorite, pinningId, voortgang]
   );
 
   return (
@@ -305,6 +325,15 @@ export function LearningsScreen({ navigation }: Props) {
           data={filtered}
           keyExtractor={l => l.id}
           renderItem={renderItem}
+          ListHeaderComponent={
+            items.length > 0 ? (
+              <LeertrajectKop
+                items={items}
+                voortgang={voortgang}
+                onGaVerder={onOpen}
+              />
+            ) : null
+          }
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
@@ -329,7 +358,129 @@ export function LearningsScreen({ navigation }: Props) {
   );
 }
 
+/* ----------------------------------------
+   MIJN LEERTRAJECT
+   Eén regel boven de lijst: hoeveel afgerond, hoeveel bezig, en waar je
+   verder kunt. "Ga verder met" kiest de recentste bladwijzer — dezelfde
+   keuze als `renderLearningPath()` op de website.
+---------------------------------------- */
+function LeertrajectKop({
+  items,
+  voortgang,
+  onGaVerder,
+}: {
+  items: Learning[];
+  voortgang: Record<string, { completed_at: string }>;
+  onGaVerder: (l: Learning) => void;
+}) {
+  const statussen = items.map(item => ({
+    item,
+    status: getLearningStatus(item, voortgang),
+  }));
+  const afgerond = statussen.filter(e => e.status.key === 'completed').length;
+  const bezig = statussen
+    .filter(e => e.status.key === 'active')
+    .sort(
+      (a, b) =>
+        new Date(b.item.bookmark?.updated_at || 0).getTime() -
+        new Date(a.item.bookmark?.updated_at || 0).getTime()
+    );
+  const verder = bezig[0]?.item || null;
+
+  return (
+    <View style={styles.pad}>
+      <View style={styles.padHead}>
+        <Text style={styles.padTitle}>Mijn leertraject</Text>
+        <Text style={styles.padSummary}>
+          <Text style={styles.padSummaryNum}>{afgerond}</Text> afgerond ·{' '}
+          <Text style={styles.padSummaryNum}>{bezig.length}</Text> bezig
+        </Text>
+      </View>
+
+      {verder ? (
+        <Pressable
+          onPress={() => onGaVerder(verder)}
+          style={({ pressed }) => [styles.padVerder, pressed && styles.pressed]}
+        >
+          <View style={styles.padVerderBody}>
+            <Text style={styles.padVerderLabel}>Ga verder met</Text>
+            <Text style={styles.padVerderTitel} numberOfLines={1}>
+              {verder.title}
+            </Text>
+          </View>
+          <Text style={styles.padVerderPijl}>→</Text>
+        </Pressable>
+      ) : (
+        <Text style={styles.padLeeg}>
+          Je leertraject begint zodra je ergens bewust verder leest of kijkt.
+        </Text>
+      )}
+    </View>
+  );
+}
+
+/* Statuskleuren per sleutel — nieuw is neutraal, bezig terracotta (je bent
+   er mee bezig), afgerond merkgroen. */
+const STATUS_STYLE: Record<LearningStatusKey, { backgroundColor: string }> = {
+  new: { backgroundColor: colors.light },
+  active: { backgroundColor: 'rgba(201, 137, 102, 0.16)' },
+  completed: { backgroundColor: 'rgba(79, 125, 108, 0.16)' },
+};
+
+const STATUS_TEXT: Record<LearningStatusKey, { color: string }> = {
+  new: { color: colors.gray },
+  active: { color: colors.primaryDark },
+  completed: { color: colors.greenText },
+};
+
 const styles = StyleSheet.create({
+  /* Mijn leertraject */
+  pad: {
+    backgroundColor: 'rgba(79, 125, 108, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.14)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  padHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  padTitle: { fontSize: 15, fontWeight: '700', color: colors.greenText },
+  padSummary: { fontSize: 12, color: colors.darkLight },
+  padSummaryNum: { fontWeight: '700', color: colors.greenText },
+  padVerder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    backgroundColor: colors.white,
+  },
+  padVerderBody: { flex: 1 },
+  padVerderLabel: { fontSize: 10, color: colors.gray, textTransform: 'uppercase', letterSpacing: 0.5 },
+  padVerderTitel: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  padVerderPijl: { fontSize: 17, color: colors.greenText },
+  padLeeg: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.darkLight,
+  },
+
+  /* Statusbadge op de kaart */
+  kindRowSpacer: { flex: 1 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  statusText: { fontSize: 10, fontWeight: '700' },
+
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
