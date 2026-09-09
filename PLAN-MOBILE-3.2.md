@@ -319,7 +319,70 @@ Gevolgen om te onthouden:
 | 3 — opzeggen | ✅ `getOpzegverzoek`/`createOpzegverzoek` + rij "Lidmaatschap" en opzegblok in ProfileScreen. |
 | 4 — gamification | 🟡 **optie C** (beslist 2026-09-09). Allergenenpad ✅ (blok 7). Mijn leertraject ✅ — statusbadges, "X afgerond · Y bezig", "Ga verder met…", afrondbalk in detail + pdf-viewer. **Nog open**: Cooked it / Pril Ritme en de HapjesHeld-"Dit helpt mij" wachten op de cross-device Supabase-basis (fase 3 van het gamificatieplan). |
 
-Nog niets gecommit in het app-project sinds `2f68625` (blok 1).
+Alle acht blokken zijn geprogrammeerd. **Niets is ooit op een toestel
+gedraaid** — typecheck is schoon, maar dat zegt niets over lay-out,
+scrollgedrag of hoe de Allergenenpad-kaart er werkelijk uitziet. Reken op
+een ronde bijschaven na de eerste build.
+
+---
+
+## Release-checklist v3.2.0
+
+Alles gaat in **één** release in plaats van de zes losse versies uit de
+tabel hierboven; die zijn nooit apart gebouwd. Vandaar één minor bump
+3.1.1 → 3.2.0, en alle `v3.3.0`/`v3.4.0`-annotaties in CLAUDE.md zijn naar
+`v3.2.0` genormaliseerd.
+
+### Klaar
+- ✅ `app.json` version `3.2.0`
+- ✅ Patch-versies bij (`expo`, `expo-constants`, `expo-file-system`,
+  `expo-font`) — `expo-doctor` 18/18 groen. `reanimated 4.1.1` en
+  `worklets 0.5.1` zijn expres NIET aangeraakt.
+- ✅ `npx tsc --noEmit` schoon
+- ✅ CLAUDE.md + roadmap bij
+
+### Voor jou, vóór de build
+- ⬜ **Apple Program License Agreement accepteren** als Account Holder op
+  `developer.apple.com/account`. Kritiek pad: zonder dit geen APNs-sleutel
+  en geen ondertekende iOS-build.
+- ⬜ **APNs-sleutel** aanmaken: `npx eas-cli credentials --platform ios`
+  → production → Push Notifications → *Set up a new key*.
+- ⬜ **Monochroom notificatie-icoon** van Anneleen (wit silhouet op
+  transparant, 96×96) → `assets/notification-icon.png` + verwijzen in de
+  expo-notifications-plugin in `app.json`. Nu staat daar het kleurenlogo,
+  dat in de Android-statusbalk een witte vlek wordt.
+- ⬜ **Tweede testaccount.** De server stuurt nooit een push naar de auteur,
+  dus: telefoon op account A, posten vanaf de web met account B. Zonder dat
+  lijkt push kapot.
+
+### Bouwen
+```
+npx eas-cli build --platform ios --profile production
+npx eas-cli submit --platform ios
+```
+`autoIncrement` bumpt `buildNumber` 68 → 69 en `versionCode` 74 → 75 in
+`app.json`; die wijziging daarna committen.
+
+Android kan pas getest worden als er een Android-toestel beschikbaar is.
+
+### Testmatrix
+1. Push: app open / achtergrond / afgesloten
+2. Tik op tijdlijn-push → tab Tijdlijn
+3. Tik op chatruimte-push → dát topic (bewijst de `data`-payload)
+4. Tijdlijn openen → badge naar 0, app-icoon zakt mee
+5. Uitloggen → icoonbadge weg, geen pushes meer
+6. Verlopen lidmaatschap → `SubscriptionExpiredScreen`, "Check opnieuw"
+   werkt, géén checkout-link op iOS
+7. Registreren met onbekend adres → de juiste van de twee foutmeldingen
+8. Merkgroen overal: tabs, knoppen, badges, avatars, chatbubbels
+9. Weekschema: segmented dagkiezer, groene subtab-onderlijn
+10. Allergenenpad: teller, segmentklik scrolt naar de tegel, één
+    veiligheidsmelding
+11. Aanraders: filters, kortingscode kopiëren, en **geen koopknop bij de
+    twee Pril Leven-producten op iOS**
+12. Profiel: lidmaatschapsdatum + opzegverzoek (dient echt in — gebruik een
+    testaccount)
+13. Learnings: statusbadges, "Ga verder met…", afronden + ongedaan maken
 
 ## Open beslissingen
 
