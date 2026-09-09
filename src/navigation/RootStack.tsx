@@ -28,6 +28,8 @@ import { EersteHapjesScreen } from '../screens/EersteHapjesScreen';
 import { DoseFormScreen } from '../screens/DoseFormScreen';
 import { SymptomLogScreen } from '../screens/SymptomLogScreen';
 import { SymptomFormScreen } from '../screens/SymptomFormScreen';
+import { AanradersScreen } from '../screens/AanradersScreen';
+import { AanraderProductScreen } from '../screens/AanraderProductScreen';
 import { LearningsScreen } from '../screens/LearningsScreen';
 import { LearningDetailScreen } from '../screens/LearningDetailScreen';
 import { LearningPdfScreen } from '../screens/LearningPdfScreen';
@@ -211,6 +213,16 @@ export function RootStackNavigator() {
       <Stack.Screen
         name="SymptomForm"
         component={SymptomFormScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Aanraders"
+        component={AanradersScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AanraderProduct"
+        component={AanraderProductScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

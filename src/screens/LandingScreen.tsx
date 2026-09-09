@@ -65,13 +65,19 @@ const IMG_RECEPTEN = require('../../assets/landing-recepten.jpeg');
 const IMG_HAPJESHELD = require('../../assets/landing-hapjesheld.png');
 const IMG_ALLERGENEN = require('../../assets/landing-allergenen.png');
 const IMG_LEARNINGS = require('../../assets/landing-learnings.png');
+const IMG_AANRADERS = require('../../assets/landing-aanraders.png');
 
 const ORDER_KEY_PREFIX = 'receptenboek_landing_tile_order_';
 
 /* ----------------------------------------
    Tegel-definities (stabiele keys voor de bewaarde volgorde)
 ---------------------------------------- */
-type TileKey = 'recepten' | 'hapjesheld' | 'learnings' | 'allergenen';
+type TileKey =
+  | 'recepten'
+  | 'hapjesheld'
+  | 'learnings'
+  | 'allergenen'
+  | 'aanraders';
 
 interface TileDef {
   key: TileKey;
@@ -107,6 +113,13 @@ const TILES: TileDef[] = [
     image: IMG_ALLERGENEN,
     overlayColor: 'rgba(201, 137, 102, 0.55)',
     title: 'Allergenen-introductie',
+    badge: 'NIEUW',
+  },
+  {
+    key: 'aanraders',
+    image: IMG_AANRADERS,
+    overlayColor: 'rgba(79, 125, 108, 0.55)',
+    title: 'Aanraders',
     badge: 'NIEUW',
   },
 ];
@@ -283,6 +296,9 @@ export function LandingScreen({ navigation }: Props) {
           break;
         case 'learnings':
           navigation.navigate('Learnings');
+          break;
+        case 'aanraders':
+          navigation.navigate('Aanraders');
           break;
         case 'allergenen':
           navigation.navigate('AllergenenChildren');

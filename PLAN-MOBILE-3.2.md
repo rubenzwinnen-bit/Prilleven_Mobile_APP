@@ -315,7 +315,7 @@ Gevolgen om te onthouden:
 | 5 — kleuren | ✅ `greenText`/`greenDark` in `theme.ts`, 73 vervangingen over 22 bestanden, plus volgknop, genereerknop, leeftijd-badge en de HapjesHeld-tegel. |
 | 6 — tabs weekschema | ✅ groene subtab-onderlijn, segmented dagkiezer, lage `activeToolbar`, dagblokken met groene rand + groene VANDAAG-badge. |
 | 7 — allergenen | ✅ `AllergenPathCard`, `SafetyBar` (2 niveaus), `HoeveelhedenBox` en arts-toezicht-banner opgeheven, segmentklik scrolt naar de tegel. Pencil-edit op doses/symptomen bleek al te bestaan. |
-| 2 — aanraders | ⬜ wacht op keuze native/WebView |
+| 2 — aanraders | ✅ **native** (beslist 2026-09-09). `services/aanraders.ts` leest Supabase-direct, `AanradersScreen` + `AanraderProductScreen` + gedeelde `AanraderKaart`, 5de landingstegel. Geen categoriescherm (de filter doet dat werk). Koopknop verborgen op iOS bij de eigen Plug&Pay-producten. |
 | 3 — opzeggen | ✅ `getOpzegverzoek`/`createOpzegverzoek` + rij "Lidmaatschap" en opzegblok in ProfileScreen. |
 | 4 — gamification | ⬜ wacht op keuze A/B/C |
 

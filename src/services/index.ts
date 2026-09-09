@@ -164,6 +164,23 @@ export {
 } from './notifications';
 export type { ChatroomActivity } from './notifications';
 export {
+  getAanraders,
+  leeftijdLabel,
+  zoekTekst,
+  veiligeUrl,
+  magKoopknopTonen,
+  RELATIE_LABELS,
+  LABEL_TEKST,
+  INTRO_TEKST,
+} from './aanraders';
+export type {
+  AanradersData,
+  AanraderCategorie,
+  AanraderProduct,
+  AanraderDownload,
+  RelatieType,
+} from './aanraders';
+export {
   getSubscriptionStatus,
   accessMessage,
   formatEndDate,
