@@ -28,13 +28,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, shadows } from '../constants/theme';
-import { signIn, signUp, resetPassword } from '../services';
+import {
+  PRIVACY_URL,
+  TERMS_URL,
+  CHECKOUT_URL,
+  MAG_NAAR_CHECKOUT_LINKEN,
+} from '../constants/links';
+import {
+  signIn,
+  signUp,
+  resetPassword,
+  checkAllowedUser,
+  checkCanSignUp,
+} from '../services';
 
 type AuthTab = 'login' | 'register' | 'reset';
-
-/* Publieke juridische pagina's (gedeeld met de website). */
-const PRIVACY_URL = 'https://community-web.prilleven.be/privacy.html';
-const TERMS_URL = 'https://community-web.prilleven.be/voorwaarden.html';
 
 interface AuthScreenProps {
   onAuthenticated: (email: string) => void;
@@ -98,6 +106,22 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
     setLoading(true);
     try {
+      /* Eerst uitzoeken wélke reden het is. signUp gooit één melding voor
+         twee heel verschillende situaties — "je hebt al een account" en
+         "wij kennen dit adres niet" vragen om een ander antwoord van de
+         gebruiker. Zelfde volgorde als de website; signUp houdt zijn eigen
+         controle als vangnet. */
+      const magRegistreren = await checkCanSignUp(email);
+      if (!magRegistreren) {
+        const isBekend = await checkAllowedUser(email);
+        setError(
+          isBekend
+            ? 'Dit e-mailadres heeft al een account. Gebruik "Inloggen" om verder te gaan.'
+            : 'Dit e-mailadres is bij ons niet bekend. Heb je met dit adres betaald? Neem contact op als je denkt dat dit een vergissing is.'
+        );
+        return;
+      }
+
       const result = await signUp(email, password);
       onAuthenticated(result.email);
     } catch (err: any) {
@@ -319,6 +343,27 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             )}
           </View>
 
+          {/* Lidmaatschap — staat onder alle tabs, want ook wie tevergeefs
+              probeert te registreren komt hier terecht. Op iOS bewust geen
+              link of knop: zie MAG_NAAR_CHECKOUT_LINKEN. */}
+          <View style={styles.membershipBox}>
+            {MAG_NAAR_CHECKOUT_LINKEN ? (
+              <Text style={styles.membershipText}>
+                Nog geen lid?{' '}
+                <Text
+                  style={styles.membershipLink}
+                  onPress={() => Linking.openURL(CHECKOUT_URL)}
+                >
+                  Word lid van Pril Leven
+                </Text>
+              </Text>
+            ) : (
+              <Text style={styles.membershipText}>
+                Nog geen lid? Je wordt lid via de webversie van Pril Leven.
+              </Text>
+            )}
+          </View>
+
           {/* Juridische links — altijd zichtbaar */}
           <View style={styles.legalFooter}>
             <Text
@@ -457,14 +502,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   successBox: {
-    backgroundColor: 'rgba(152, 195, 164, 0.18)',
+    backgroundColor: 'rgba(79, 125, 108, 0.18)',
     borderLeftWidth: 4,
-    borderLeftColor: colors.secondaryDark,
+    borderLeftColor: colors.greenText,
     borderRadius: radius.sm,
     padding: spacing.md,
   },
   successText: {
-    color: colors.secondaryDark,
+    color: colors.greenText,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -489,6 +534,20 @@ const styles = StyleSheet.create({
   consentLink: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  membershipBox: {
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  membershipText: {
+    fontSize: 13,
+    color: colors.gray,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  membershipLink: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   legalFooter: {
     flexDirection: 'row',

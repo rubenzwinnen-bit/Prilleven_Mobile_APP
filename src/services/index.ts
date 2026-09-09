@@ -164,6 +164,12 @@ export {
 } from './notifications';
 export type { ChatroomActivity } from './notifications';
 export {
+  getSubscriptionStatus,
+  accessMessage,
+  formatEndDate,
+} from './subscription';
+export type { SubscriptionStatus, AccessReason } from './subscription';
+export {
   registerPushToken,
   deregisterPushToken,
   syncBadgeState,

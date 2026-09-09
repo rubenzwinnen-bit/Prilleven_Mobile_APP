@@ -11,8 +11,9 @@
  *                 └── NotificationProvider
  *                       └── ShoppingListProvider
  *                             └── AppGate
- *                             ├── AuthScreen          (niet ingelogd)
- *                             └── RootStackNavigator  (ingelogd)
+ *                             ├── AuthScreen                   (niet ingelogd)
+ *                             ├── SubscriptionExpiredScreen    (lidmaatschap verlopen)
+ *                             └── RootStackNavigator           (ingelogd)
  *                                   ├── Landing       (tegels)
  *                                   ├── Main          (MainTabs)
  *                                   └── HapjesHeld    (chat stack)
@@ -34,12 +35,15 @@ import { ToastProvider } from './src/components/Toast';
 import { RootStackNavigator } from './src/navigation/RootStack';
 import { navigationRef, PushRouter } from './src/navigation/pushRouting';
 import { AuthScreen } from './src/screens/AuthScreen';
+import { SubscriptionExpiredScreen } from './src/screens/SubscriptionExpiredScreen';
+import { useSubscriptionGate } from './src/lib/useSubscriptionGate';
 
 /* ----------------------------------------
    Gate – wacht tot sessie is gecheckt
 ---------------------------------------- */
 function AppGate() {
-  const { user, loading, setUser } = useUser();
+  const { user, loading, setUser, logout } = useUser();
+  const { status, geblokkeerd, recheck } = useSubscriptionGate(user);
 
   /* Supabase sessie wordt gecheckt... */
   if (loading) {
@@ -57,6 +61,21 @@ function AppGate() {
         onAuthenticated={async (email) => {
           await setUser(email);
         }}
+      />
+    );
+  }
+
+  /* Ingelogd, maar de server zegt dat het lidmaatschap niet meer loopt.
+     Dit scherm staat bewust vóór de NavigationContainer: er valt niets te
+     navigeren en de gebruiker mag er niet omheen. Alleen een expliciet
+     serverantwoord komt hier terecht — bij een netwerkfout is de gate
+     fail-open en gaat de app gewoon open. */
+  if (geblokkeerd) {
+    return (
+      <SubscriptionExpiredScreen
+        status={status}
+        onRecheck={recheck}
+        onLogout={logout}
       />
     );
   }
