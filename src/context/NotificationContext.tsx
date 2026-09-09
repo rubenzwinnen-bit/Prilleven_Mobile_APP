@@ -8,7 +8,7 @@
  *   chatroomsCount  → nieuwe admin-activiteit over alle chatruimtes, opgeteld
  *
  * De chatruimtes-teller is opgebouwd uit drie niveaus die uit één telling
- * komen (countNewAdminChatroomActivity → { total, perRoom, perTopic }):
+ * komen (fetchAppBadgeCounts → chatrooms { total, perRoom, perTopic }):
  *   - chatroomsCount        footer-badge (som over alles)
  *   - chatroomRoomCounts    per chatruimte (roomlijst)
  *   - chatroomTopicCounts   per topic (topiclijst binnen een room)
@@ -44,8 +44,9 @@
  * bij focus aan zodat de tellers meteen kloppen i.p.v. tot de volgende poll.
  *
  * Admin-modus: voor admins tellen ALLE nieuwe posts/topics mee (niet enkel
- * admin-aankondigingen) zodat zij alle community-activiteit zien. We bepalen
- * de admin-status één keer per gebruiker via getIsAdmin().
+ * admin-aankondigingen) zodat zij alle community-activiteit zien. Die
+ * beslissing valt sinds v3.2.0 SERVER-side voor beide tellers; de app hoeft
+ * de admin-status dus niet meer zelf op te vragen.
  */
 
 import React, {
@@ -60,15 +61,23 @@ import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from './UserContext';
 import {
-  fetchTimelineBadge,
-  countNewAdminChatroomActivity,
-  getIsAdmin,
+  fetchAppBadgeCounts,
   registerPushToken,
   syncBadgeState,
   setAppBadge,
 } from '../services';
 
-const POLL_INTERVAL_MS = 60_000;
+/* De chatruimteteller doet per ronde listRooms() + getRoom() per ruimte +
+   getTopic() voor elk recent-actief topic: al gauw vijf tot twintig verzoeken.
+   Elke minuut is dat te vaak voor badges die zelden binnen die tijd wijzigen,
+   en het loopt in de weg terwijl je scrollt. Drie minuten volstaat; terugkeren
+   naar de voorgrond ververst sowieso meteen, en een push corrigeert het getal
+   op het app-icoon. */
+const POLL_INTERVAL_MS = 180_000;
+
+/* Terugkeren naar de voorgrond ververst, maar niet vaker dan dit — anders
+   telt de app opnieuw bij elke korte wissel tussen apps. */
+const FOREGROUND_MIN_GAP_MS = 30_000;
 
 const SEEN_TIMELINE_PREFIX = 'notif_seen_timeline_';
 const SEEN_CHATROOMS_PREFIX = 'notif_seen_chatrooms_';
@@ -128,7 +137,6 @@ export function NotificationProvider({
   const topicReadsRef = useRef<Record<string, string>>({});
 
   /* Admin-status (true = alle posts tellen, niet enkel admin-posts). */
-  const isAdminRef = useRef<boolean>(false);
 
   const timelineKey = user ? `${SEEN_TIMELINE_PREFIX}${user}` : null;
   const chatroomsKey = user ? `${SEEN_CHATROOMS_PREFIX}${user}` : null;
@@ -137,14 +145,12 @@ export function NotificationProvider({
   /* Tel opnieuw op basis van de huidige markeerpunten. */
   const refresh = useCallback(async () => {
     if (!user) return;
-    const [tl, chatroom] = await Promise.all([
-      fetchTimelineBadge(seenTimelineRef.current),
-      countNewAdminChatroomActivity(
-        seenChatroomsRef.current,
-        isAdminRef.current,
-        topicReadsRef.current
-      ),
-    ]);
+    /* Eén verzoek voor beide tellers. De chatruimte-baseline en de per-topic
+       markeerpunten leest de server zelf uit `user_badge_state`; die spiegelen
+       we via syncBadgeState. */
+    const { timeline: tl, chatrooms: chatroom } = await fetchAppBadgeCounts(
+      seenTimelineRef.current
+    );
     setTimelineCount(tl);
     setChatroomsCount(chatroom.total);
     setChatroomRoomCounts(chatroom.perRoom);
@@ -164,7 +170,6 @@ export function NotificationProvider({
       seenTimelineRef.current = null;
       seenChatroomsRef.current = null;
       topicReadsRef.current = {};
-      isAdminRef.current = false;
       setTimelineCount(0);
       setChatroomsCount(0);
       setChatroomRoomCounts({});
@@ -177,14 +182,6 @@ export function NotificationProvider({
          server-side op de user_id zodat de server pushes + app-icoon-badge
          kan sturen wanneer de app dicht is. Niet-blokkerend (gooit nooit). */
       registerPushToken();
-
-      /* Admin-status bepalen vóór de eerste telling. */
-      try {
-        isAdminRef.current = await getIsAdmin(user);
-      } catch {
-        isAdminRef.current = false;
-      }
-      if (cancelled) return;
 
       const nowIso = new Date().toISOString();
       try {
@@ -240,8 +237,13 @@ export function NotificationProvider({
       refresh();
     }, POLL_INTERVAL_MS);
 
+    let lastForegroundRefresh = 0;
     const onAppStateChange = (state: AppStateStatus) => {
-      if (state === 'active') refresh();
+      if (state !== 'active') return;
+      const now = Date.now();
+      if (now - lastForegroundRefresh < FOREGROUND_MIN_GAP_MS) return;
+      lastForegroundRefresh = now;
+      refresh();
     };
     const sub = AppState.addEventListener('change', onAppStateChange);
 

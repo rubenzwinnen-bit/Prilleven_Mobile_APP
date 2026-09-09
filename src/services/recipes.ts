@@ -32,22 +32,31 @@ function dbToRecipe(row: any): Recipe {
   };
 }
 
-/** Haal alle recepten op (gecached). */
+/* Kolommen voor lijstweergaven. `ingredients` en `preparation` zitten er
+   bewust NIET in: dat zijn de twee zware arrays, en geen enkel lijstscherm
+   toont ze. Ze worden opgehaald zodra je één recept opvraagt. */
+const LIST_COLUMNS =
+  'id, name, image, meal_moments, allergens, min_age_months, ' +
+  'cooking_time, portions, created_at, updated_at';
+
+/** Haal alle recepten op (gecached), zonder ingrediënten en bereidingswijze. */
 export async function getRecipes(): Promise<Recipe[]> {
   const cached = cacheGet<Recipe[]>('recipes:all');
   if (cached) return cached;
 
   const { data, error } = await supabase
     .from('recipes')
-    .select('*')
+    .select(LIST_COLUMNS)
     .order('created_at', { ascending: false })
     .range(0, 9999);
 
   if (error) throw error;
 
+  /* Deze rijen zijn onvolledig, dus ze mogen de per-recept-cache NIET vullen:
+     anders zou een detailscherm of de boodschappenlijst een recept zonder
+     ingrediënten uit de cache krijgen. */
   const recipes = (data || []).map(dbToRecipe);
   cacheSet('recipes:all', recipes);
-  for (const r of recipes) cacheSet(`recipe:${r.id}`, r);
   return recipes;
 }
 

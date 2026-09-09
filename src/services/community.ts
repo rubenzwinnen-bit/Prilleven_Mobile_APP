@@ -184,22 +184,51 @@ export async function listPosts(opts: {
   return data?.posts ?? [];
 }
 
+export interface ChatroomBadges {
+  total: number;
+  /** Aantal per chatruimte, keyed op room_id. */
+  perRoom: Record<string, number>;
+  /** Aantal per topic, keyed op topic_id. */
+  perTopic: Record<string, number>;
+}
+
+export interface AppBadges {
+  timeline: number;
+  chatrooms: ChatroomBadges;
+}
+
 /* ----------------------------------------
    getAppBadges
    GET /api/community/app-badges?since=<iso>
 
-   Server-side teller voor de tijdlijn-badge. Telt nieuwe posts ÉN
-   replies sinds `since` (admin = alles, gewone gebruiker = admin-content
-   + gevolgde topics). Ondergrens 6 weken zit server-side. `since` null
-   → server geeft 0.
+   Server-side tellers voor beide badges.
+
+   Tijdlijn: nieuwe posts ÉN replies sinds `since` (admin = alles, gewone
+   gebruiker = admin-content + gevolgde topics). `since` null → 0.
+
+   Chatruimtes: nieuwe topics + replies met dezelfde telregel, uitgesplitst
+   per ruimte en per topic. De server leest de markeerpunten daarvoor ZELF uit
+   `user_badge_state` — dezelfde bron als de push-badge — dus die worden hier
+   niet meegestuurd. De app spiegelt ze via `syncBadgeState`.
+
+   Ondergrens van 6 weken zit voor beide server-side.
 ---------------------------------------- */
-export async function getAppBadges(
-  since: string | null
-): Promise<{ timeline: number }> {
+export async function getAppBadges(since: string | null): Promise<AppBadges> {
   const qs = since ? `?since=${encodeURIComponent(since)}` : '';
   const response = await authedFetch(`/api/community/app-badges${qs}`);
-  const data = await jsonOrThrow<{ timeline?: number }>(response);
-  return { timeline: typeof data?.timeline === 'number' ? data.timeline : 0 };
+  const data = await jsonOrThrow<{
+    timeline?: number;
+    chatrooms?: Partial<ChatroomBadges>;
+  }>(response);
+
+  return {
+    timeline: typeof data?.timeline === 'number' ? data.timeline : 0,
+    chatrooms: {
+      total: typeof data?.chatrooms?.total === 'number' ? data.chatrooms.total : 0,
+      perRoom: data?.chatrooms?.perRoom || {},
+      perTopic: data?.chatrooms?.perTopic || {},
+    },
+  };
 }
 
 /* ----------------------------------------

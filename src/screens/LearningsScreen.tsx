@@ -322,6 +322,10 @@ export function LearningsScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
           data={filtered}
           keyExtractor={l => l.id}
           renderItem={renderItem}

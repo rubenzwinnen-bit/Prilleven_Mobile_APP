@@ -158,11 +158,8 @@ export {
   relTime,
 } from './memory';
 export type { Memory } from './memory';
-export {
-  fetchTimelineBadge,
-  countNewAdminChatroomActivity,
-} from './notifications';
-export type { ChatroomActivity } from './notifications';
+export { fetchAppBadgeCounts } from './notifications';
+export type { ChatroomActivity, AppBadgeCounts } from './notifications';
 export {
   getAanraders,
   leeftijdLabel,

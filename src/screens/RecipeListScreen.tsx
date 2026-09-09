@@ -250,6 +250,10 @@ export function RecipeListScreen({ navigation }: any) {
       ) : null}
 
       <FlatList
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
         data={filtered}
         keyExtractor={r => r.id}
         contentContainerStyle={styles.list}

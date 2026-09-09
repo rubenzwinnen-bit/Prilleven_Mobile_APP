@@ -989,6 +989,10 @@ export function TimelineScreen() {
           />
         ) : (
           <FlatList
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        removeClippedSubviews
             data={posts}
             keyExtractor={(p) => p.id}
             renderItem={({ item }) =>

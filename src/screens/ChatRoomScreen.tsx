@@ -437,6 +437,10 @@ export function ChatRoomScreen({ navigation, route }: Props) {
         />
       ) : (
         <FlatList
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews
           data={topics}
           keyExtractor={(t) => t.id}
           contentContainerStyle={styles.listContent}
