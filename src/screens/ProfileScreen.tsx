@@ -63,7 +63,7 @@ import {
 } from '../services';
 import type { CommunityProfile, BlockedUser, SubscriptionStatus } from '../services';
 import type { RootStackParamList } from '../navigation/types';
-import { PRIVACY_URL, TERMS_URL } from '../constants/links';
+import { PRIVACY_URL, WEBSITE_URL, TERMS_URL } from '../constants/links';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
@@ -1001,7 +1001,23 @@ export function ProfileScreen({ navigation }: Props) {
         </Section>
 
         {/* ----- 8. JURIDISCH ----- */}
-        <Section title="Juridisch">
+        {/* Algemene websitelink staat hier, los van alles wat met het
+            lidmaatschap te maken heeft — op iOS mag er nergens een oproep
+            tot kopen buiten de app staan (zie constants/links.ts). */}
+        <Section title="Over Pril Leven">
+          <Pressable
+            onPress={() => Linking.openURL(WEBSITE_URL)}
+            style={({ pressed }) => [
+              styles.btnSecondary,
+              pressed && styles.btnPressed,
+            ]}
+          >
+            <Feather name="globe" size={16} color={colors.primary} />
+            <Text style={styles.btnSecondaryTextPrimary}>
+              Pril Leven op het web
+            </Text>
+          </Pressable>
+
           <Pressable
             onPress={() => Linking.openURL(PRIVACY_URL)}
             style={({ pressed }) => [

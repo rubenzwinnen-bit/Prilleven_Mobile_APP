@@ -123,12 +123,11 @@ export function AanraderKnop({ product }: { product: AanraderProduct }) {
     );
   }
 
+  /* Eigen digitaal product op iOS: geen knop én geen zin die zegt waar je
+     het koopt — ook dat is een oproep tot kopen buiten de app (3.1.3(f), zie
+     constants/links.ts). De kaart zelf blijft staan. */
   if (link && !mag) {
-    return (
-      <Text style={styles.btnUit}>
-        Te bekijken in de webversie van Pril Leven.
-      </Text>
-    );
+    return null;
   }
 
   return (

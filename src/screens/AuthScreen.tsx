@@ -345,7 +345,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
           {/* Lidmaatschap — staat onder alle tabs, want ook wie tevergeefs
               probeert te registreren komt hier terecht. Op iOS bewust geen
-              link of knop: zie MAG_NAAR_CHECKOUT_LINKEN. */}
+              link, geen knop én geen verwijzing naar waar je lid wordt: de
+              zin legt alleen uit waarom je een account nodig hebt. Zie
+              MAG_NAAR_CHECKOUT_LINKEN. */}
           <View style={styles.membershipBox}>
             {MAG_NAAR_CHECKOUT_LINKEN ? (
               <Text style={styles.membershipText}>
@@ -359,7 +361,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               </Text>
             ) : (
               <Text style={styles.membershipText}>
-                Nog geen lid? Je wordt lid via de webversie van Pril Leven.
+                Log in met het account van je Pril Leven-lidmaatschap.
               </Text>
             )}
           </View>

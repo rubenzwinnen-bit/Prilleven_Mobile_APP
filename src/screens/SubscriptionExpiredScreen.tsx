@@ -85,8 +85,18 @@ export function SubscriptionExpiredScreen({
             <Text style={styles.primaryBtnText}>Lidmaatschap verlengen</Text>
           </Pressable>
         ) : (
+          /* iOS: geen verwijzing naar waar je verlengt — dat is een oproep tot
+             kopen buiten de app (3.1.3(f), zie constants/links.ts). Wel een
+             supportroute: die gaat over hulp, niet over betalen. */
           <Text style={styles.webHint}>
-            Je beheert je lidmaatschap in de webversie van Pril Leven.
+            Denk je dat dit niet klopt? Mail ons via{' '}
+            <Text
+              style={styles.webHintLink}
+              onPress={() => Linking.openURL('mailto:hallo@prilleven.be')}
+            >
+              hallo@prilleven.be
+            </Text>
+            .
           </Text>
         )}
 
@@ -162,6 +172,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 320,
     marginBottom: spacing.lg,
+  },
+  webHintLink: {
+    color: colors.greenText,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   primaryBtn: {
     backgroundColor: colors.primary,
