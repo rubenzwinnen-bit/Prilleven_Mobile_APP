@@ -184,6 +184,37 @@ export async function listPosts(opts: {
   return data?.posts ?? [];
 }
 
+/* ----------------------------------------
+   Eenmalig voorladen van de eerste feedpagina.
+
+   De landing roept `prefetchFeed()` aan; de tijdlijn neemt die belofte bij
+   zijn EERSTE load over via `takePrefetchedFeed()`. Bewust geen gewone cache:
+   likes en reacties wijzigen de tellers, en een bewaarde feed zou een hartje
+   tonen dat je net had uitgezet. Dit wordt precies één keer verbruikt en
+   vervalt na 30 s.
+---------------------------------------- */
+/** Paginagrootte van de feed — gedeeld door de tijdlijn en het voorladen. */
+export const FEED_PAGE_SIZE = 20;
+
+const PREFETCH_TTL_MS = 30_000;
+let voorgeladenFeed: { t: number; limit: number; p: Promise<CommunityPost[]> } | null =
+  null;
+
+export function prefetchFeed(limit: number): void {
+  const p = listPosts({ limit });
+  voorgeladenFeed = { t: Date.now(), limit, p };
+  p.catch(() => {
+    voorgeladenFeed = null;
+  });
+}
+
+export function takePrefetchedFeed(limit: number): Promise<CommunityPost[]> | null {
+  const v = voorgeladenFeed;
+  voorgeladenFeed = null;
+  if (!v || v.limit !== limit || Date.now() - v.t > PREFETCH_TTL_MS) return null;
+  return v.p;
+}
+
 export interface ChatroomBadges {
   total: number;
   /** Aantal per chatruimte, keyed op room_id. */

@@ -48,7 +48,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useUser } from '../context/UserContext';
 import { AvatarButton } from '../components/AvatarButton';
-import { getCommunityProfile } from '../services';
+import {
+  getCommunityProfile,
+  getLearnings,
+  prefetchFeed,
+  FEED_PAGE_SIZE,
+} from '../services';
 import type {
   RootStackParamList,
   LandingTabParamList,
@@ -97,19 +102,16 @@ const TILES: TileDef[] = [
     key: 'hapjesheld',
     image: IMG_HAPJESHELD,
     title: 'HapjesHeld 2.0',
-    badge: 'NIEUW',
   },
   {
     key: 'learnings',
     image: IMG_LEARNINGS,
     title: 'Learnings',
-    badge: 'NIEUW',
   },
   {
     key: 'allergenen',
     image: IMG_ALLERGENEN,
     title: 'Allergenen-introductie',
-    badge: 'NIEUW',
   },
   {
     key: 'aanraders',
@@ -256,6 +258,19 @@ export function LandingScreen({ navigation }: Props) {
     return () => {
       cancelled = true;
     };
+  }, [user]);
+
+  /* De learnings-bibliotheek en de tijdlijn alvast op de achtergrond ophalen,
+     één keer per gebruiker. Dat vult de cache én warmt de Vercel-function op, zodat de
+     lijst klaarligt als je op de tegel tikt in plaats van een koude start af
+     te wachten. Fouten zijn hier irrelevant: het scherm haalt zelf opnieuw op. */
+  const learningsVoorgeladenVoor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || learningsVoorgeladenVoor.current === user) return;
+    learningsVoorgeladenVoor.current = user;
+    getLearnings().catch(() => {});
+    /* Idem voor de eerste pagina van de tijdlijn, de tab ernaast. */
+    prefetchFeed(FEED_PAGE_SIZE);
   }, [user]);
 
   /* Bij elke focus (incl. terugkeer van ProfileScreen) refresh

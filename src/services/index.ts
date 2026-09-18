@@ -66,6 +66,9 @@ export {
 export type { CommunityProfile } from './communityProfile';
 export {
   listPosts,
+  prefetchFeed,
+  takePrefetchedFeed,
+  FEED_PAGE_SIZE,
   getAppBadges,
   createPost,
   togglePostLike,
@@ -207,6 +210,7 @@ export {
   SYMPTOM_TYPES,
   SYMPTOM_SEVERITIES,
   getEhState,
+  getEhOverview,
   patchEhState,
   getEhDoses,
   createEhDose,

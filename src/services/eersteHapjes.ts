@@ -19,6 +19,7 @@
 
 import { supabase } from '../lib/supabase';
 import { RAG_API_URL } from './hapjesheld';
+import { cacheGet, cacheSet, cacheInvalidate } from './cache';
 
 /* ----------------------------------------
    Constants — gespiegeld van de website
@@ -577,6 +578,57 @@ export async function getEhState(childId: string): Promise<EhState> {
   return data.state;
 }
 
+/* ----------------------------------------
+   getEhOverview
+   GET /api/eerste-hapjes/state?child_id=...&include=doses,symptoms
+
+   Eén verzoek voor alles wat het allergenenscherm nodig heeft. Daarvoor waren
+   dit drie aanroepen naar drie APARTE Vercel-functies, die elk apart konden
+   afkoelen: gemeten 3,8 s voor de doses alleen bij een koude start. Nu wordt
+   één functie geraakt, die daardoor ook warm blijft.
+---------------------------------------- */
+/* 30 s cache per kind. Het allergenenscherm vult hem, en het doseformulier
+   en het symptoomformulier lezen eruit — die haalden anders dezelfde
+   gegevens opnieuw op bij de APARTE /doses- en /state-functions, die sinds
+   het samenvoegen bijna nooit meer geraakt worden en dus bijna altijd koud
+   staan (~4 s per opening). Elke mutatie hieronder wist hem. */
+const OVERVIEW_CACHE_PREFIX = 'eh:overview:';
+
+function invalidateOverview(): void {
+  cacheInvalidate(OVERVIEW_CACHE_PREFIX);
+}
+
+export async function getEhOverview(childId: string): Promise<{
+  state: EhState | null;
+  doses: EhDose[];
+  symptoms: EhSymptom[];
+}> {
+  const cacheKey = `${OVERVIEW_CACHE_PREFIX}${childId}`;
+  const cached = cacheGet<{
+    state: EhState | null;
+    doses: EhDose[];
+    symptoms: EhSymptom[];
+  }>(cacheKey);
+  if (cached) return cached;
+
+  const response = await authedFetch(
+    `/api/eerste-hapjes/state?child_id=${encodeURIComponent(childId)}` +
+      `&include=doses,symptoms`
+  );
+  const data = await jsonOrThrow<{
+    state?: EhState;
+    doses?: EhDose[];
+    symptoms?: EhSymptom[];
+  }>(response);
+  const overzicht = {
+    state: data?.state ?? null,
+    doses: data?.doses ?? [],
+    symptoms: data?.symptoms ?? [],
+  };
+  cacheSet(cacheKey, overzicht);
+  return overzicht;
+}
+
 export async function patchEhState(
   childId: string,
   patch: Partial<{
@@ -597,6 +649,7 @@ export async function patchEhState(
   });
   const data = await jsonOrThrow<StateEnvelope>(response);
   if (!data?.state) throw new Error('Allergeen-status kon niet worden bijgewerkt.');
+  invalidateOverview();
   return data.state;
 }
 
@@ -626,6 +679,7 @@ export async function createEhDose(input: EhDoseInput): Promise<EhDose> {
   });
   const data = await jsonOrThrow<DoseEnvelope>(response);
   if (!data?.dose) throw new Error('Dose kon niet worden opgeslagen.');
+  invalidateOverview();
   return data.dose;
 }
 
@@ -643,6 +697,7 @@ export async function updateEhDose(
   );
   const data = await jsonOrThrow<DoseEnvelope>(response);
   if (!data?.dose) throw new Error('Dose kon niet worden bijgewerkt.');
+  invalidateOverview();
   return data.dose;
 }
 
@@ -652,6 +707,7 @@ export async function deleteEhDose(id: string): Promise<void> {
     { method: 'DELETE' }
   );
   await okOrThrow(response);
+  invalidateOverview();
 }
 
 /* ----------------------------------------
@@ -685,6 +741,7 @@ export async function createEhSymptom(
   });
   const data = await jsonOrThrow<SymptomEnvelope>(response);
   if (!data?.symptom) throw new Error('Symptoom kon niet worden opgeslagen.');
+  invalidateOverview();
   return data.symptom;
 }
 
@@ -716,6 +773,7 @@ export async function updateEhSymptom(
   );
   const data = await jsonOrThrow<SymptomEnvelope>(response);
   if (!data?.symptom) throw new Error('Symptoom kon niet worden bijgewerkt.');
+  invalidateOverview();
   return data.symptom;
 }
 
@@ -725,6 +783,7 @@ export async function deleteEhSymptom(id: string): Promise<void> {
     { method: 'DELETE' }
   );
   await okOrThrow(response);
+  invalidateOverview();
 }
 
 /* ----------------------------------------

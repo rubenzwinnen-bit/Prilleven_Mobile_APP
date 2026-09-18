@@ -14,7 +14,7 @@
  * te maken.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,10 @@ import { Feather } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { getChildren, formatAge } from '../services';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colorFromSeed, initialsFromName } from '../lib/familyLayer';
+import { InfoModal } from '../components/InfoModal';
+import { InfoIconButton } from '../navigation/RootStack';
 import type { Child } from '../services';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -63,11 +67,15 @@ export function AllergenenChildrenScreen({ navigation }: Props) {
   const { show } = useToast();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
+  const [infoVisible, setInfoVisible] = useState(false);
+  /* Alleen de eerste keer een spinner; daarna stil herladen, zodat de lijst
+     niet bij elke terugkeer leeg knippert. */
+  const eersteKeerRef = useRef(true);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      setLoading(true);
+      if (eersteKeerRef.current) setLoading(true);
       (async () => {
         try {
           const list = await getChildren();
@@ -77,7 +85,10 @@ export function AllergenenChildrenScreen({ navigation }: Props) {
             show(err.message || 'Kon kinderen niet laden.', 'error');
           }
         } finally {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) {
+            setLoading(false);
+            eersteKeerRef.current = false;
+          }
         }
       })();
       return () => {
@@ -92,14 +103,30 @@ export function AllergenenChildrenScreen({ navigation }: Props) {
       <View style={styles.header}>
         <ChevronBack onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Allergenen-introductie</Text>
-        <View style={{ width: 28 }} />
+        <InfoIconButton onPress={() => setInfoVisible(true)} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.intro}>
-          Voor welk kind wil je een allergeen registreren of een symptoom
-          loggen? Tik op een naam om de allergeen-flow te openen.
+      <InfoModal
+        visible={infoVisible}
+        onClose={() => setInfoVisible(false)}
+        title="Allergenen-introductie"
+      >
+        <Text style={styles.infoText}>
+          Kies het kind waarvoor je een allergeen wil registreren of een
+          symptoom wil loggen. Tik op een naam om de allergeen-flow te openen.
         </Text>
+      </InfoModal>
+
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <LinearGradient
+          colors={['rgba(79, 125, 108, 0.12)', 'rgba(79, 125, 108, 0.035)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hero}
+        >
+          <Text style={styles.eyebrow}>Allergenen-introductie</Text>
+          <Text style={styles.heroTitle}>Voor wie?</Text>
+        </LinearGradient>
 
         {loading ? (
           <View style={styles.loadingBlock}>
@@ -136,11 +163,25 @@ export function AllergenenChildrenScreen({ navigation }: Props) {
               ]}
               accessibilityLabel={`Allergeen-flow openen voor ${child.name}`}
             >
+              <View
+                style={[
+                  styles.avatar,
+                  { backgroundColor: colorFromSeed(child.id || child.name) },
+                ]}
+              >
+                <Text style={styles.avatarText}>
+                  {initialsFromName(child.name)}
+                </Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardName}>{child.name}</Text>
                 <Text style={styles.cardAge}>{formatAge(child.birthdate)}</Text>
               </View>
-              <Feather name="chevron-right" size={22} color={colors.primary} />
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.greenText}
+              />
             </Pressable>
           ))
         )}
@@ -170,11 +211,32 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  intro: {
-    fontSize: 13,
-    color: colors.gray,
-    lineHeight: 18,
+  infoText: {
+    fontSize: 13.5,
+    color: colors.darkLight,
+    lineHeight: 20,
+  },
+  /* Kop in dezelfde vorm als de favorietenzone en de landing. */
+  hero: {
+    padding: spacing.lg,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.18)',
     marginBottom: spacing.lg,
+  },
+  eyebrow: {
+    color: colors.greenText,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    marginTop: spacing.xs,
+    color: colors.greenText,
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 31,
   },
   loadingBlock: {
     paddingVertical: spacing.xl,
@@ -194,11 +256,28 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
     backgroundColor: colors.white,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.16)',
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     ...shadows.sm,
+  },
+  /* Zelfde kleur en initiaal als de avatarrij op het receptdetail, zodat een
+     kind er door de hele app hetzelfde uitziet. */
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
   cardName: {
     fontSize: 17,

@@ -7,8 +7,13 @@
  *      pagina X, dan opent dit scherm meteen op pagina X (en omgekeerd).
  *   2. Download verbergen — net als de website tonen we geen downloadknop.
  *
- * Werking: pdf.js (CDN, UMD-build) rendert alle pagina's als canvassen in
- * een scrollbare WebView. De pagina-tracker post elke pagina-wissel terug
+ * Werking: pdf.js (CDN, UMD-build) rendert de pagina's als canvassen in
+ * een scrollbare WebView. **Lui**: eerst worden alleen lege canvassen met de
+ * juiste afmetingen geplaatst, en pas wat rond de zichtbare pagina ligt wordt
+ * gerasterd (venster van 3, één render tegelijk); ver weg gerenderde pagina's
+ * worden weer leeggemaakt zodat het geheugen niet oploopt. Daarvoor werden
+ * álle pagina's vooraf gerenderd, wat bij een dik document minutenlang duurde.
+ * De pixelratio is afgetopt op 2. De pagina-tracker post elke pagina-wissel terug
  * via `window.ReactNativeWebView.postMessage`; wij debouncen het bewaren
  * (1500 ms, identiek aan de website) en bewaren ook bij verlaten.
  *
@@ -101,9 +106,17 @@ function buildViewerHtml(pdfUrl: string, startPage: number): string {
       var viewer = document.getElementById('viewer');
       var status = document.getElementById('status');
       status.style.display = 'none';
-      var dpr = window.devicePixelRatio || 1;
+
+      /* Een pixelratio van 3 verviervoudigt het rasterwerk tegenover 1,5
+         zonder dat je op een telefoon het verschil ziet. Aftoppen op 2. */
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
       var cw = document.body.clientWidth;
-      var canvases = [];
+
+      /* EERST alleen de afmetingen bepalen en lege canvassen plaatsen. Het
+         rasteren zelf gebeurt pas wanneer een pagina in beeld komt — anders
+         wacht je bij een document van dertig pagina's op dertig renders
+         voor je iets ziet. */
+      var pages = [];
       for (var n = 1; n <= pdf.numPages; n++){
         var page = await pdf.getPage(n);
         var base = page.getViewport({ scale: 1 });
@@ -111,32 +124,85 @@ function buildViewerHtml(pdfUrl: string, startPage: number): string {
         var vp = page.getViewport({ scale: fit * dpr });
         var canvas = document.createElement('canvas');
         canvas.className = 'page';
-        canvas.width = vp.width;
-        canvas.height = vp.height;
         canvas.style.width = cw + 'px';
         canvas.style.height = (vp.height / dpr) + 'px';
         canvas.setAttribute('data-page', String(n));
         viewer.appendChild(canvas);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-        canvases.push(canvas);
+        pages.push({ n: n, page: page, vp: vp, canvas: canvas, state: 'leeg' });
       }
+
       post({ type: 'loaded', pages: pdf.numPages });
 
-      if (START_PAGE > 1 && canvases[START_PAGE - 1]) {
-        canvases[START_PAGE - 1].scrollIntoView();
+      /* Eén render tegelijk: parallelle renders vechten om dezelfde thread
+         en maken het scrollen schokkerig. */
+      var wachtrij = [];
+      var bezig = false;
+      async function werkAf(){
+        if (bezig) return;
+        bezig = true;
+        while (wachtrij.length){
+          var item = wachtrij.shift();
+          if (item.state !== 'leeg') continue;
+          item.state = 'bezig';
+          try {
+            item.canvas.width = item.vp.width;
+            item.canvas.height = item.vp.height;
+            await item.page.render({
+              canvasContext: item.canvas.getContext('2d'),
+              viewport: item.vp
+            }).promise;
+            item.state = 'klaar';
+          } catch (e){
+            item.state = 'leeg';
+          }
+        }
+        bezig = false;
       }
 
+      function planIn(item){
+        if (item.state !== 'leeg') return;
+        wachtrij.push(item);
+        werkAf();
+      }
+
+      /* Ver weg gerenderde pagina's weer leegmaken: de CSS-afmeting blijft,
+         dus de opmaak schuift niet, maar de bitmap komt vrij. Zonder dit
+         groeit het geheugen bij een lang document tot het tabblad sneuvelt. */
+      function laatVallen(item){
+        if (item.state !== 'klaar') return;
+        item.canvas.width = 0;
+        item.canvas.height = 0;
+        item.state = 'leeg';
+      }
+
+      var VENSTER = 3;
+      function verversRondom(midden){
+        for (var i = 0; i < pages.length; i++){
+          var afstand = Math.abs(pages[i].n - midden);
+          if (afstand <= VENSTER) planIn(pages[i]);
+          else if (afstand > VENSTER + 3) laatVallen(pages[i]);
+        }
+      }
+
+      /* Bij een bladwijzer eerst daarheen springen, zodat die pagina als
+         eerste gerasterd wordt in plaats van pagina 1. */
       var cur = START_PAGE || 1;
+      if (START_PAGE > 1 && pages[START_PAGE - 1]) {
+        pages[START_PAGE - 1].canvas.scrollIntoView();
+      }
+      verversRondom(cur);
+
       var t;
       function detect(){
         var mid = window.scrollY + window.innerHeight / 2;
         var best = 1, bestDist = Infinity;
-        for (var i = 0; i < canvases.length; i++){
-          var c = canvases[i];
+        for (var i = 0; i < pages.length; i++){
+          var c = pages[i].canvas;
           var center = c.offsetTop + c.offsetHeight / 2;
           var d = Math.abs(center - mid);
-          if (d < bestDist){ bestDist = d; best = parseInt(c.getAttribute('data-page'), 10); }
+          if (d < bestDist){ bestDist = d; best = pages[i].n; }
         }
+        verversRondom(best);
         if (best !== cur){ cur = best; post({ type: 'page', page: best }); }
       }
       window.addEventListener('scroll', function(){

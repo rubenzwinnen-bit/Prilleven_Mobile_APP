@@ -46,8 +46,7 @@ import {
   ALLERGEN_FLOW,
   createEhSymptom,
   updateEhSymptom,
-  getEhSymptoms,
-  getEhDoses,
+  getEhOverview,
   getChildren,
   getEhState,
   patchEhState,
@@ -55,6 +54,7 @@ import {
 import type {
   SymptomSeverity,
   EhSymptom,
+  EhDose,
   TimeAfterEating,
   SymptomDuration,
   SymptomWorsened,
@@ -323,11 +323,18 @@ export function SymptomFormScreen({ navigation, route }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [list, doses, ehState] = await Promise.all([
+        /* Kinderen en het overzicht komen allebei meestal uit de cache: het
+           allergenenscherm haalde ze net op. Daarvoor waren dit losse calls
+           naar /doses en /state, en /doses stond bijna altijd koud. */
+        const [list, overzicht] = await Promise.all([
           getChildren(),
-          getEhDoses(childId).catch(() => []),
-          getEhState(childId).catch(() => null),
+          getEhOverview(childId).catch(() => ({
+            state: null,
+            doses: [] as EhDose[],
+            symptoms: [] as EhSymptom[],
+          })),
         ]);
+        const { doses, state: ehState } = overzicht;
         if (cancelled) return;
         const target = list.find(c => c.id === childId);
         if (target) setChildName(target.name);
@@ -353,8 +360,7 @@ export function SymptomFormScreen({ navigation, route }: Props) {
         setIntroducedKeys(keys);
 
         if (isEdit && symptomId) {
-          const all = await getEhSymptoms(childId, { limit: 200 });
-          if (cancelled) return;
+          const all = overzicht.symptoms;
           const existing: EhSymptom | undefined = all.find(
             s => s.id === symptomId
           );

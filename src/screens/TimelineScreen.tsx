@@ -41,6 +41,8 @@ import { useToast } from '../components/Toast';
 import { openModerationMenu } from '../lib/moderation';
 import {
   listPosts,
+  takePrefetchedFeed,
+  FEED_PAGE_SIZE,
   createPost,
   togglePostLike,
   toggleReplyLike,
@@ -63,7 +65,7 @@ import {
 import { deleteReply } from '../services/community';
 import type { CommunityPost, CommunityReply } from '../services';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = FEED_PAGE_SIZE;
 
 /* ----------------------------------------
    Mini-avatar — foto of gekleurde initiaal-bol
@@ -889,16 +891,23 @@ export function TimelineScreen() {
   }, []);
 
   const load = useCallback(
-    async (mode: 'initial' | 'refresh') => {
+    async (mode: 'initial' | 'refresh' | 'silent') => {
       if (mode === 'refresh') setRefreshing(true);
-      else setLoading(true);
+      else if (mode === 'initial') setLoading(true);
       try {
-        const list = await listPosts({ limit: PAGE_SIZE });
+        /* De eerste keer de door de landing voorgeladen pagina gebruiken,
+           als die er (nog) is — dan staat de feed er meteen. */
+        const voorgeladen =
+          mode === 'initial' ? takePrefetchedFeed(PAGE_SIZE) : null;
+        const list = await (voorgeladen ?? listPosts({ limit: PAGE_SIZE }));
         setPosts(list);
         cursorRef.current = computeCursor(list);
         setHasMore(list.length >= PAGE_SIZE);
       } catch (err: any) {
-        show(err.message || 'Tijdlijn laden mislukt.', 'error');
+        /* Een mislukte stille verversing laat de feed gewoon staan. */
+        if (mode !== 'silent') {
+          show(err.message || 'Tijdlijn laden mislukt.', 'error');
+        }
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -931,17 +940,21 @@ export function TimelineScreen() {
     }
   }, [loadingMore, hasMore, loading, refreshing, computeCursor, show]);
 
-  /* Eerste load + admin-check + eigen user-id (voor edit/delete-rechten). */
+  /* Admin-check + eigen user-id (voor edit/delete-rechten). */
   useEffect(() => {
-    load('initial');
     getIsAdmin(user).then(setIsAdmin);
     getCurrentUserId().then(setCurrentUserId);
-  }, [load, user]);
+  }, [user]);
 
-  /* Verse feed bij elke focus (bv. terugkeer uit andere tab). */
+  /* Laden bij focus. Hier stond eerst óók een load in de useEffect erboven,
+     waardoor bij het openen twee volledige feed-verzoeken tegelijk liepen.
+     De eerste focus toont de spinner; daarna blijft de feed staan en wordt
+     hij stil ververst in plaats van met de ververs-cirkel. */
+  const geladenRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      load('refresh');
+      load(geladenRef.current ? 'silent' : 'initial');
+      geladenRef.current = true;
     }, [load])
   );
 

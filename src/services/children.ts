@@ -17,6 +17,7 @@
 
 import { supabase } from '../lib/supabase';
 import { RAG_API_URL } from './hapjesheld';
+import { cacheGet, cacheSet, cacheInvalidate } from './cache';
 
 /* ----------------------------------------
    Types
@@ -127,10 +128,22 @@ async function jsonOrThrow<T>(response: Response): Promise<T> {
    getChildren
    GET /api/children — niet-gearchiveerde kinderen, oudste eerst.
 ---------------------------------------- */
+const CHILDREN_CACHE_KEY = 'children:all';
+
+/** Wist de kinderen-cache. Elke mutatie in deze service roept dit aan. */
+function invalidateChildren(): void {
+  cacheInvalidate('children:');
+}
+
 export async function getChildren(): Promise<Child[]> {
+  const cached = cacheGet<Child[]>(CHILDREN_CACHE_KEY);
+  if (cached) return cached;
+
   const response = await authedFetch('/api/children');
   const data = await jsonOrThrow<ChildrenListEnvelope>(response);
-  return data?.children ?? [];
+  const children = data?.children ?? [];
+  cacheSet(CHILDREN_CACHE_KEY, children);
+  return children;
 }
 
 /* ----------------------------------------
@@ -145,6 +158,7 @@ export async function createChild(input: ChildInput): Promise<Child> {
   });
   const data = await jsonOrThrow<ChildEnvelope>(response);
   if (!data?.child) throw new Error('Kind kon niet worden aangemaakt.');
+  invalidateChildren();
   return data.child;
 }
 
@@ -163,6 +177,7 @@ export async function updateChild(
   });
   const data = await jsonOrThrow<ChildEnvelope>(response);
   if (!data?.child) throw new Error('Kind kon niet worden bijgewerkt.');
+  invalidateChildren();
   return data.child;
 }
 
@@ -177,6 +192,7 @@ export async function archiveChild(id: string): Promise<void> {
     body: JSON.stringify({ id }),
   });
   await jsonOrThrow<{ ok: true }>(response);
+  invalidateChildren();
 }
 
 /* ----------------------------------------

@@ -33,6 +33,7 @@
 
 import { supabase } from '../lib/supabase';
 import { RAG_API_URL } from './hapjesheld';
+import { cacheGet, cacheSet, cacheInvalidate } from './cache';
 
 /* ----------------------------------------
    Types
@@ -149,14 +150,33 @@ async function jsonOrThrow<T>(response: Response): Promise<T> {
 export async function getLearnings(opts?: {
   kind?: LearningKind;
   favoritesOnly?: boolean;
+  /** Cache overslaan — voor pull-to-refresh. */
+  force?: boolean;
 }): Promise<Learning[]> {
   const params = new URLSearchParams();
   if (opts?.kind) params.set('kind', opts.kind);
   if (opts?.favoritesOnly) params.set('favorites', '1');
   const qs = params.toString();
+
+  /* 30 s cache. Terugkomen uit een document of video haalde anders telkens
+     de hele bibliotheek opnieuw op; en de landing haalt hem vooraf op, zodat
+     hij klaarligt als je op de tegel tikt. */
+  const cacheKey = `${LEARNINGS_CACHE_PREFIX}${qs}`;
+  const cached = opts?.force ? null : cacheGet<Learning[]>(cacheKey);
+  if (cached) return cached;
+
   const response = await authedFetch(`/api/learnings${qs ? `?${qs}` : ''}`);
   const data = await jsonOrThrow<LearningsEnvelope>(response);
-  return Array.isArray(data?.learnings) ? data.learnings : [];
+  const learnings = Array.isArray(data?.learnings) ? data.learnings : [];
+  cacheSet(cacheKey, learnings);
+  return learnings;
+}
+
+const LEARNINGS_CACHE_PREFIX = 'learnings:list:';
+
+/** Favorieten en bladwijzers zitten in de lijst, dus die wijzigingen wissen hem. */
+function invalidateLearnings(): void {
+  cacheInvalidate(LEARNINGS_CACHE_PREFIX);
 }
 
 /* ----------------------------------------
@@ -181,6 +201,7 @@ export async function toggleLearningFavorite(
     { method: 'POST' }
   );
   const data = await jsonOrThrow<FavoriteEnvelope>(response);
+  invalidateLearnings();
   return !!data?.is_favorite;
 }
 
@@ -215,6 +236,8 @@ export async function putLearningBookmark(
     }
   );
   await jsonOrThrow<unknown>(response);
+  /* De bladwijzer bepaalt "Bezig" en "Ga verder met…" in de lijst. */
+  invalidateLearnings();
 }
 
 /* ----------------------------------------

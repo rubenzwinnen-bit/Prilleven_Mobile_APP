@@ -14,7 +14,7 @@
  * Eén fetch op focus; filteren gebeurt client-side op de geladen lijst.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -100,18 +100,23 @@ export function LearningsScreen({ navigation }: Props) {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [pinningId, setPinningId] = useState<string | null>(null);
 
+  /* Alleen de eerste keer een spinner; daarna stil verversen zodat de lijst
+     blijft staan wanneer je terugkomt uit een document of video. */
+  const eersteKeerRef = useRef(true);
+
   const load = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      else if (eersteKeerRef.current) setLoading(true);
       try {
-        const list = await getLearnings();
+        const list = await getLearnings({ force: isRefresh });
         setItems(list);
       } catch (err: any) {
         show(err.message || 'Kon learnings niet laden.', 'error');
       } finally {
         setLoading(false);
         setRefreshing(false);
+        eersteKeerRef.current = false;
       }
     },
     [show]

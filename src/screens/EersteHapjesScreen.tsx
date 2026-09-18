@@ -39,17 +39,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { InfoModal } from '../components/InfoModal';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import {
   getChildren,
-  formatAge,
   ageInMonths,
-  getEhState,
-  getEhDoses,
-  getEhSymptoms,
+  getEhOverview,
   buildAllergenContext,
   getAllergenStatus,
   successfulDoseCount,
@@ -149,6 +147,28 @@ const ALLERGEN_PHOTOS: Record<string, ImageSourcePropType> = {
   tarwe: require('../../assets/allergens/tarwe.jpg'),
   koemelk: require('../../assets/allergens/koemelk.jpg'),
 };
+
+/* Lokaal, net als ChevronBack: importeren uit RootStack zou een
+   require-cycle geven. Zelfde vorm als de InfoIconButton daar. */
+function InfoIconButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={12}>
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          borderWidth: 1.5,
+          borderColor: colors.greenText,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather name="info" size={19} color={colors.greenText} />
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 function ChevronBack({ onPress }: { onPress: () => void }) {
   return (
@@ -370,7 +390,14 @@ function AllergenPathCard({
       )}
 
       {nextUp ? (
-        <View style={styles.pathNext}>
+        /* De hele kaart is de knop om te registreren — dat scheelt een
+           aparte CTA en dus hoogte. */
+        <Pressable
+          onPress={onRegister}
+          style={({ pressed }) => [styles.pathNext, pressed && styles.btnPressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`Introductie ${nextUp.doseNumber} registreren voor ${nextUp.allergen.label}`}
+        >
           {photo ? (
             <Image source={photo} style={styles.pathNextBg} resizeMode="cover" />
           ) : null}
@@ -386,7 +413,16 @@ function AllergenPathCard({
             style={styles.pathNextGradient}
           />
           <View style={styles.pathNextContent}>
-            <Text style={styles.pathNextLabel}>VOLGENDE STAP</Text>
+            <View style={styles.pathNextLabelRow}>
+              <Text style={styles.pathNextLabel}>VOLGENDE STAP</Text>
+              {artsToezicht && (
+                <View style={styles.pathSupervision}>
+                  <Text style={styles.pathSupervisionText} numberOfLines={1}>
+                    🩺 Medisch toezicht
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.pathNextTitle}>
               {nextUp.allergen.label} · introductie {nextUp.doseNumber}/3
             </Text>
@@ -398,25 +434,8 @@ function AllergenPathCard({
             <Text style={styles.pathNextSub} numberOfLines={2}>
               {nextUp.allergen.suggestion}
             </Text>
-            <Pressable
-              onPress={onRegister}
-              style={({ pressed }) => [styles.pathNextCta, pressed && styles.btnPressed]}
-            >
-              <Text style={styles.pathNextCtaText}>
-                Introductie {nextUp.doseNumber} registreren
-              </Text>
-            </Pressable>
-            {/* Medisch toezicht staat bewust hier, compact onder de CTA —
-                niet meer als losse banner bovenaan het scherm. */}
-            {artsToezicht && (
-              <View style={styles.pathSupervision}>
-                <Text style={styles.pathSupervisionText}>
-                  🩺 Introductie onder medisch toezicht
-                </Text>
-              </View>
-            )}
           </View>
-        </View>
+        </Pressable>
       ) : resolvedCount < allergens.length ? (
         <View style={styles.pathWait}>
           <Text style={styles.pathWaitText}>
@@ -1218,6 +1237,7 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
   const [doses, setDoses] = useState<EhDose[]>([]);
   const [symptoms, setSymptoms] = useState<EhSymptom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   /* Een tik op een segment in het Allergenenpad opent de bijbehorende tegel
@@ -1252,8 +1272,22 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
   const loadAll = useCallback(
     async (signal?: { cancelled: boolean }) => {
       try {
-        const list = await getChildren();
+        /* Alles tegelijk: het kind-id staat al in de route, dus de
+           allergeengegevens hoeven niet te wachten op de kinderenlijst.
+           Daarvoor kostte dit scherm twee opeenvolgende rondes. */
+        /* Twee verzoeken in plaats van vier: de kinderenlijst (meestal uit
+           cache) en één gecombineerde call voor state + doses + symptomen. */
+        const [list, overzicht] = await Promise.all([
+          getChildren(),
+          getEhOverview(childId).catch(() => ({
+            state: null,
+            doses: [] as EhDose[],
+            symptoms: [] as EhSymptom[],
+          })),
+        ]);
+        const { state: s, doses: d, symptoms: sy } = overzicht;
         if (signal?.cancelled) return;
+
         const target = list.find(c => c.id === childId);
         if (!target) {
           show('Kind niet gevonden.', 'error');
@@ -1261,15 +1295,6 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
           return;
         }
         setChild(target);
-
-        const [s, d, sy] = await Promise.all([
-          getEhState(childId).catch(() => null),
-          getEhDoses(childId).catch(() => [] as EhDose[]),
-          getEhSymptoms(childId, { limit: 200 }).catch(
-            () => [] as EhSymptom[]
-          ),
-        ]);
-        if (signal?.cancelled) return;
         setState(s);
         setDoses(d);
         setSymptoms(sy);
@@ -1284,10 +1309,16 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
     [childId, navigation, show]
   );
 
+  /* Alleen de eerste keer een spinner; daarna stil herladen zodat het scherm
+     niet elke keer leeg knippert. */
+  const eersteKeerRef = useRef(true);
   useFocusEffect(
     useCallback(() => {
       const signal = { cancelled: false };
-      setLoading(true);
+      if (eersteKeerRef.current) {
+        setLoading(true);
+        eersteKeerRef.current = false;
+      }
       void loadAll(signal);
       return () => {
         signal.cancelled = true;
@@ -1578,8 +1609,53 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
       <View style={styles.header}>
         <ChevronBack onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Allergenen-introductie</Text>
-        <View style={{ width: 28 }} />
+        <View style={styles.headerActions}>
+          {child && !isPaused && !needsDisabled && (
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('SymptomForm', { childId: child.id })
+              }
+              hitSlop={12}
+              accessibilityLabel="Symptoom loggen"
+              style={styles.headerIconBtn}
+            >
+              <Feather name="activity" size={19} color={colors.greenText} />
+            </TouchableOpacity>
+          )}
+          <InfoIconButton onPress={() => setInfoVisible(true)} />
+        </View>
       </View>
+
+      <InfoModal
+        visible={infoVisible}
+        onClose={() => setInfoVisible(false)}
+        title="Zo werkt de introductie"
+      >
+        <Text style={styles.infoModalText}>
+          Volg de 9 allergenen, telkens 3 introducties met een rustpauze van
+          minstens 2 dagen ertussen. Bekende allergieën uit het profiel zijn
+          automatisch gemarkeerd.
+        </Text>
+        <Text style={[styles.infoModalText, { marginTop: spacing.md }]}>
+          Tik op een allergeen voor info en om een introductie te registreren.
+        </Text>
+
+        <Text style={[styles.infoModalTitle, { marginTop: spacing.lg }]}>
+          🩺 Medisch toezicht
+        </Text>
+        <Text style={styles.infoModalText}>
+          Deze markering verschijnt zodra je bij een allergeen een ernstige
+          reactie hebt bevestigd. Vanaf dan gaat de introductie in overleg met
+          je arts, en kan je per allergeen kiezen om het over te slaan met de
+          knop "Overslaan" op de tegel. Overgeslagen allergenen tellen niet
+          meer mee als "nog te doen"; je kan ze later weer opnemen.
+        </Text>
+        <Text style={[styles.infoModalText, { marginTop: spacing.sm }]}>
+          Pril Leven geeft geen medisch advies. Bespreek de introductie van een
+          allergeen waarop je kind heeft gereageerd altijd met je huisarts,
+          kinderarts of kinderdiëtiste.
+        </Text>
+      </InfoModal>
 
       {loading || !child || !ctx ? (
         <View style={styles.loadingBlock}>
@@ -1587,40 +1663,6 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
         </View>
       ) : (
         <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
-          {/* Intro-tekst paritair met `.allergenen-intro` op de website. */}
-          <Text style={styles.introText}>
-            Volg de 9 allergenen, telkens 3 introducties met een rustpauze
-            van minstens 2 dagen ertussen. Bekende allergieën uit het profiel
-            zijn automatisch gemarkeerd.
-          </Text>
-
-          {/* Kind-info met inline "Symptoom loggen"-knop (groene outline,
-             paritair met `.btn-outline.btn-sm` op de website).
-             v2.8.9: tijdens een pauze-flow (twijfel / ernstige reactie)
-             verbergen we de "Symptoom loggen"-knop tot de gebruiker alle
-             waarschuwingsstappen heeft doorlopen. */}
-          <View style={styles.childRow}>
-            <View style={styles.childInfo}>
-              <Text style={styles.childName}>{child.name}</Text>
-              <Text style={styles.childAge}>{formatAge(child.birthdate)}</Text>
-            </View>
-            {!isPaused && !needsDisabled && (
-              <Pressable
-                onPress={() =>
-                  navigation.navigate('SymptomForm', { childId: child.id })
-                }
-                style={({ pressed }) => [
-                  styles.symptomLogBtn,
-                  pressed && styles.symptomLogBtnPressed,
-                ]}
-                accessibilityLabel="Symptoom loggen"
-              >
-                <Feather name="plus" size={13} color={colors.greenText} />
-                <Text style={styles.symptomLogBtnText}>Symptoom loggen</Text>
-              </Pressable>
-            )}
-          </View>
-
           {/* Eén veiligheidsmelding, niet inklapbaar. Ernstig verdringt
              twijfel; nooit twee balken tegelijk. */}
           {veiligheid && <SafetyBar level={veiligheid} childName={child.name} />}
@@ -1675,10 +1717,6 @@ export function EersteHapjesScreen({ navigation, route }: Props) {
               />
 
               {/* Allergenen-lijst */}
-              <Text style={styles.listLabel}>
-                Tik op een allergeen voor info en om een introductie te
-                registreren.
-              </Text>
               <View
                 style={styles.list}
                 onLayout={e => {
@@ -1781,33 +1819,33 @@ const styles = StyleSheet.create({
   },
   /* `.allergenen-intro` op de website (color-dark-light, .95rem,
      line-height 1.5). */
-  introText: {
-    fontSize: 14,
-    color: colors.darkLight,
-    lineHeight: 21,
-    marginBottom: spacing.md,
-  },
-  childRow: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing.sm,
-    marginBottom: spacing.lg,
   },
-  childInfo: {
-    flex: 1,
-    minWidth: 0,
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.greenText,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  childName: {
-    fontSize: 20,
+  infoModalTitle: {
+    fontSize: 14,
     fontWeight: '700',
     color: colors.dark,
+    marginBottom: 4,
   },
-  childAge: {
-    fontSize: 13,
-    color: colors.gray,
-    marginTop: 2,
+  infoModalText: {
+    fontSize: 13.5,
+    color: colors.darkLight,
+    lineHeight: 20,
   },
+  /* Kind-blok: zelfde initiaalbol als de kind-picker en de family-layer, op
+     een zachtgroene kaart in plaats van kale zwarte tekst. */
 
   bold: {
     fontWeight: '700',
@@ -1983,13 +2021,13 @@ const styles = StyleSheet.create({
      .allergenen-path-next[data-key] op de website. */
   pathNext: {
     position: 'relative',
+    marginTop: 10,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(79, 125, 108, 0.24)',
     overflow: 'hidden',
-    marginTop: 10,
     backgroundColor: '#eef3e8',
-    minHeight: 130,
+    minHeight: 112,
   },
   pathNextBg: {
     position: 'absolute',
@@ -2003,14 +2041,13 @@ const styles = StyleSheet.create({
   },
   pathNextContent: {
     padding: spacing.md,
-    width: '72%',
+    width: '78%',
   },
   pathNextLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: colors.greenText,
-    letterSpacing: 1,
-    marginBottom: 2,
+    letterSpacing: 0.8,
   },
   pathNextTitle: {
     fontSize: 15,
@@ -2039,31 +2076,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: spacing.sm,
   },
-  pathNextCta: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primary,
+  /* Medisch toezicht: pil naast het label VOLGENDE STAP, dus zonder eigen rij. */
+  pathNextLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
   },
-  pathNextCtaText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  /* Medisch toezicht: compact onder de CTA, geen eigen banner meer. */
   pathSupervision: {
-    alignSelf: 'flex-start',
-    marginTop: 6,
+    flexShrink: 1,
     paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(109, 93, 50, 0.22)',
     backgroundColor: 'rgba(255, 255, 255, 0.86)',
   },
   pathSupervisionText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#6d5d32',
   },
@@ -2129,11 +2159,6 @@ const styles = StyleSheet.create({
   },
 
   /* Allergen-cards */
-  listLabel: {
-    fontSize: 13,
-    color: colors.gray,
-    marginBottom: spacing.sm,
-  },
   list: {
     gap: spacing.md,
   },
@@ -2338,25 +2363,6 @@ const styles = StyleSheet.create({
 
   /* "Symptoom loggen"-knop — kleine groene outline, paritair met
      `.btn.btn-outline.btn-sm` op de website (sage-groen). */
-  symptomLogBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: colors.greenText,
-    backgroundColor: 'transparent',
-  },
-  symptomLogBtnPressed: {
-    backgroundColor: colors.greenText,
-  },
-  symptomLogBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.greenText,
-  },
 
   /* "Overslaan"/"Opnemen"-toggle in arts-toezicht modus, paritair met
      `.allergenen-exclude-btn` op de website. v2.9.1: tekstknop op de

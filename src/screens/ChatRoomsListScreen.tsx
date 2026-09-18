@@ -12,21 +12,21 @@
  * (die status tonen we nog wel als groene stip).
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   Pressable,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { colors, radius, spacing, shadows } from '../constants/theme';
+import { colors, spacing, shadows } from '../constants/theme';
 import { useToast } from '../components/Toast';
 import { listRooms, ROOMS } from '../services';
 import type { ChatRoom } from '../services';
@@ -47,22 +47,25 @@ const FALLBACK_ROOMS: ChatRoom[] = ROOMS.map((r, i) => ({
 export function ChatRoomsListScreen({ navigation }: Props) {
   const { show } = useToast();
   const { chatroomRoomCounts, refresh } = useNotifications();
+  /* Meteen tonen: de vier ruimtes liggen vast in de app. De server vult
+     daarna stil aan met beschrijvingen en de volgstatus. Vroeger stond hier
+     een spinner tot de server antwoordde — bij een koude start van de
+     chatruimtes-function enkele seconden voor een lijst die er al lag. */
   const [rooms, setRooms] = useState<ChatRoom[]>(FALLBACK_ROOMS);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const loadedOnce = useRef(false);
 
   const load = useCallback(
-    async (mode: 'initial' | 'refresh' | 'silent') => {
+    async (mode: 'refresh' | 'silent') => {
       if (mode === 'refresh') setRefreshing(true);
-      else if (mode === 'initial') setLoading(true);
       try {
         const list = await listRooms();
         if (list.length) setRooms(list);
       } catch (err: any) {
-        show(err.message || 'Chatruimtes laden mislukt.', 'error');
+        /* Stil bij de achtergrondverversing: de lijst staat er al. */
+        if (mode === 'refresh') {
+          show(err.message || 'Chatruimtes laden mislukt.', 'error');
+        }
       } finally {
-        setLoading(false);
         setRefreshing(false);
       }
       /* Notificatie-tellers verversen zodat de per-room badges kloppen. */
@@ -71,85 +74,81 @@ export function ChatRoomsListScreen({ navigation }: Props) {
     [show, refresh]
   );
 
-  /* Eerste focus toont de centrale spinner; daarna stil herladen zodat
-     de pull-to-refresh-cirkel niet blijft hangen bij terugkeer. */
   useFocusEffect(
     useCallback(() => {
-      load(loadedOnce.current ? 'silent' : 'initial');
-      loadedOnce.current = true;
+      load('silent');
     }, [load])
   );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Chatruimtes</Text>
-        <Text style={styles.headerSub}>
-          Praat met andere ouders per thema
-        </Text>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator
-          color={colors.primary}
-          style={{ marginTop: spacing.xxl }}
-        />
-      ) : (
-        <FlatList
-          data={rooms}
-          keyExtractor={(r) => r.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => {
-            const count = chatroomRoomCounts[item.id] ?? 0;
-            return (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.card,
-                  pressed ? styles.cardPressed : null,
-                ]}
-                onPress={() =>
-                  navigation.navigate('ChatRoom', {
-                    slug: item.slug,
-                    title: item.title,
-                  })
-                }
-              >
-                <View style={styles.cardMeta}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {item.title}
+      <FlatList
+        data={rooms}
+        /* Slug i.p.v. id: de lokale ruimtes hebben de slug als id, die van de
+           server een UUID. Op slug blijven de rijen staan bij de wissel. */
+        keyExtractor={(r) => r.slug}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <LinearGradient
+            colors={['rgba(79, 125, 108, 0.12)', 'rgba(79, 125, 108, 0.035)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
+          >
+            <Text style={styles.eyebrow}>Chatruimtes</Text>
+            <Text style={styles.heroTitle}>Waarover wil je praten?</Text>
+          </LinearGradient>
+        }
+        renderItem={({ item }) => {
+          const count = chatroomRoomCounts[item.id] ?? 0;
+          return (
+            <Pressable
+              style={({ pressed }) => [
+                styles.card,
+                pressed ? styles.cardPressed : null,
+              ]}
+              onPress={() =>
+                navigation.navigate('ChatRoom', {
+                  slug: item.slug,
+                  title: item.title,
+                })
+              }
+            >
+              <View style={styles.cardMeta}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                {item.description ? (
+                  <Text style={styles.cardDesc} numberOfLines={2}>
+                    {item.description}
                   </Text>
-                  {item.description ? (
-                    <Text style={styles.cardDesc} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  ) : null}
-                </View>
-                {count > 0 ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                      {count > 99 ? '99+' : count}
-                    </Text>
-                  </View>
-                ) : item.is_followed ? (
-                  <View style={styles.followedDot} />
                 ) : null}
-                <Feather
-                  name="chevron-right"
-                  size={22}
-                  color={colors.grayLight}
-                />
-              </Pressable>
-            );
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => load('refresh')}
-              tintColor={colors.primary}
-            />
-          }
-        />
-      )}
+              </View>
+              {count > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {count > 99 ? '99+' : count}
+                  </Text>
+                </View>
+              ) : item.is_followed ? (
+                <View style={styles.followedDot} />
+              ) : null}
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.greenText}
+              />
+            </Pressable>
+          );
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => load('refresh')}
+            tintColor={colors.primary}
+          />
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -159,32 +158,42 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.dark,
-  },
-  headerSub: {
-    fontSize: 14,
-    color: colors.gray,
-    marginTop: 2,
-  },
   listContent: {
-    padding: spacing.lg,
-    paddingTop: spacing.sm,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  /* Kop in dezelfde vorm als "Voor wie?" bij de allergenen. */
+  hero: {
+    padding: spacing.lg,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.18)',
+    marginBottom: spacing.lg,
+  },
+  eyebrow: {
+    color: colors.greenText,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    marginTop: spacing.xs,
+    color: colors.greenText,
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 31,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
     backgroundColor: colors.white,
-    borderRadius: radius.md,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 125, 108, 0.16)',
     padding: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     ...shadows.sm,
   },
   cardPressed: {
@@ -192,7 +201,6 @@ const styles = StyleSheet.create({
   },
   cardMeta: {
     flex: 1,
-    marginRight: spacing.md,
   },
   cardTitle: {
     fontSize: 16,
@@ -213,7 +221,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
-    marginRight: spacing.xs,
   },
   badgeText: {
     color: colors.white,
@@ -225,6 +232,5 @@ const styles = StyleSheet.create({
     height: 9,
     borderRadius: 4.5,
     backgroundColor: colors.greenText,
-    marginRight: spacing.sm,
   },
 });

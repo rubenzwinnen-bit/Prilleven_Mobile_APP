@@ -42,7 +42,7 @@ import {
   ALLERGEN_FLOW,
   createEhDose,
   updateEhDose,
-  getEhDoses,
+  getEhOverview,
   nextDoseNumber,
   todayIsoDate,
   ALLERGEN_TARGET_DOSES,
@@ -131,7 +131,10 @@ export function DoseFormScreen({ navigation, route }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const existing = await getEhDoses(childId, allergenKey);
+        /* Uit het gecachete overzicht dat het allergenenscherm net ophaalde:
+           geen aparte /doses-call meer, die bijna altijd koud stond. */
+        const { doses: alleDoses } = await getEhOverview(childId);
+        const existing = alleDoses.filter(d => d.allergen_key === allergenKey);
         if (cancelled) return;
         if (isEdit) {
           const cur = existing.find(d => d.id === doseId);
