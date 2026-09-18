@@ -6,6 +6,101 @@
 
 ---
 
+## 2026-09-18 — Laadtijden, App Store-veiligheid en release-voorbereiding
+
+### Afgerond
+
+- **Dev-build herinstalleerd in plaats van herbouwd.** De build van 9 september
+  (`6550ca6d`) paste nog: sindsdien kwam er geen native module bij. Een dev-build vervalt
+  niet — waarschijnlijk had iOS hem opgeruimd via "Ongebruikte apps verwijderen".
+- **Formulieren sneller.** Dose- en symptoomformulier lazen opnieuw bij de aparte
+  `/doses`- en `/state`-functions, die door de bundeling van vorige week bijna nooit meer
+  geraakt werden en dus bijna altijd koud stonden (~4 s). Nu uit een overzichtscache van
+  30 s die zeven mutaties wissen. Die vertraging was een bijwerking van de eigen fix.
+- **Learnings**: cache, stil verversen, voorladen vanaf de landing; server-queries parallel
+  (website-commit `3c4657f`).
+- **Tijdlijn**: er liepen twee volledige feed-verzoeken tegelijk bij het openen
+  (`useEffect` én `useFocusEffect`). Nu één, stil verversen, eenmalig voorladen.
+- **Chatruimtes**: meteen tonen uit de lokale constant in plaats van een spinner; nieuwe hero.
+- **App Store 3.1.3(f)**: op iOS geen enkele zin meer die zegt waar je lid wordt of koopt
+  (inlogscherm, verlopen-scherm, aanraders). Commentaar bij `MAG_NAAR_CHECKOUT_LINKEN`
+  verwees naar 3.1.3(b) — die vereist juist in-app aankoop; rechtgezet.
+- **Profiel**: sectie Juridisch → Over Pril Leven, met een link naar prilleven.be.
+
+### Bewust niet gedaan
+
+- Een link naar de community-webapp vanaf het inlogscherm: dat inlogscherm heeft een
+  "Word lid"-knop, en een link erheen is een koopoproep.
+- De symptoomlog (lijst) leest nog bij de aparte `/symptoms`-function en kan dus koud staan.
+
+### Volgende stap
+
+Release 3.2.0. Nog open vóór de productiebuild: APNs-sleutel (`eas credentials`), het
+monochrome notificatie-icoon voor Android, en de testmatrix — punt 1 t/m 5 (push) zijn nooit
+getest, punt 12 (opzegverzoek) ook niet.
+
+---
+
+## 2026-09-09 (deel 3) — Gamification, sleepbeweging en gemeten traagheid
+
+### Afgerond
+
+- **Cooked it + Pril Ritme** (`lib/cookingProgress.ts`, `CookingRhythm`, `CookSlider`).
+  Afvinken per plaats in het actieve schema, weekritme op unieke kookdagen (doel 3),
+  historiek over vier weken, drie mijlpalen als toast. Opslag lokaal, zoals de web.
+- **Eén baan per plaats, alleen vooruit.** Komt een recept meerdere keren voor, dan krijgt
+  elke plaats een eigen slider; dagen die voorbij zijn verdwijnen. Daarvoor was er één
+  slider die na het afvinken doorsprong naar de volgende plaats, waardoor de bevestiging
+  nooit verscheen.
+- **Sleepbeweging bruikbaar gemaakt**: de hele baan luistert (niet enkel de knop), het
+  gebaar wordt in de capture-fase opgeëist zodat de ScrollView het niet afpakt, en de
+  animatiewaarde wordt teruggezet na "Ongedaan maken".
+- **`width` animeren kan niet op de native driver** — vervangen door `translateX`.
+- **Allergenen: kind-picker vernieuwd** (hero + gekleurde initiaalbollen uit de
+  family-layer), introtekst naar de info-knop.
+- **Badges "NIEUW"** weg bij HapjesHeld, Learnings en Allergenen-introductie. Aanraders
+  houdt de zijne.
+- **PDF-viewer**: rendert nu lui (venster van 3, één render tegelijk, ver weg gerenderde
+  pagina's weer leegmaken) en topt de pixelratio af op 2. Daarvoor werden álle pagina's
+  vooraf gerenderd.
+
+### Gemeten, niet gegokt
+
+Het allergenenscherm voelde traag. Meting op het toestel (tijdelijke `__DEV__`-logs):
+
+| call | koud | warm |
+|---|---|---|
+| token ophalen | 2 ms | 2 ms |
+| `getChildren` | 4 ms | 1 ms |
+| `getEhState` | 463 ms | 696 ms |
+| `getEhSymptoms` | 678 ms | 512 ms |
+| **`getEhDoses`** | **3762 ms** | 478 ms |
+
+Het token en de kinderenlijst waren dus niet de oorzaak — mijn eerste vermoeden was fout.
+Het waren **koude starts**: `state`, `doses` en `symptoms` zijn drie aparte Vercel-functions
+die elk apart afkoelen, en omdat de app ze parallel aanroept kan er geen warme instantie
+gedeeld worden.
+
+Opgelost met `GET /api/eerste-hapjes/state?include=doses,symptoms` → `getEhOverview`.
+Vier verzoeken werden er twee; één function die bovendien warmer blijft.
+Website-commit `9c47bb2`.
+
+Verder: `getChildren()` zit nu achter de 30 s-cache (met invalidatie bij mutaties), het
+allergenenscherm wacht niet meer op de kinderenlijst voor het aan de rest begint, en beide
+schermen verversen stil in plaats van leeg te knipperen.
+
+### Correctie in de documentatie
+
+`CLAUDE.md` beweerde dat endpoints gebundeld moesten worden wegens de Vercel Hobby-limiet
+van 12 functions. Er staan er **21** gedeployed: het project draait sinds 2026-07-29 op
+Vercel Pro. Bundelen blijft zinvol, maar dan wegens koude starts — dat staat nu zo in §11.
+
+### Volgende stap
+
+Website-deploy afwachten, dan op het toestel narekenen of de koude start echt zakt.
+
+---
+
 ## 2026-09-09 (deel 2) — Toestel-testronde: stijl, weergaven en prestaties
 
 **Context**: eerste sessie waarin de 3.2.0-code écht op een toestel draaide. Expo Go bleek
