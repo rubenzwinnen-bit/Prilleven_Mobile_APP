@@ -29,7 +29,7 @@
     "android": {
       "package": "be.prilleven.mobileapp",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 74,
+      "versionCode": 75,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
