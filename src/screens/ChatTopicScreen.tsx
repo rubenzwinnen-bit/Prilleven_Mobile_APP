@@ -383,7 +383,9 @@ export function ChatTopicScreen({ navigation, route }: Props) {
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [isFollowed, setIsFollowed] = useState(false);
+  /* null = nog onbekend. Met `false` als startwaarde toonde de knop eerst
+     "Volg" en sprong hij daarna naar "Gevolgd" zodra de server antwoordde. */
+  const [isFollowed, setIsFollowed] = useState<boolean | null>(null);
   const [following, setFollowing] = useState(false);
   const [pinning, setPinning] = useState(false);
 
@@ -515,7 +517,9 @@ export function ChatTopicScreen({ navigation, route }: Props) {
   /* Topic volgen/ontvolgen — optimistisch met rollback. Een gevolgd topic
      verschijnt op de tijdlijn (mirror website). */
   const toggleFollow = useCallback(async () => {
-    if (following) return;
+    /* Onbekende status: de knop staat dan niet in beeld, maar voor de
+       zekerheid niets doen — anders zou !null naar "volgen" gokken. */
+    if (following || isFollowed === null) return;
     const next = !isFollowed;
     setIsFollowed(next);
     setFollowing(true);
@@ -557,7 +561,10 @@ export function ChatTopicScreen({ navigation, route }: Props) {
   /* Volg-knop rechts in de header. */
   useEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
+      /* Pas tonen zodra we de volgstatus kennen: anders staat er even "Volg"
+         terwijl je de ruimte al volgt, en klapt hij daarna om. */
+      headerRight: () =>
+        isFollowed === null ? null : (
         <Pressable
           onPress={toggleFollow}
           disabled={following}
@@ -570,7 +577,7 @@ export function ChatTopicScreen({ navigation, route }: Props) {
           <Feather
             name={isFollowed ? 'check' : 'plus'}
             size={14}
-            color={isFollowed ? colors.white : colors.primary}
+            color={isFollowed ? colors.white : colors.greenText}
           />
           <Text
             style={[

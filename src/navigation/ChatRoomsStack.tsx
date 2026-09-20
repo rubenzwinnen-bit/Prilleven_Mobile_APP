@@ -26,7 +26,11 @@ export function ChatRoomsStackNavigator() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.bg },
         headerTintColor: colors.primary,
-        headerTitleStyle: { fontWeight: '700' },
+        /* Titelkleur expliciet: headerTintColor kleurt anders ook de titel
+           terracotta, terwijl dezelfde naam op de roomlijst donkergrijs is.
+           Dat gaf een kleursprong bij het openen van een ruimte. De
+           terugpijl blijft wel terracotta. */
+        headerTitleStyle: { fontWeight: '700', color: colors.dark },
         headerShadowVisible: false,
       }}
     >
