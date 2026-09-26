@@ -531,6 +531,8 @@ Profielen in `eas.json`:
 - `preview` → APK met internal distribution.
 - `production` → `app-bundle` (Android) + `autoIncrement: true` (iOS+Android).
 
+Submit-profielen: `production` → Play **interne testtrack**; `release` (sinds 3.3.0) → Play **productie** (`eas submit --platform android --profile release`). iOS is in beide gelijk: upload naar App Store Connect, indienen ter beoordeling gebeurt daar met de hand.
+
 ---
 
 ## 14. Roadmap (web → mobile)
