@@ -6,6 +6,76 @@
 
 ---
 
+## 2026-09-20 — Release-dag: builds, store-formulieren en een notificatie-icoon
+
+### Afgerond
+
+- **Chatruimtes rechtgetrokken.** De ruimtenaam sprong van donkergrijs (lijstkaart) naar
+  terracotta (header): `headerTintColor` kleurt óók de titel. Titelkleur staat nu expliciet
+  op `colors.dark`, de terugpijl blijft terracotta. De volgknop toonde eerst "Volg" en
+  klapte om naar "Gevolgd" zodra de server antwoordde — `isFollowed` is nu `boolean | null`
+  en de knop verschijnt pas als de status bekend is. Het plusje was terracotta tussen groene
+  rand en tekst; nu merkgroen. Geldt voor ruimtes én topics (`9588ad8`).
+- **Formulieren sneller.** Dose- en symptoomformulier lezen uit de nieuwe overzichtscache
+  van 30 s in plaats van bij de aparte `/doses`- en `/state`-functions, die sinds de
+  bundeling van 18 september bijna nooit meer geraakt worden en dus koud stonden.
+- **Monochroom notificatie-icoon** (`assets/notification-icon.png`, 96×96). Het lijnenlogo
+  is onbruikbaar op 24 punten en Android gebruikt enkel de transparantie — een gevuld
+  kleurenlogo wordt daar een witte vlek. Vereenvoudigd tot een steel met drie spitse
+  blaadjes, gecontroleerd op werkelijke statusbalk-grootte (`2cecc4a`). Een variant met de
+  groene vlek uit het logo is gemaakt en verworpen: op die grootte een betekenisloze klodder.
+- **iOS 3.2.0 (70)** gebouwd en door Ruben ingediend ter beoordeling bij Apple.
+- **Android 3.2.0 (76)** gebouwd en ingediend op de **interne testtrack** van Google Play.
+  Versie 75 is geannuleerd omdat die nog het oude icoon droeg.
+
+### Onderweg opgelost
+
+- **Play-submit weigerde** met "service account is missing the necessary permissions". Het
+  serviceaccount `eas-submit@prilleven-mobile-app.iam.gserviceaccount.com` stond helemaal
+  niet in **Gebruikers en rechten**; er waren enkel twee menselijke gebruikers. Na het
+  uitnodigen met beheerdersrechten lukte het indienen meteen.
+- **Dev-build was van de telefoon verdwenen.** Niet vervallen — een dev-build blijft een
+  jaar geldig. Waarschijnlijk opgeruimd door iOS ("Ongebruikte apps verwijderen"). De
+  bestaande build van 9 september paste nog: sindsdien kwam er geen native module bij.
+
+### Store-administratie (buiten de code)
+
+- **Apple App Privacy**: `Device ID` toegevoegd onder Identifiers voor de push-tokens
+  (App Functionality, gekoppeld aan identiteit, geen tracking). `Health & Fitness` stond er
+  al in.
+- **Google Play, App-content**: van de tien declaraties raakt 3.2.0 er drie — Veiligheid van
+  gegevens (`Apparaat- of andere ID's` toevoegen), Gezondheidsapps (Voeding en
+  gewichtsbeheer; medisch blok leeg gelaten) en **Inloggegevens**. Die laatste is het
+  grootste risico: sinds 3.2.0 komt een account zonder lopend lidmaatschap nergens meer
+  binnen, dus het testaccount voor de reviewer moet een actieve einddatum hebben.
+- Op de vraag of gebruikers een deel van hun gegevens kunnen laten verwijderen zonder hun
+  account te wissen is **"Nee"** geantwoord. De app biedt dat wél in-app (geheugen, kinderen,
+  symptomen, eigen berichten), maar Google wil er een URL bij die de stappen en de
+  bewaartermijnen beschrijft, en `delete-account.html` gaat vandaag enkel over de volledige
+  account. Optionele vraag, dus geen gevolg voor de release.
+- **Android-ontwikkelaarsverificatie** (deadline 30 september 2026): `be.prilleven.mobileapp`
+  staat op "Geregistreerd". Er staat ook een tweede pakketnaam `be.prilleven.mobile` — een
+  restant; de productie-app is `mobileapp`.
+
+### Blockers
+
+- **Android push is nooit getest.** Er is geen Android-toestel. De build compileert en het
+  icoon is nu correct, maar of FCM effectief aankomt is ongeverifieerd. Regelen vóór er
+  verder gegaan wordt dan de interne testtrack.
+- **iOS push is ook nooit op een toestel getest.** De build is ingediend zonder TestFlight-
+  ronde. Build 70 staat wel in TestFlight, dus de test kan nog tijdens de beoordeling; blijkt
+  er iets stuk, dan kan de release tegengehouden worden in App Store Connect.
+- **Schermafbeeldingen** in beide stores tonen nog de oude vormgeving.
+
+### Volgende stap
+
+1. In TestFlight push testen: melding ontvangen met de app open, op de achtergrond en
+   afgesloten, en de tik-navigatie. Let op: je krijgt nooit een melding van je eigen bericht.
+2. Het testaccount voor Apple én Google controleren op een actief lidmaatschap.
+3. De Play-declaraties afmaken en verzenden (een concept telt niet).
+
+---
+
 ## 2026-09-18 — Laadtijden, App Store-veiligheid en release-voorbereiding
 
 ### Afgerond
