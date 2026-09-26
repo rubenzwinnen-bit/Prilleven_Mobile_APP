@@ -361,7 +361,7 @@ Gebruik altijd `<prefix>_<email>` voor per-user state (zoals WeekScheduleScreen 
 - Branch `main` = productie. Grotere features → feature branch + merge.
 
 ### Versionering
-- `app.json.expo.version` = user-facing string (huidig `3.2.0`).
+- `app.json.expo.version` = user-facing string (huidig `3.3.0`).
 - `app.json.ios.buildNumber` (`63`) + `app.json.android.versionCode` (`67`) bumpen bij elke store-release. EAS productie heeft `autoIncrement: true`.
 - `package.json.version` wordt **niet** actief gebruikt — niet syncen.
 
