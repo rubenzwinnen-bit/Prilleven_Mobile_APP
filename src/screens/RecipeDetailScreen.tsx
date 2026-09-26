@@ -219,8 +219,12 @@ export function RecipeDetailScreen({ route, navigation }: any) {
     load();
   }, [load]);
 
+  // Dit scherm staat in drie tab-stacks én in de HapjesHeld-stack, telkens op een
+  // andere diepte. Daarom de bovenste navigator zoeken en daar terug naar Landing.
   const goToLanding = useCallback(() => {
-    navigation.getParent()?.getParent()?.goBack();
+    let root = navigation;
+    while (root.getParent()) root = root.getParent();
+    root.popTo('Landing', undefined, { merge: true });
   }, [navigation]);
 
   const handleFav = async () => {

@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-09-26 — HapjesHeld op gelijke hoogte met de website
+
+### Afgerond
+
+- **Streaming**: het antwoord verschijnt terwijl het geschreven wordt, via `expo/fetch`
+  (geen extra dependency). Wie tijdens het schrijven naar boven scrollt, wordt niet
+  teruggetrokken. Het definitieve antwoord uit `done` vervangt de gestreamde tekst.
+- **Receptlinks** openen het eigen receptscherm, full screen in de HapjesHeld-stack, i.p.v.
+  de community-webapp in Safari — die heeft de "Word lid"-knop (App Store 3.1.3(f)). Het
+  huisje op het receptscherm werkt nu vanuit elke stack (`popTo('Landing')` op de root).
+- **Duim omhoog/omlaag** per antwoord via `/api/chat-feedback`, met een klein venster voor
+  een optionele reden bij duim omlaag. Vervangt het roadmappunt "Dit helpt mij".
+- **Fototip** in het welkomstbericht en een nieuwe placeholder (zonder 📷, §8).
+- **Gesprekkenoverzicht vernieuwd**: hero-kaart, groepen Vandaag / Afgelopen week / Eerder,
+  selectiemodus om meerdere gesprekken tegelijk te verwijderen, en een potlood-knop om een
+  gesprek een eigen titel te geven (gedeeld met de website).
+- **Voorgestelde vervolgvragen** gebouwd en dezelfde avond weer geschrapt, op web én app:
+  inhoudelijk te zwak.
+- **Website (server)**: receptlinks naar een recept dat niet in het antwoord staat worden
+  weggefilterd (`2418b8a`).
+- **Nieuwe iOS-dev-build** (`a6bce3f8`): het bestand van de build van 9 september was door
+  Expo verwijderd, waardoor installeren mislukte met "kan niet worden geïnstalleerd".
+
+### Onderweg geleerd
+
+- Dev-build en TestFlight/App Store-versie delen de bundle-id: er kan er maar één op de
+  telefoon staan. Een aparte `be.prilleven.mobileapp.dev` zou dat oplossen (niet gedaan).
+- Expo bewaart buildbestanden niet onbeperkt; een oude installatielink kan stilletjes 404 geven.
+
+### Open
+
+- Bot krijgt uit de allergenenflow geen reactie per dosis, geen symptoomlog, geen pauze en
+  negeert "functie uitgeschakeld" (`api/_lib/profile.mjs` op de website). Nog niet beslist.
+- `script.js` op de website importeert nog `?v=4.0.34` terwijl de rest op 4.0.39 staat.
+
+---
+
 ## 2026-09-20 — Release-dag: builds, store-formulieren en een notificatie-icoon
 
 ### Afgerond

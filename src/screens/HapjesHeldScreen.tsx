@@ -8,7 +8,10 @@
  *   - Bericht-lijst met user (sage) en assistant (lichtgrijs) bubbles
  *   - Input + verstuur knop
  *   - 📷 Foto-knop (galerij of camera) — automatische compressie < 3 MB
- *   - Loading spinner terwijl antwoord geladen wordt
+ *   - Antwoord verschijnt terwijl het geschreven wordt (streaming); wie
+ *     tijdens het schrijven naar boven scrollt, wordt niet teruggetrokken
+ *   - Receptlinks openen het eigen receptscherm, andere links de browser
+ *   - Duim omhoog/omlaag per antwoord (/api/chat-feedback)
  *   - Conversation ID wordt onthouden binnen 1 sessie
  *   - Foout-afhandeling als chat-bubbel
  *   - Dagelijkse foto-limit (50/user) server-side afgedwongen
@@ -38,6 +41,10 @@ import {
   sendChatMessage,
   getConversation,
   getProfile,
+  getChatFeedback,
+  sendChatFeedback,
+  recipeIdFromUrl,
+  type FeedbackRating,
   type MonthlyUsage,
   type DailyImageUsage,
 } from '../services/hapjesheld';
@@ -49,6 +56,7 @@ import {
 import type { HapjesHeldStackParamList } from '../navigation/types';
 import { useToast } from '../components/Toast';
 import { HealthDisclaimerModal } from '../components/HealthDisclaimerModal';
+import { ChatFeedbackRow, FeedbackReasonModal } from '../components/ChatFeedback';
 
 type Role = 'user' | 'assistant';
 
@@ -57,6 +65,8 @@ interface Message {
   role: Role;
   text: string;
   imageUri?: string;
+  /** id van het antwoord in de DB; enkel dan kan er feedback op. */
+  feedbackId?: string;
 }
 
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -141,7 +151,7 @@ const usageBarStyles = StyleSheet.create({
 
 type Props = NativeStackScreenProps<HapjesHeldStackParamList, 'Chat'>;
 
-export function HapjesHeldScreen({ route }: Props) {
+export function HapjesHeldScreen({ route, navigation }: Props) {
   const initialConversationId = route.params?.conversationId ?? null;
   const headerHeight = useHeaderHeight();
 
@@ -157,7 +167,14 @@ export function HapjesHeldScreen({ route }: Props) {
   );
   const [usage, setUsage] = useState<MonthlyUsage | null>(null);
   const [imageUsage, setImageUsage] = useState<DailyImageUsage | null>(null);
+  /* Tekst van het antwoord dat nu binnenstroomt; null zolang er nog niets is. */
+  const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, FeedbackRating>>({});
+  /* Antwoord waarvoor het reden-venster openstaat (na duim omlaag). */
+  const [reasonFor, setReasonFor] = useState<string | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
+  /* Enkel meescrollen als de gebruiker onderaan staat — spiegel van de website. */
+  const nearBottomRef = useRef(true);
   const { show: showToast } = useToast();
 
   /* Quota state — afgeleid van usage voor disable-logica */
@@ -189,7 +206,10 @@ export function HapjesHeldScreen({ route }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getConversation(initialConversationId);
+        const [data, saved] = await Promise.all([
+          getConversation(initialConversationId),
+          getChatFeedback(initialConversationId),
+        ]);
         if (cancelled) return;
         const loaded: Message[] = data.messages
           .filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -197,8 +217,14 @@ export function HapjesHeldScreen({ route }: Props) {
             id: m.id,
             role: m.role as Role,
             text: m.content,
+            feedbackId: m.role === 'assistant' ? m.id : undefined,
           }));
         setMessages(loaded);
+        setFeedback(
+          Object.fromEntries(
+            Object.entries(saved).map(([id, f]) => [id, f.rating])
+          )
+        );
       } catch (e: any) {
         if (cancelled) return;
         setMessages([
@@ -284,15 +310,19 @@ export function HapjesHeldScreen({ route }: Props) {
     const imgToSend = pendingImage;
     setPendingImage(null);
     setLoading(true);
+    nearBottomRef.current = true;
     scrollToEnd();
 
     try {
-      const res = await sendChatMessage({
-        question: effectiveQuestion,
-        conversation_id: conversationId,
-        image_b64: imgToSend?.base64,
-        image_mime: imgToSend?.mime,
-      });
+      const res = await sendChatMessage(
+        {
+          question: effectiveQuestion,
+          conversation_id: conversationId,
+          image_b64: imgToSend?.base64,
+          image_mime: imgToSend?.mime,
+        },
+        setStreamingText
+      );
 
       if (!conversationId && res.conversation_id) {
         setConversationId(res.conversation_id);
@@ -302,7 +332,9 @@ export function HapjesHeldScreen({ route }: Props) {
         id: res.assistant_message_id || uid(),
         role: 'assistant',
         text: res.answer,
+        feedbackId: res.assistant_message_id,
       };
+      setStreamingText(null);
       setMessages((prev) => [...prev, asstMsg]);
       scrollToEnd();
 
@@ -339,8 +371,47 @@ export function HapjesHeldScreen({ route }: Props) {
         scrollToEnd();
       }
     } finally {
+      setStreamingText(null);
       setLoading(false);
     }
+  };
+
+  /* ---- Feedback ---- */
+  const handleRate = async (messageId: string, next: 1 | -1) => {
+    const previous = feedback[messageId] ?? 0;
+    const rating: FeedbackRating = previous === next ? 0 : next;
+    setFeedback((prev) => ({ ...prev, [messageId]: rating }));
+    try {
+      await sendChatFeedback(messageId, rating);
+      if (rating === -1) setReasonFor(messageId);
+    } catch {
+      setFeedback((prev) => ({ ...prev, [messageId]: previous }));
+      showToast('Opslaan mislukt, probeer opnieuw.', 'error');
+    }
+  };
+
+  const handleReason = async (reden: string) => {
+    if (!reasonFor) return;
+    try {
+      await sendChatFeedback(reasonFor, -1, reden);
+      setReasonFor(null);
+      showToast('Bedankt, dat helpt ons HapjesHeld te verbeteren.', 'success');
+    } catch {
+      showToast('Opslaan mislukt, probeer opnieuw.', 'error');
+    }
+  };
+
+  /* Receptlinks van HapjesHeld openen het eigen receptscherm, full screen
+     bovenop het gesprek. Andere links (partnerbronnen) gaan naar de browser. */
+  const openLink = (url: string) => {
+    const recipeId = recipeIdFromUrl(url);
+    if (recipeId) {
+      navigation.navigate('RecipeDetail', { id: recipeId });
+      return;
+    }
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Kon link niet openen', url);
+    });
   };
 
   /* ---- Render helpers ---- */
@@ -362,11 +433,7 @@ export function HapjesHeldScreen({ route }: Props) {
         <Text
           key={`lnk-${key++}`}
           style={styles.assistantLink}
-          onPress={() => {
-            Linking.openURL(url).catch(() => {
-              Alert.alert('Kon link niet openen', url);
-            });
-          }}
+          onPress={() => openLink(url)}
         >
           {label}
         </Text>
@@ -381,31 +448,40 @@ export function HapjesHeldScreen({ route }: Props) {
 
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
+    const feedbackId = item.feedbackId;
     return (
-      <View
-        style={[
-          styles.bubble,
-          isUser ? styles.userBubble : styles.assistantBubble,
-        ]}
-      >
-        {item.imageUri ? (
-          <Image
-            source={{ uri: item.imageUri }}
-            style={styles.bubbleImage}
-            resizeMode="cover"
+      <>
+        <View
+          style={[
+            styles.bubble,
+            isUser ? styles.userBubble : styles.assistantBubble,
+          ]}
+        >
+          {item.imageUri ? (
+            <Image
+              source={{ uri: item.imageUri }}
+              style={styles.bubbleImage}
+              resizeMode="cover"
+            />
+          ) : null}
+          {item.text ? (
+            <Text
+              style={[
+                styles.bubbleText,
+                isUser ? styles.userText : styles.assistantText,
+              ]}
+            >
+              {isUser ? item.text : renderTextWithLinks(item.text)}
+            </Text>
+          ) : null}
+        </View>
+        {feedbackId ? (
+          <ChatFeedbackRow
+            rating={feedback[feedbackId] ?? 0}
+            onRate={(next) => handleRate(feedbackId, next)}
           />
         ) : null}
-        {item.text ? (
-          <Text
-            style={[
-              styles.bubbleText,
-              isUser ? styles.userText : styles.assistantText,
-            ]}
-          >
-            {isUser ? item.text : renderTextWithLinks(item.text)}
-          </Text>
-        ) : null}
-      </View>
+      </>
     );
   };
 
@@ -418,6 +494,11 @@ export function HapjesHeldScreen({ route }: Props) {
       {/* Disclaimer modal: getoond bij eerste gebruik. Verplicht voor Google
           Play "Beleid voor content over en services voor gezondheid". */}
       <HealthDisclaimerModal />
+      <FeedbackReasonModal
+        visible={reasonFor !== null}
+        onSubmit={handleReason}
+        onClose={() => setReasonFor(null)}
+      />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -444,8 +525,12 @@ export function HapjesHeldScreen({ route }: Props) {
             <Text style={styles.emptyTitle}>Hallo, ik ben HapjesHeld</Text>
             <Text style={styles.emptySubtitle}>
               Stel me gerust een vraag over kindervoeding. Bijvoorbeeld over
-              allergenen, eetgedrag of recepten voor jouw kindje. Je kan ook
-              een foto toevoegen van ingrediënten of een etiket.
+              allergenen, eetgedrag of recepten voor jouw kindje.
+            </Text>
+            <Text style={styles.emptyTip}>
+              <Text style={styles.emptyTipLabel}>Tip: </Text>
+              stuur een foto van je koelkast of voorraadkast, dan zoek ik
+              recepten met wat je in huis hebt.
             </Text>
             <Text style={styles.emptyDisclaimer}>
               Mijn antwoorden zijn algemene info en geen medisch advies. Bij
@@ -460,11 +545,32 @@ export function HapjesHeldScreen({ route }: Props) {
             keyExtractor={(m) => m.id}
             renderItem={renderItem}
             contentContainerStyle={styles.list}
-            onContentSizeChange={scrollToEnd}
+            onScroll={(e) => {
+              const { contentOffset, contentSize, layoutMeasurement } =
+                e.nativeEvent;
+              nearBottomRef.current =
+                contentSize.height - contentOffset.y - layoutMeasurement.height <
+                80;
+            }}
+            scrollEventThrottle={100}
+            /* Zonder animatie: bij elk binnenkomend stukje tekst groeit de lijst,
+               en een lopende animatie zou onScroll laten denken dat de gebruiker
+               wegscrolde. */
+            onContentSizeChange={() => {
+              if (nearBottomRef.current) {
+                listRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
             ListFooterComponent={
               loading ? (
                 <View style={[styles.bubble, styles.assistantBubble]}>
-                  <ActivityIndicator size="small" color={colors.greenText} />
+                  {streamingText ? (
+                    <Text style={[styles.bubbleText, styles.assistantText]}>
+                      {renderTextWithLinks(streamingText)}
+                    </Text>
+                  ) : (
+                    <ActivityIndicator size="small" color={colors.greenText} />
+                  )}
                 </View>
               ) : null
             }
@@ -537,7 +643,7 @@ export function HapjesHeldScreen({ route }: Props) {
             placeholder={
               monthlyReached
                 ? 'Maandlimiet bereikt — terug op de 1e van volgende maand'
-                : 'Stel je vraag...'
+                : 'Typ je vraag of voeg een foto toe'
             }
             placeholderTextColor={colors.gray}
             multiline
@@ -599,6 +705,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 320,
+  },
+  emptyTip: {
+    fontSize: 15,
+    color: colors.gray,
+    textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: 320,
+    marginTop: spacing.md,
+  },
+  emptyTipLabel: {
+    fontWeight: '700',
+    color: colors.greenText,
   },
   emptyDisclaimer: {
     fontSize: 12,

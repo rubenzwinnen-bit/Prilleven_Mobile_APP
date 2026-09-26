@@ -63,6 +63,7 @@ export type MainTabParamList = {
 export type HapjesHeldStackParamList = {
   Conversations: undefined;
   Chat: { conversationId?: string } | undefined;
+  RecipeDetail: { id: string };
 };
 
 /* ---- Recepten tab stack ---- */

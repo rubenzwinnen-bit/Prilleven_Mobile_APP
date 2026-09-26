@@ -4,6 +4,7 @@
  * Stack voor de HapjesHeld 2.0 chat module.
  *   Conversations  — lijst met oude gesprekken (start-scherm)
  *   Chat           — het chat scherm (met optionele conversationId)
+ *   RecipeDetail   — recept uit een receptlink van HapjesHeld; terug = het gesprek
  */
 
 import React from 'react';
@@ -11,6 +12,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../constants/theme';
 import { HapjesHeldScreen } from '../screens/HapjesHeldScreen';
 import { ConversationsScreen } from '../screens/ConversationsScreen';
+import { RecipeDetailScreen } from '../screens/RecipeDetailScreen';
 import { ChevronBack, HomeIconButton } from './RootStack';
 import type { HapjesHeldStackParamList } from './types';
 
@@ -50,6 +52,11 @@ export function HapjesHeldStackNavigator() {
             />
           ),
         })}
+      />
+      <Stack.Screen
+        name="RecipeDetail"
+        component={RecipeDetailScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
