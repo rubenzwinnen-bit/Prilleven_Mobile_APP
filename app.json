@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "be.prilleven.mobileapp",
-      "buildNumber": "70",
+      "buildNumber": "71",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Laat je HapjesHeld een foto nemen van ingrediënten of een etiket om een antwoord te krijgen.",
@@ -29,7 +29,7 @@
     "android": {
       "package": "be.prilleven.mobileapp",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 76,
+      "versionCode": 77,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
