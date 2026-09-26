@@ -35,6 +35,15 @@
   telefoon staan. Een aparte `be.prilleven.mobileapp.dev` zou dat oplossen (niet gedaan).
 - Expo bewaart buildbestanden niet onbeperkt; een oude installatielink kan stilletjes 404 geven.
 
+### Release 3.3.0
+
+- **Android 3.3.0 (77)** ingediend op de **productietrack** (nieuw submit-profiel `release`),
+  volledige implementatie in dezelfde 2 landen. Staat op "Wordt beoordeeld".
+  Correctie op 20-09: **3.2.0 (76) staat sinds 20 september live op productie**, niet enkel
+  op de interne track. Release-notes vult `eas submit` niet in — met de hand in de Play Console.
+- **iOS 3.3.0 (71)** geüpload naar App Store Connect; versie aanmaken, build koppelen en
+  indienen ter beoordeling gebeurt met de hand. Beslissen wat er met 3.2.0 (70) gebeurt.
+
 ### Open
 
 - Bot krijgt uit de allergenenflow geen reactie per dosis, geen symptoomlog, geen pauze en
