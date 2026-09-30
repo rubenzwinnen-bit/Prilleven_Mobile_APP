@@ -319,6 +319,12 @@ function sseReader(body: ReadableStream<Uint8Array>) {
   };
 }
 
+/* Vloeiend tonen: Sonnet 5.5 levert de tekst in pakketjes (veel stukjes tegelijk,
+   dan tot ±0,6 s niets), wat zonder buffer schokt. De tekst gaat eerst in een
+   buffer en verschijnt dan per ±16 ms aan het gemiddelde tempo waarmee hij
+   binnenkomt. Loopt de buffer op, dan versnelt het (achterstand weg in ±0,6 s);
+   na `done` nog sneller (±0,25 s, hooguit 1,5 s wachten). Spiegel van
+   readChatStream in js/chat.js op de website. */
 async function readChatStream(
   body: ReadableStream<Uint8Array>,
   onText?: (text: string) => void
@@ -327,13 +333,57 @@ async function readChatStream(
   let text = '';
   let failure = 'Het antwoord werd onderbroken. Probeer het opnieuw.';
 
+  let shown = 0;
+  let firstAt = 0;
+  let lastTick = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let finishing = false;
+  let drained: (() => void) | null = null;
+
+  const tick = () => {
+    const now = Date.now();
+    const backlog = text.length - shown;
+    if (backlog <= 0) {
+      timer = null;
+      drained?.();
+      return;
+    }
+    const dt = Math.min(now - lastTick, 100);
+    lastTick = now;
+    // Minstens 400 ms rekenen, anders verschijnt het eerste pakketje in één keer.
+    const avgRate = text.length / Math.max(now - firstAt, 400);
+    const rate = Math.max(avgRate, backlog / (finishing ? 250 : 600));
+    shown = Math.min(text.length, shown + Math.max(1, Math.round(rate * dt)));
+    onText?.(text.slice(0, shown));
+    timer = setTimeout(tick, 16);
+  };
+  const schedule = () => {
+    if (timer) return;
+    lastTick = Date.now();
+    timer = setTimeout(tick, 16);
+  };
+  const flush = async () => {
+    if (shown < text.length) {
+      finishing = true;
+      schedule();
+      await new Promise<void>((resolve) => {
+        drained = resolve;
+        setTimeout(resolve, 1500);
+      });
+    }
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+
   let ev: ChatEvent | null;
   while ((ev = await nextEvent())) {
     const { event, payload } = ev;
     if (event === 'delta') {
+      if (!text) firstAt = Date.now();
       text += payload.text ?? '';
-      onText?.(text);
+      schedule();
     } else if (event === 'done') {
+      await flush();
       return payload as unknown as ChatResponse;
     } else if (event === 'error') {
       failure = payload.error || failure;
@@ -341,6 +391,7 @@ async function readChatStream(
     }
   }
 
+  await flush();
   const error = new Error(failure) as Error & ChatError;
   error.status = 500;
   error.error = failure;
